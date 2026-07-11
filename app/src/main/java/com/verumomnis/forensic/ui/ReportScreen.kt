@@ -14,8 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -32,7 +34,11 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
-fun ReportScreen(state: UiState, viewModel: VerumViewModel) {
+fun ReportScreen(
+    state: UiState,
+    viewModel: VerumViewModel,
+    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -40,10 +46,15 @@ fun ReportScreen(state: UiState, viewModel: VerumViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Button(
-            onClick = { viewModel.generateReport() },
-            colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
-        ) { Text("Generate Sealed Forensic Report") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { viewModel.generateReport() },
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+            ) { Text("Generate Sealed Report") }
+            state.report?.let { rpt ->
+                OutlinedButton(onClick = { onExportReport(rpt) }) { Text("Export Sealed PDF") }
+            }
+        }
 
         val report = state.report
         if (report == null) {

@@ -53,7 +53,13 @@ import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 
 @Composable
-fun VerumApp(viewModel: VerumViewModel, onCaptureLocation: () -> Unit = {}, initialTab: Int = 0) {
+fun VerumApp(
+    viewModel: VerumViewModel,
+    onCaptureLocation: () -> Unit = {},
+    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
+    onExportEmail: (com.verumomnis.forensic.model.SealedEmail) -> Unit = {},
+    initialTab: Int = 0
+) {
     val state by viewModel.state.collectAsState()
     var selectedTab by remember { mutableIntStateOf(initialTab) }
     val tabs: List<Pair<String, ImageVector>> = listOf(
@@ -99,9 +105,9 @@ fun VerumApp(viewModel: VerumViewModel, onCaptureLocation: () -> Unit = {}, init
                 }
                 when (selectedTab) {
                     0 -> DashboardScreen(state, viewModel)
-                    1 -> ReportScreen(state, viewModel)
+                    1 -> ReportScreen(state, viewModel, onExportReport)
                     2 -> ChatScreen(state, viewModel)
-                    3 -> EmailScreen(state, viewModel)
+                    3 -> EmailScreen(state, viewModel, onExportEmail)
                     else -> VaultScreen(state)
                 }
             }

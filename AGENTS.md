@@ -36,3 +36,11 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
   `ExperimentalTextApi` for `FontVariation`.
 - Forensic logic is deterministic by design (same evidence ⇒ same findings/seal); tests rely on this,
   so pass a fixed `Instant` to `ForensicService.scan` / `ReportGenerator.generate` in tests.
+- Sealed PDFs are produced by `pdf/SealedPdfGenerator` (Android `PdfDocument`); each page is painted by
+  `pdf/SealedPageRenderer`, which draws the portrait watermark (`res/drawable-nodpi/watermark_portrait.png`)
+  as a low-opacity, page-centred background underlay before the text and per-page seal footer.
+- `android.graphics.pdf.PdfDocument.writeTo` is a native API that Robolectric cannot run off-device, so the
+  PDF-bytes test self-skips there (JUnit `Assume`). Verify the visual output via `SealedPageRenderer` drawn to
+  a `Bitmap` instead (see `SealedPdfTest.rendersSealedPageWithWatermarkToArtifact`).
+- The watermark asset was extracted from a real sealed report and made transparent; to swap in an exact
+  brand file, replace `app/src/main/res/drawable-nodpi/watermark_portrait.png` (transparent background).

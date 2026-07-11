@@ -20,6 +20,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +42,11 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
-fun EmailScreen(state: UiState, viewModel: VerumViewModel) {
+fun EmailScreen(
+    state: UiState,
+    viewModel: VerumViewModel,
+    onExportEmail: (com.verumomnis.forensic.model.SealedEmail) -> Unit = {}
+) {
     var recipient by remember { mutableStateOf("investigator@saps.gov.za") }
     var subject by remember { mutableStateOf("Sealed forensic report") }
 
@@ -117,6 +122,9 @@ fun EmailScreen(state: UiState, viewModel: VerumViewModel) {
                     Text("Seal ${sealed.seal.shortcode} · 24h count ${sealed.assessment.recipientSendCount24h}", color = VoTextMuted, fontSize = 10.sp)
                     if (sealed.assessment.reasons.isNotEmpty()) {
                         Text(sealed.assessment.reasons.joinToString("; "), color = color, fontSize = 10.sp)
+                    }
+                    TextButton(onClick = { onExportEmail(sealed) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text("Export sealed PDF", color = VoGold, fontSize = 11.sp)
                     }
                 }
             }

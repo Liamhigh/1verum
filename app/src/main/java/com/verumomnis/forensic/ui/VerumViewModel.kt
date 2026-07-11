@@ -13,6 +13,7 @@ import com.verumomnis.forensic.engine.AudioEvidence
 import com.verumomnis.forensic.engine.EmailModule
 import com.verumomnis.forensic.engine.EvidenceDocument
 import com.verumomnis.forensic.engine.ForensicService
+import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.engine.ReportGenerator
 import com.verumomnis.forensic.engine.ScanResult
 import com.verumomnis.forensic.model.ForensicReport
@@ -67,7 +68,10 @@ class VerumViewModel : ViewModel() {
 
     private val documents = mutableListOf<EvidenceDocument>()
     private val audios = mutableListOf<AudioEvidence>()
+    private val medias = mutableListOf<MediaEvidence>()
     private val harassmentMonitor = AntiHarassmentMonitor()
+
+    fun mediaCount(): Int = medias.size
 
     init {
         configureDevice(6)
@@ -120,6 +124,18 @@ class VerumViewModel : ViewModel() {
         }
     }
 
+    fun addMedia(media: MediaEvidence) {
+        medias += media
+        val gps = media.exifGps ?: media.deviceGps
+        val label = gps?.let { "%.4f, %.4f".format(it.latitude, it.longitude) } ?: "NOT RECORDED"
+        _state.update {
+            it.copy(
+                files = it.files + FileEntry(media.fileName, media.kind.name.lowercase(), "queued", media.sha512, label),
+                scanLog = "${media.fileName} sealed · SHA-512 ${media.sha512.take(12)}… · GPS $label (${if (media.exifGps != null) "EXIF" else "device"})"
+            )
+        }
+    }
+
     fun ingestText(fileName: String, type: String, content: String) {
         val doc = ForensicService.ingest(
             evidenceId = "DOC%03d".format(documents.size + 1),
@@ -132,12 +148,12 @@ class VerumViewModel : ViewModel() {
     }
 
     fun runScan(now: Instant = Instant.now()) {
-        if (documents.isEmpty() && audios.isEmpty()) {
+        if (documents.isEmpty() && audios.isEmpty() && medias.isEmpty()) {
             _state.update { it.copy(scanLog = "No evidence to scan. Upload documents first.") }
             return
         }
         _state.update { it.copy(scanning = true, scanLog = "Nine-Brain forensic analysis in progress…") }
-        val result = ForensicService.scan(documents, audios, now)
+        val result = ForensicService.scan(documents, audios, medias, now)
         _state.update { s ->
             s.copy(
                 scanning = false,
@@ -205,7 +221,7 @@ class VerumViewModel : ViewModel() {
     fun verifyCurrentSeal(): VerificationResult? {
         val result = _state.value.scanResult ?: return null
         // The seal is computed over the corpus fingerprint; re-supply the same bytes.
-        val corpus = (documents.map { it.sha512 } + audios.map { it.sha512 }).joinToString("|")
+        val corpus = (documents.map { it.sha512 } + audios.map { it.sha512 } + medias.map { it.sha512 }).joinToString("|")
         return ForensicService.verify(corpus.toByteArray(), result.seal)
     }
 
@@ -302,6 +318,25 @@ class VerumViewModel : ViewModel() {
                 "Gary was non-committal and negotiated for more time; three executives removed his only witness."
         )
         addAudioNote()
+        addPhotoNote()
+    }
+
+    private fun addPhotoNote() {
+        // A seeded photographic exhibit anchored to GPS + capture time (EXIF).
+        val media = ForensicService.ingestMedia(
+            id = "MED001",
+            fileName = "site_photo_allfuels.jpg",
+            kind = com.verumomnis.forensic.model.MediaKind.IMAGE,
+            bytes = "seed-photographic-evidence".toByteArray(),
+            mimeType = "image/jpeg",
+            capturedAt = "2026-07-06T14:32:10Z",
+            deviceGps = _state.value.gps,
+            exifGps = GpsRecord(-30.7669, 30.3998, accuracy = 4.0, timestamp = "2026-01-14T09:15:00Z"),
+            exifTimestamp = "2026:01:14 09:15:00",
+            width = 4032,
+            height = 3024
+        )
+        addMedia(media)
     }
 
     private fun addAudioNote() {

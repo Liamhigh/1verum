@@ -77,6 +77,15 @@ fun VerumApp(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) onCaptureLocation() }
 
+    val mediaPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        uris.forEach { uri ->
+            runCatching { MediaIngestor(context).ingest(uri, state.gps, viewModel.mediaCount() + 1) }
+                .onSuccess { viewModel.addMedia(it) }
+        }
+    }
+
     LaunchedEffect(Unit) {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
@@ -106,7 +115,7 @@ fun VerumApp(
                     }
                 }
                 when (selectedTab) {
-                    0 -> DashboardScreen(state, viewModel)
+                    0 -> DashboardScreen(state, viewModel, onAddMedia = { mediaPicker.launch(arrayOf("image/*", "video/*")) })
                     1 -> ReportScreen(state, viewModel, onExportReport)
                     2 -> ChatScreen(state, viewModel)
                     3 -> EmailScreen(state, viewModel, onExportEmail)

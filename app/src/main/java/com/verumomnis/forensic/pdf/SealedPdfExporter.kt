@@ -29,7 +29,15 @@ class SealedPdfExporter(private val context: Context) {
         File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
 
     fun exportReport(report: ForensicReport): File {
-        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark, logo)
+        // Load preserved originals for image exhibits so they render on the exhibit pages.
+        val rawDir = File(context.filesDir, "vault/evidence/raw")
+        val exhibitImages = report.mediaExhibits
+            .filter { it.kind == com.verumomnis.forensic.model.MediaKind.IMAGE }
+            .mapNotNull { ex ->
+                val f = File(rawDir, ex.fileName)
+                if (f.exists()) BitmapFactory.decodeFile(f.path)?.let { ex.fileName to it } else null
+            }.toMap()
+        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark, logo, exhibitImages)
         val file = File(sealedDir(), "${report.reference}.pdf")
         file.writeBytes(bytes)
         return file

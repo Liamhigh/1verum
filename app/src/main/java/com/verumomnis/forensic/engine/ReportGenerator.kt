@@ -50,6 +50,7 @@ object ReportGenerator {
             legalFramework = findings.legalMappings,
             offenceMatrix = offenceMatrix,
             financial = findings.financial,
+            mediaExhibits = findings.mediaExhibits,
             seal = seal,
             body = body
         )
@@ -161,7 +162,19 @@ object ReportGenerator {
             findings.rndValidation.forEach { appendLine("     - $it") }
         }
         appendLine()
-        appendLine("10. DECLARATION")
+        if (findings.mediaExhibits.isNotEmpty()) {
+            appendLine("10. EVIDENCE EXHIBITS — PHOTOGRAPHIC / VIDEO (ANNEXURE)")
+            findings.mediaExhibits.forEach { ex ->
+                appendLine("   ${ex.exhibitId} [${ex.kind}] ${ex.fileName} (${ex.mimeType})")
+                appendLine("      SHA-512: ${ex.sha512.take(32)}…")
+                val g = ex.gps
+                appendLine("      GPS: " + (g?.let { "%.6f, %.6f (source: ${ex.gpsSource})".format(it.latitude, it.longitude) } ?: "NOT RECORDED"))
+                appendLine("      Captured (upload): ${ex.capturedAt}" + (ex.exifTimestamp?.let { " · EXIF: $it" } ?: ""))
+                appendLine("      Jurisdiction: ${ex.jurisdiction}")
+                appendLine()
+            }
+        }
+        appendLine("11. DECLARATION")
         appendLine("   Triple-verified (Gemma 3 · communicator · Nine-Brain). Evidence before narrative.")
         appendLine("   Ordinal confidence only. Same evidence yields the same result (determinism).")
     }

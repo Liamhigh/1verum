@@ -11,7 +11,12 @@ import java.io.ByteArrayOutputStream
  */
 object SealedPdfGenerator {
 
-    fun render(content: SealedPdfContent, watermark: Bitmap?, logo: Bitmap? = null): ByteArray {
+    fun render(
+        content: SealedPdfContent,
+        watermark: Bitmap?,
+        logo: Bitmap? = null,
+        exhibitImages: Map<String, Bitmap> = emptyMap()
+    ): ByteArray {
         val document = PdfDocument()
         var pageNumber = 1
 
@@ -32,6 +37,20 @@ object SealedPdfGenerator {
             val pdfPage = document.startPage(info)
             SealedPageRenderer.drawPage(pdfPage.canvas, page, watermark)
             document.finishPage(pdfPage)
+        }
+
+        // Sealed photographic/video exhibit pages (annexure).
+        content.exhibits.forEach { exhibit ->
+            val info = PdfDocument.PageInfo.Builder(
+                SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, pageNumber
+            ).create()
+            val page = document.startPage(info)
+            SealedPageRenderer.drawExhibit(
+                page.canvas, exhibit, exhibitImages[exhibit.fileName], watermark,
+                content.sealFooter, "Exhibit ${exhibit.exhibitId} | ${content.shortcode}"
+            )
+            document.finishPage(page)
+            pageNumber++
         }
 
         return ByteArrayOutputStream().use { out ->

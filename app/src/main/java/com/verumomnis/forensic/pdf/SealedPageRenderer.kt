@@ -212,6 +212,81 @@ object SealedPageRenderer {
         drawFooter(canvas, page, pageWidth, pageHeight)
     }
 
+    /**
+     * A sealed photographic/video EXHIBIT page: watermark underlay, gold-framed
+     * image, and a caption block anchoring the exhibit to its SHA-512, GPS and
+     * timestamp. Originals stay unaltered in the vault; this is the court exhibit.
+     */
+    fun drawExhibit(
+        canvas: Canvas,
+        exhibit: SealedPdfContent.ExhibitPage,
+        image: Bitmap?,
+        watermark: Bitmap?,
+        sealFooter: String,
+        pageLabel: String,
+        pageWidth: Int = PAGE_WIDTH,
+        pageHeight: Int = PAGE_HEIGHT
+    ) {
+        canvas.drawColor(Color.WHITE)
+        drawWatermark(canvas, watermark, pageWidth, pageHeight)
+
+        var y = MARGIN + 6f
+        val header = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = gold; textSize = 11f; letterSpacing = 0.12f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        canvas.drawText("EVIDENCE EXHIBIT ${exhibit.exhibitId} · ${exhibit.kind}", MARGIN, y, header)
+        y += 14f
+        val sep = Paint().apply { color = Color.parseColor("#D9DEE6"); strokeWidth = 1f }
+        canvas.drawLine(MARGIN, y, pageWidth - MARGIN, y, sep)
+        y += 12f
+
+        // Framed image (or placeholder for video / undecoded media).
+        val frameLeft = MARGIN
+        val frameRight = pageWidth - MARGIN
+        val frameTop = y
+        val frameBottom = pageHeight - MARGIN - 120f
+        val frame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; color = gold; strokeWidth = 1.2f
+        }
+        canvas.drawRect(frameLeft, frameTop, frameRight, frameBottom, frame)
+        if (image != null) {
+            val availW = frameRight - frameLeft - 16f
+            val availH = frameBottom - frameTop - 16f
+            val scale = minOf(availW / image.width, availH / image.height)
+            val w = image.width * scale
+            val h = image.height * scale
+            val ix = frameLeft + (frameRight - frameLeft - w) / 2f
+            val iy = frameTop + (frameBottom - frameTop - h) / 2f
+            canvas.drawBitmap(
+                image, Rect(0, 0, image.width, image.height),
+                RectF(ix, iy, ix + w, iy + h),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+        } else {
+            val ph = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = mutedColor; textSize = 12f; textAlign = Paint.Align.CENTER; typeface = Typeface.MONOSPACE
+            }
+            canvas.drawText("[${exhibit.kind} preserved in vault — original bytes unaltered]",
+                (frameLeft + frameRight) / 2f, (frameTop + frameBottom) / 2f, ph)
+        }
+
+        // Caption block anchoring exhibit to hash/GPS/time.
+        var cy = frameBottom + 18f
+        val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bodyColor; textSize = 9.5f; typeface = Typeface.MONOSPACE }
+        exhibit.caption.forEach { canvas.drawText(it, MARGIN, cy, cap); cy += 13f }
+
+        // Footer.
+        val footerY = pageHeight - MARGIN + 12f
+        canvas.drawLine(MARGIN, footerY - 14f, pageWidth - MARGIN, footerY - 14f, sep)
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = mutedColor; textSize = 7f; typeface = Typeface.MONOSPACE }
+        canvas.drawText(sealFooter, MARGIN, footerY, footerPaint)
+        val pageLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = mutedColor; textSize = 7f; typeface = Typeface.MONOSPACE; textAlign = Paint.Align.RIGHT
+        }
+        canvas.drawText(pageLabel, pageWidth - MARGIN, footerY, pageLabelPaint)
+    }
+
     private fun drawWatermark(canvas: Canvas, watermark: Bitmap?, pageWidth: Int, pageHeight: Int) {
         if (watermark == null) return
         val targetW = pageWidth * WATERMARK_WIDTH_RATIO

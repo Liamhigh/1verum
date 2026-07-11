@@ -29,6 +29,7 @@ data class ForensicReport(
     val legalFramework: List<String>,
     val offenceMatrix: List<OffenceRow>,
     val financial: FinancialAnalysis? = null,
+    val mediaExhibits: List<MediaExhibit> = emptyList(),
     val seal: SealRecord,
     val body: String
 )

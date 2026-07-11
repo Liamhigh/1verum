@@ -98,6 +98,32 @@ class SealedPdfTest {
     }
 
     @Test
+    fun rendersSealedExhibitPageToArtifact() {
+        val exhibit = SealedPdfContent.ExhibitPage(
+            exhibitId = "EX-001",
+            fileName = "site_photo_allfuels.jpg",
+            kind = "IMAGE",
+            caption = listOf(
+                "EX-001 — site_photo_allfuels.jpg (image/jpeg)",
+                "SHA-512: 9f2c1a…(sealed)",
+                "GPS: -30.766900, 30.399800 (exif)",
+                "Captured: 2026-07-06T14:32:10Z · EXIF 2026:01:14 09:15:00",
+                "Jurisdiction: ZA-KZN"
+            )
+        )
+        // Synthetic photo so the page has a framed image.
+        val photo = Bitmap.createBitmap(600, 400, Bitmap.Config.ARGB_8888)
+        Canvas(photo).drawColor(android.graphics.Color.parseColor("#35506E"))
+        val bmp = Bitmap.createBitmap(
+            SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, Bitmap.Config.ARGB_8888
+        )
+        SealedPageRenderer.drawExhibit(Canvas(bmp), exhibit, photo, watermark(), "VERUM OMNIS SEAL | seal-demo | demo…demo | demo", "Exhibit EX-001 | demo")
+        val dir = File("build/screenshots").apply { mkdirs() }
+        FileOutputStream(File(dir, "10_sealed_exhibit_page.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue(bmp.height == SealedPageRenderer.PAGE_HEIGHT)
+    }
+
+    @Test
     fun rendersSealedPageWithWatermarkToArtifact() {
         val content = SealedPdfContent.fromReport(sampleReport())
         val page = content.paginate().first()

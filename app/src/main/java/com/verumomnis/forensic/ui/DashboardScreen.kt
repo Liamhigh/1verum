@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Biotech
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,8 +47,7 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
-fun DashboardScreen(state: UiState, viewModel: VerumViewModel) {
-    var uploadCounter by remember { mutableIntStateOf(0) }
+fun DashboardScreen(state: UiState, viewModel: VerumViewModel, onAddMedia: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -86,16 +86,13 @@ fun DashboardScreen(state: UiState, viewModel: VerumViewModel) {
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = {
-                        uploadCounter++
-                        viewModel.ingestText(
-                            fileName = "evidence_%02d.txt".format(uploadCounter),
-                            type = "document",
-                            content = "Supplementary exhibit $uploadCounter captured at upload time."
-                        )
-                    },
+                    onClick = onAddMedia,
                     colors = ButtonDefaults.buttonColors(containerColor = VoAccentBlue)
-                ) { Text("Add Evidence") }
+                ) {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add Photo / Video")
+                }
                 Button(
                     onClick = { viewModel.runScan() },
                     enabled = !state.scanning,

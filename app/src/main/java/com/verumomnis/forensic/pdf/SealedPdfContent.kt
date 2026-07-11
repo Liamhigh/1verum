@@ -10,8 +10,17 @@ data class SealedPdfContent(
     val sealFooter: String,
     val shortcode: String,
     val bodyLines: List<String>,
-    val cover: Cover? = null
+    val cover: Cover? = null,
+    val exhibits: List<ExhibitPage> = emptyList()
 ) {
+    /** A sealed photographic/video exhibit page. */
+    data class ExhibitPage(
+        val exhibitId: String,
+        val fileName: String,
+        val kind: String,
+        val caption: List<String>
+    )
+
     /** Front-cover metadata for the branded blue cover page. */
     data class Cover(
         val title: String,
@@ -75,13 +84,28 @@ data class SealedPdfContent(
                 classification = report.classification,
                 summary = report.executiveSummary.let { wrap(it) }.take(6)
             )
+            val exhibits = report.mediaExhibits.map { ex ->
+                ExhibitPage(
+                    exhibitId = ex.exhibitId,
+                    fileName = ex.fileName,
+                    kind = ex.kind.name,
+                    caption = listOf(
+                        "${ex.exhibitId} — ${ex.fileName} (${ex.mimeType})",
+                        "SHA-512: ${ex.sha512.take(48)}…",
+                        "GPS: " + (ex.gps?.let { "%.6f, %.6f (${ex.gpsSource})".format(it.latitude, it.longitude) } ?: "NOT RECORDED"),
+                        "Captured: ${ex.capturedAt}" + (ex.exifTimestamp?.let { " · EXIF ${it}" } ?: ""),
+                        "Jurisdiction: ${ex.jurisdiction}"
+                    )
+                )
+            }
             return SealedPdfContent(
                 title = report.title,
                 classification = report.classification,
                 sealFooter = report.seal.sealFooter(),
                 shortcode = report.seal.shortcode,
                 bodyLines = lines,
-                cover = cover
+                cover = cover,
+                exhibits = exhibits
             )
         }
 

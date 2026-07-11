@@ -173,5 +173,6 @@ data class ForensicFindings(
     val documentForensics: List<String> = emptyList(),
     val communications: List<String> = emptyList(),
     val rndValidation: List<String> = emptyList(),
+    val mediaExhibits: List<MediaExhibit> = emptyList(),
     val brainVerdicts: Map<String, String>
 )

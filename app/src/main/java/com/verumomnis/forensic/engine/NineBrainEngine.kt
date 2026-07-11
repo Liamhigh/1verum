@@ -34,6 +34,7 @@ object NineBrainEngine {
     fun analyze(
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
+        media: List<MediaEvidence> = emptyList(),
         now: Instant = Instant.now()
     ): ForensicFindings {
         val timestamp = now.toString()
@@ -61,6 +62,7 @@ object NineBrainEngine {
         val financial = analyzeFinancials(allDocs)                                   // B6
         val legalMappings = mapLegalFramework(allDocs, jurisdiction)                 // B7
         val rndValidation = rndBrain(contradictions, financial, behavioral)          // B9
+        val mediaExhibits = buildMediaExhibits(media, jurisdiction)                  // photographic/video evidence
 
         val brainVerdicts = linkedMapOf(
             "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND",
@@ -87,8 +89,40 @@ object NineBrainEngine {
             documentForensics = documentForensics,
             communications = communications,
             rndValidation = rndValidation,
+            mediaExhibits = mediaExhibits,
             brainVerdicts = brainVerdicts
         )
+    }
+
+    /** Anchor each photograph/video to GPS + timestamp + SHA-512 (chain of custody). */
+    private fun buildMediaExhibits(
+        media: List<MediaEvidence>,
+        fallbackJurisdiction: String
+    ): List<com.verumomnis.forensic.model.MediaExhibit> = media.mapIndexed { i, m ->
+        val gps = m.exifGps ?: m.deviceGps
+        val gpsSource = if (m.exifGps != null) "exif" else "device"
+        com.verumomnis.forensic.model.MediaExhibit(
+            exhibitId = "EX-%03d".format(i + 1),
+            evidenceId = m.id,
+            fileName = m.fileName,
+            kind = m.kind,
+            mimeType = m.mimeType,
+            sha512 = m.sha512,
+            capturedAt = m.capturedAt,
+            exifTimestamp = m.exifTimestamp,
+            gps = gps,
+            gpsSource = gpsSource,
+            jurisdiction = gps?.let { jurisdictionFor(it) } ?: fallbackJurisdiction,
+            width = m.width,
+            height = m.height,
+            durationMs = m.durationMs
+        )
+    }
+
+    private fun jurisdictionFor(gps: com.verumomnis.forensic.model.GpsRecord): String = when {
+        gps.latitude in -35.0..-22.0 && gps.longitude in 16.0..33.0 -> "ZA-KZN"
+        gps.latitude in 22.0..26.5 && gps.longitude in 51.0..56.5 -> "UAE-RAKEZ"
+        else -> "INTL"
     }
 
     private fun audioVerdict(audio: List<AudioEvidence>, a: com.verumomnis.forensic.model.AudioAnalysis): String = when {

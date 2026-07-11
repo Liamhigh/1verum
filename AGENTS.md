@@ -51,6 +51,12 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
   `VerumViewModel.anchorSealToBitcoin()` (runs on `Dispatchers.IO`); never anchor inside `EvidenceSealer`
   (keeps sealing deterministic for tests). Unit tests cover the digest/proof/offline paths; the live
   calendar submission is validated manually (see PR), not in CI.
+- Photo/video evidence (`ui/MediaIngestor` + `engine/MediaEvidence`): images/videos are picked via
+  `ActivityResultContracts.OpenMultipleDocuments`; the ORIGINAL bytes are preserved unaltered in the vault
+  (`evidence/raw`), SHA-512 fingerprinted, and GPS-anchored (EXIF `latLong` if present, else device GPS at
+  upload) with the capture timestamp. The sealed, watermarked EXHIBIT is a derivative rendered onto its own
+  PDF page (`SealedPageRenderer.drawExhibit`) so originals stay pristine for chain of custody. EXIF/GPS/video
+  metadata extraction is device-only; unit tests drive the deterministic parts via `ForensicService.ingestMedia`.
 - B8 audio (`engine/AudioBrain` + `Transcriber`): tamper/voice-stress/diarization run on `AudioEvidence`.
   Transcription is pluggable — `ProvidedTranscriptTranscriber` parses an imported `[mm:ss] Speaker: text`
   transcript (which is folded into the doc set so B1 cross-references it); a real on-device Whisper model

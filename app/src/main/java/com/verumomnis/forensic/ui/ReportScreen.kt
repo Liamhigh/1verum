@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -123,6 +124,32 @@ fun ReportScreen(
                 if (a.fullTranscript.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(a.fullTranscript, color = VoTextPrimary, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                }
+            }
+        }
+
+        val exhibits = state.scanResult?.findings?.mediaExhibits.orEmpty()
+        if (exhibits.isNotEmpty()) {
+            VoCard(title = "EVIDENCE EXHIBITS (PHOTO / VIDEO)", icon = Icons.Filled.PhotoCamera) {
+                exhibits.forEach { ex ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .background(VoSurfaceAlt, RoundedCornerShape(12.dp))
+                            .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text("${ex.exhibitId} · ${ex.kind} · ${ex.fileName}", color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("SHA-512 ${ex.sha512.take(24)}…", color = VoTextMuted, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                        val g = ex.gps
+                        Text(
+                            "GPS " + (g?.let { "%.5f, %.5f (${ex.gpsSource})".format(it.latitude, it.longitude) } ?: "NOT RECORDED"),
+                            color = VoTextPrimary, fontSize = 11.sp
+                        )
+                        Text("Captured ${ex.capturedAt}" + (ex.exifTimestamp?.let { " · EXIF $it" } ?: ""), color = VoTextMuted, fontSize = 10.sp)
+                        Text("Jurisdiction ${ex.jurisdiction}", color = VoTextMuted, fontSize = 10.sp)
+                    }
                 }
             }
         }

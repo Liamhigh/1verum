@@ -11,19 +11,29 @@ import java.io.ByteArrayOutputStream
  */
 object SealedPdfGenerator {
 
-    fun render(content: SealedPdfContent, watermark: Bitmap?): ByteArray {
+    fun render(content: SealedPdfContent, watermark: Bitmap?, logo: Bitmap? = null): ByteArray {
         val document = PdfDocument()
-        val pages = content.paginate()
-        pages.forEachIndexed { index, page ->
-            val pageInfo = PdfDocument.PageInfo.Builder(
-                SealedPageRenderer.PAGE_WIDTH,
-                SealedPageRenderer.PAGE_HEIGHT,
-                index + 1
+        var pageNumber = 1
+
+        // Branded blue front cover (reports only).
+        content.cover?.let { cover ->
+            val info = PdfDocument.PageInfo.Builder(
+                SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, pageNumber++
             ).create()
-            val pdfPage = document.startPage(pageInfo)
+            val page = document.startPage(info)
+            SealedPageRenderer.drawCover(page.canvas, cover, watermark, logo, content.sealFooter)
+            document.finishPage(page)
+        }
+
+        content.paginate().forEach { page ->
+            val info = PdfDocument.PageInfo.Builder(
+                SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, pageNumber++
+            ).create()
+            val pdfPage = document.startPage(info)
             SealedPageRenderer.drawPage(pdfPage.canvas, page, watermark)
             document.finishPage(pdfPage)
         }
+
         return ByteArrayOutputStream().use { out ->
             document.writeTo(out)
             document.close()

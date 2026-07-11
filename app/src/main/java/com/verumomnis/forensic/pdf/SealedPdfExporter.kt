@@ -21,19 +21,22 @@ class SealedPdfExporter(private val context: Context) {
     private val watermark: Bitmap? by lazy {
         BitmapFactory.decodeResource(context.resources, R.drawable.watermark_portrait)
     }
+    private val logo: Bitmap? by lazy {
+        BitmapFactory.decodeResource(context.resources, R.drawable.vo_badge)
+    }
 
     private fun sealedDir(): File =
         File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
 
     fun exportReport(report: ForensicReport): File {
-        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark)
+        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark, logo)
         val file = File(sealedDir(), "${report.reference}.pdf")
         file.writeBytes(bytes)
         return file
     }
 
     fun exportEmail(email: SealedEmail): File {
-        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromEmail(email), watermark)
+        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromEmail(email), watermark, logo)
         val file = File(sealedDir(), email.sealedPdfFile)
         file.writeBytes(bytes)
         return file

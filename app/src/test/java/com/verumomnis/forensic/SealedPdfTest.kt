@@ -81,6 +81,23 @@ class SealedPdfTest {
     }
 
     @Test
+    fun rendersBlueCoverToArtifact() {
+        val content = SealedPdfContent.fromReport(sampleReport())
+        val cover = content.cover!!
+        val logo = BitmapFactory.decodeResource(
+            ApplicationProvider.getApplicationContext<android.content.Context>().resources,
+            R.drawable.vo_badge
+        )
+        val bmp = Bitmap.createBitmap(
+            SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, Bitmap.Config.ARGB_8888
+        )
+        SealedPageRenderer.drawCover(Canvas(bmp), cover, watermark(), logo, content.sealFooter)
+        val dir = File("build/screenshots").apply { mkdirs() }
+        FileOutputStream(File(dir, "08_sealed_pdf_cover.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue(cover.title == "FORENSIC EVIDENCE REPORT")
+    }
+
+    @Test
     fun rendersSealedPageWithWatermarkToArtifact() {
         val content = SealedPdfContent.fromReport(sampleReport())
         val page = content.paginate().first()

@@ -9,8 +9,21 @@ data class SealedPdfContent(
     val classification: String,
     val sealFooter: String,
     val shortcode: String,
-    val bodyLines: List<String>
+    val bodyLines: List<String>,
+    val cover: Cover? = null
 ) {
+    /** Front-cover metadata for the branded blue cover page. */
+    data class Cover(
+        val title: String,
+        val subtitle: String,
+        val entity: String,
+        val reference: String,
+        val date: String,
+        val jurisdiction: String,
+        val classification: String,
+        val summary: List<String>
+    )
+
     data class Page(
         val title: String,
         val classification: String,
@@ -52,12 +65,23 @@ data class SealedPdfContent(
 
         fun fromReport(report: ForensicReport): SealedPdfContent {
             val lines = report.body.lines().flatMap { wrap(it) }
+            val cover = Cover(
+                title = "FORENSIC EVIDENCE REPORT",
+                subtitle = report.title,
+                entity = "Contradictions: ${report.contradictions.size} · Jurisdiction: ${report.jurisdiction}",
+                reference = report.reference,
+                date = report.createdAt.take(10),
+                jurisdiction = report.jurisdiction,
+                classification = report.classification,
+                summary = report.executiveSummary.let { wrap(it) }.take(6)
+            )
             return SealedPdfContent(
                 title = report.title,
                 classification = report.classification,
                 sealFooter = report.seal.sealFooter(),
                 shortcode = report.seal.shortcode,
-                bodyLines = lines
+                bodyLines = lines,
+                cover = cover
             )
         }
 

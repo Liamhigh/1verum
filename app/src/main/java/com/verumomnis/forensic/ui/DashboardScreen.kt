@@ -26,19 +26,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoAmber
 import com.verumomnis.forensic.ui.theme.VoBorder
+import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoPrimary
 import com.verumomnis.forensic.ui.theme.VoSurface
@@ -55,6 +55,20 @@ fun DashboardScreen(state: UiState, viewModel: VerumViewModel, onAddMedia: () ->
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("AI FORENSICS FOR TRUTH", color = VoGold, fontSize = 11.sp, letterSpacing = 3.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Text("Truth for All", color = VoTextPrimary, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 40.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "A constitutional forensic AI platform built to democratise justice — evidence sealed, GPS-anchored, and court-ready. Free for every citizen.",
+                color = VoTextMuted, fontSize = 13.sp, lineHeight = 19.sp, textAlign = TextAlign.Center
+            )
+        }
+
         VoCard(title = "DOCUMENT UPLOAD", icon = Icons.Filled.Add) {
             state.files.forEach { file ->
                 Column(

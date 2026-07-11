@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Description
@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.verumomnis.forensic.R
-import com.verumomnis.forensic.ui.theme.Cormorant
+import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -93,33 +93,39 @@ fun VerumApp(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = VoBackground) {
-        Scaffold(
-            containerColor = VoBackground,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            topBar = { VerumHeader(state) }
-        ) { padding ->
-            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = VoBackground,
-                    contentColor = VoGold,
-                    edgePadding = 12.dp
-                ) {
-                    tabs.forEachIndexed { index, (title, icon) ->
-                        Tab(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            text = { Text(title) },
-                            icon = { Icon(icon, contentDescription = title) }
-                        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConstellationBackground(modifier = Modifier.fillMaxSize())
+            Scaffold(
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                topBar = { VerumHeader(state) }
+            ) { padding ->
+                Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        contentColor = VoGold,
+                        edgePadding = 16.dp,
+                        divider = {}
+                    ) {
+                        tabs.forEachIndexed { index, (title, icon) ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                selectedContentColor = VoGold,
+                                unselectedContentColor = VoTextMuted,
+                                text = { Text(title, letterSpacing = 0.5.sp) },
+                                icon = { Icon(icon, contentDescription = title, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
                     }
-                }
-                when (selectedTab) {
-                    0 -> DashboardScreen(state, viewModel, onAddMedia = { mediaPicker.launch(arrayOf("image/*", "video/*")) })
-                    1 -> ReportScreen(state, viewModel, onExportReport)
-                    2 -> ChatScreen(state, viewModel)
-                    3 -> EmailScreen(state, viewModel, onExportEmail)
-                    else -> VaultScreen(state)
+                    when (selectedTab) {
+                        0 -> DashboardScreen(state, viewModel, onAddMedia = { mediaPicker.launch(arrayOf("image/*", "video/*")) })
+                        1 -> ReportScreen(state, viewModel, onExportReport)
+                        2 -> ChatScreen(state, viewModel)
+                        3 -> EmailScreen(state, viewModel, onExportEmail)
+                        else -> VaultScreen(state)
+                    }
                 }
             }
         }
@@ -131,32 +137,22 @@ private fun VerumHeader(state: UiState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(VoBackground)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(R.drawable.vo_globe),
-                contentDescription = "Verum Omnis",
-                modifier = Modifier.size(38.dp).clip(CircleShape)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    "Verum Omnis",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontFamily = Cormorant,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 22.sp
-                )
-                Text("AI FORENSICS FOR TRUTH", color = VoGold, fontSize = 9.sp, letterSpacing = 2.sp)
-            }
-        }
+        Image(
+            painter = painterResource(R.drawable.vo_banner),
+            contentDescription = "Verum Omnis — AI Forensics for Truth",
+            modifier = Modifier.height(40.dp).clip(RoundedCornerShape(8.dp))
+        )
         Column(horizontalAlignment = Alignment.End) {
-            Text("${state.deviceTier.label} · ${state.deviceRamGb}GB", color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text("Comm: ${state.communicator}", color = VoTextMuted, fontSize = 10.sp)
+            Text(
+                "${state.deviceTier.label} · ${state.deviceRamGb}GB",
+                color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                fontFamily = JetBrainsMono
+            )
+            Text("Comm · ${state.communicator}", color = VoTextMuted, fontSize = 9.sp, fontFamily = JetBrainsMono)
         }
     }
 }

@@ -244,19 +244,24 @@ class VerumViewModel : ViewModel() {
     private fun seedSampleCase() {
         setGps(GpsRecord(latitude = -30.7667, longitude = 30.4000, accuracy = 5.2, timestamp = "2026-07-06T14:32:00Z"))
         ingestText(
-            fileName = "email_marius_9mar2025.txt",
-            type = "email",
-            content = "From: Marius Nortje\nDate: 9 March 2025\n" +
-                "Regarding the petroleum export arrangement: unfortunately the deal fell through. " +
-                "There is nothing further to discuss. No payment was outstanding."
+            fileName = "cct_affidavit.txt",
+            type = "affidavit",
+            content = "From: AllFuels\n" +
+                "Sworn before the Constitutional Court (CCT237/20, para 27): operators have no compensable goodwill.\n" +
+                "The MOU was never countersigned by AllFuels.\n" +
+                "We comply with PPA requirements in all franchise matters.\n" +
+                "Gary was grateful and agreed to exit gracefully."
         )
         ingestText(
-            fileName = "email_admission_6apr2025.txt",
+            fileName = "contemporaneous_record.txt",
             type = "email",
-            content = "From: Marius Nortje\nDate: 6 April 2025\n" +
-                "For the record, Kevin's Export proceeded with the deal as planned. " +
-                "This concerns fraud allegations against the company shareholders. " +
-                "The disputed amount is R 500,000."
+            content = "From: AllFuels\n" +
+                "Date: 14 January 2026\n" +
+                "AllFuels demanded R3.8M extension fee and drafted a clause forcing Gary to forfeit goodwill.\n" +
+                "AllFuels collected rent under the binding MOU terms for 7 years.\n" +
+                "The lease was presented as binding to Gary.\n" +
+                "There was no Section 12B referral to Gary Highcock.\n" +
+                "Gary was non-committal and negotiated for more time; three executives removed his only witness."
         )
     }
 }

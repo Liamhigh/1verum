@@ -99,7 +99,7 @@ object ReportGenerator {
             appendLine("   No material contradictions detected.")
         } else {
             findings.contradictions.forEach { c ->
-                appendLine("   ${c.contradictionId} [${c.severity}] — Respondent: ${c.respondent}")
+                appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent}")
                 appendLine("      Claim A: \"${c.claimA.text}\"")
                 appendLine("               (${c.claimA.source}, p${c.claimA.page}, ln${c.claimA.line}, SHA-512 ${c.claimA.sha512.take(12)}…)")
                 appendLine("      Claim B: \"${c.claimB.text}\"")
@@ -129,7 +129,28 @@ object ReportGenerator {
             fin.flaggedAnomalies.forEach { appendLine("   Anomaly: $it") }
             appendLine()
         }
-        appendLine("7. DECLARATION")
+        findings.behavioral?.let { b ->
+            appendLine("7. BEHAVIOURAL ANALYSIS (B4)")
+            (b.gaslighting + b.manipulation + b.stress).forEach {
+                appendLine("   [${it.severity}] ${it.type}: \"${it.trigger}\" — ${it.evidenceId}")
+            }
+            appendLine("   Behavioural score: ${"%.2f".format(b.score)}")
+            appendLine()
+        }
+        if (findings.documentForensics.isNotEmpty() || findings.communications.isNotEmpty()) {
+            appendLine("8. DOCUMENT & COMMUNICATIONS FORENSICS (B2/B3)")
+            findings.documentForensics.forEach { appendLine("   $it") }
+            findings.communications.forEach { appendLine("   $it") }
+            appendLine()
+        }
+        appendLine("9. NINE-BRAIN VERDICTS")
+        findings.brainVerdicts.forEach { (brain, verdict) -> appendLine("   $brain: $verdict") }
+        if (findings.rndValidation.isNotEmpty()) {
+            appendLine("   R&D (B9) notes:")
+            findings.rndValidation.forEach { appendLine("     - $it") }
+        }
+        appendLine()
+        appendLine("10. DECLARATION")
         appendLine("   Triple-verified (Gemma 3 · communicator · Nine-Brain). Evidence before narrative.")
         appendLine("   Ordinal confidence only. Same evidence yields the same result (determinism).")
     }

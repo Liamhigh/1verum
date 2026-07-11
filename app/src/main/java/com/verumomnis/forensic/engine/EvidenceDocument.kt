@@ -12,5 +12,8 @@ data class EvidenceDocument(
     val gps: GpsRecord? = null,
     /** Optional structured financials parsed from the document. */
     val revenue: Double? = null,
-    val expenses: Double? = null
+    val expenses: Double? = null,
+    /** Optional document metadata for B2 tamper detection. */
+    val creatorTool: String? = null,
+    val documentKind: String? = null
 )

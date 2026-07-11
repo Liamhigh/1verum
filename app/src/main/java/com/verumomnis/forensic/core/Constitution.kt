@@ -1,0 +1,57 @@
+package com.verumomnis.forensic.core
+
+/**
+ * Verum Omnis Constitution v5.2.7 — hard-coded, immutable governance constants.
+ *
+ * Per the specification these are COMPILE-TIME CONSTANTS: they are not stored in
+ * config files or databases. Changing them requires recompiling from source, and
+ * doing so invalidates every existing seal (hash mismatch). They therefore act as
+ * the machine-readable ruleset embedded into every cryptographic seal.
+ */
+object Constitution {
+    const val VERSION = "5.2.7"
+    const val FINAL = true
+
+    const val PROFIT_TO_FOUNDATION = 99      // 99% to Verum Foundation
+    const val ETHICS_HALT_THRESHOLD = 0.003  // 0.3% bias = halt everything
+    const val DEAD_MAN_SWITCH_HOURS = 72     // 72h inactivity = INTERPOL release
+    const val BRAIN_COUNT = 9                // Exactly 9 brains
+    const val GUARDIAN_COUNCIL_SIZE = 7      // 7 oversight members
+    const val COMMISSION_PERCENT = 20        // 20% of recovered fraud
+    const val CITIZEN_ACCESS_FREE = true     // Always free for citizens
+
+    // AI Behaviour — Constitutional Prime Directives
+    const val TRUTH_OVER_PROBABILITY = true          // Ordinal confidence only
+    const val EVIDENCE_BEFORE_NARRATIVE = true       // No anchor = no sentence
+    const val MANDATORY_CONTRADICTION_DISCLOSURE = true
+    const val DETERMINISM_REQUIRED = true            // No randomness, no Date.now()
+    const val CHAIN_OF_CUSTODY_IS_LAW = true
+    const val FAILURE_MODE_DISCLOSURE = true
+    const val ANTI_COERCION = true
+    const val NON_OWNERSHIP = true
+    const val ANTI_WAR_DOCTRINE = true               // Article X — supreme hierarchy
+
+    // Sealing
+    const val HASH_ALGORITHM = "SHA-512"
+    const val PDF_STANDARD = "PDF/A-3B"
+    const val ENCRYPTION = "AES-256-GCM"
+    const val BLOCKCHAIN_NETWORK = "bitcoin"
+
+    const val NINE_BRAIN_VERSION = "v1.0"
+    const val SEALING_PROTOCOL = "verum-omnis-seal v1.0"
+    const val TAGLINE = "AI Forensics for Truth"
+
+    /** Machine-readable ruleset embedded into every seal. */
+    fun rulesetFingerprint(): String = buildString {
+        append("VO-CONSTITUTION|")
+        append("v=$VERSION|final=$FINAL|")
+        append("profit=$PROFIT_TO_FOUNDATION|ethicsHalt=$ETHICS_HALT_THRESHOLD|")
+        append("deadman=$DEAD_MAN_SWITCH_HOURS|brains=$BRAIN_COUNT|")
+        append("council=$GUARDIAN_COUNCIL_SIZE|commission=$COMMISSION_PERCENT|")
+        append("citizenFree=$CITIZEN_ACCESS_FREE|")
+        append("truthOverProb=$TRUTH_OVER_PROBABILITY|evidenceFirst=$EVIDENCE_BEFORE_NARRATIVE|")
+        append("contradictionDisclosure=$MANDATORY_CONTRADICTION_DISCLOSURE|determinism=$DETERMINISM_REQUIRED|")
+        append("chainOfCustody=$CHAIN_OF_CUSTODY_IS_LAW|antiCoercion=$ANTI_COERCION|antiWar=$ANTI_WAR_DOCTRINE|")
+        append("hash=$HASH_ALGORITHM|pdf=$PDF_STANDARD|enc=$ENCRYPTION|chain=$BLOCKCHAIN_NETWORK")
+    }
+}

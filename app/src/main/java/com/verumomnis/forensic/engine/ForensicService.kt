@@ -1,0 +1,60 @@
+package com.verumomnis.forensic.engine
+
+import com.verumomnis.forensic.crypto.EvidenceSealer
+import com.verumomnis.forensic.crypto.Sha512
+import com.verumomnis.forensic.crypto.VerificationResult
+import com.verumomnis.forensic.model.ForensicFindings
+import com.verumomnis.forensic.model.GpsRecord
+import com.verumomnis.forensic.model.SealRecord
+import java.time.Instant
+
+/** Result of a complete forensic scan: findings plus the seal over the evidence set. */
+data class ScanResult(
+    val findings: ForensicFindings,
+    val seal: SealRecord
+)
+
+/**
+ * Orchestrates the forensic pipeline (Part IV): ingest documents, run the
+ * deterministic 9-Brain analysis, and cryptographically seal the evidence set.
+ * Pure Kotlin so it is fully unit-testable off-device.
+ */
+object ForensicService {
+
+    fun ingest(
+        evidenceId: String,
+        fileName: String,
+        type: String,
+        bytes: ByteArray,
+        gps: GpsRecord? = null,
+        revenue: Double? = null,
+        expenses: Double? = null
+    ): EvidenceDocument = EvidenceDocument(
+        evidenceId = evidenceId,
+        fileName = fileName,
+        type = type,
+        text = String(bytes, Charsets.UTF_8),
+        sha512 = Sha512.hash(bytes),
+        gps = gps,
+        revenue = revenue,
+        expenses = expenses
+    )
+
+    fun scan(documents: List<EvidenceDocument>, now: Instant = Instant.now()): ScanResult {
+        val findings = NineBrainEngine.analyze(documents, now)
+        // Seal the deterministic fingerprint of the entire evidence set.
+        val corpusFingerprint = documents.joinToString("|") { it.sha512 }
+        val corpusHash = Sha512.hash(corpusFingerprint)
+        val reference = "VO-AF-${now.toString().take(10).replace("-", "")}-FOR"
+        val seal = EvidenceSealer.sealFromHash(
+            sha512 = corpusHash,
+            documentType = "forensic_report",
+            documentReference = reference,
+            nowInstant = now
+        )
+        return ScanResult(findings, seal)
+    }
+
+    fun verify(bytes: ByteArray, seal: SealRecord): VerificationResult =
+        EvidenceSealer.verify(bytes, seal)
+}

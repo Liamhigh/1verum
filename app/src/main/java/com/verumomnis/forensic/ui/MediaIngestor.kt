@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.exifinterface.media.ExifInterface
+import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.model.GpsRecord
@@ -76,6 +77,28 @@ class MediaIngestor(private val context: Context) {
             height = height,
             durationMs = durationMs
         )
+    }
+
+    data class DocInfo(val fileName: String, val mime: String, val text: String)
+
+    /** Seal a non-media document: preserve original in the vault, return extracted text. */
+    fun ingestDocument(uri: Uri, now: Instant = Instant.now()): DocInfo {
+        val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+        val fileName = displayName(uri) ?: "document_${now.toEpochMilli()}"
+        vault.storeEvidence(fileName, bytes)
+        val text = if (mime.startsWith("text")) {
+            String(bytes, Charsets.UTF_8)
+        } else {
+            "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
+        }
+        return DocInfo(fileName, mime, text)
+    }
+
+    /** Compute SHA-512 of a picked file for seal verification. */
+    fun hashOf(uri: Uri): Pair<String, String> {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+        return (displayName(uri) ?: "document") to Sha512.hash(bytes)
     }
 
     private fun displayName(uri: Uri): String? =

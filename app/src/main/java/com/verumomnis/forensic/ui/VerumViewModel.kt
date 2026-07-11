@@ -16,6 +16,7 @@ import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.engine.ReportGenerator
 import com.verumomnis.forensic.engine.ScanResult
+import com.verumomnis.forensic.engine.TaxModule
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.HarassmentVerdict
@@ -81,13 +82,94 @@ class VerumViewModel : ViewModel() {
                 chat = listOf(
                     ChatMessage(
                         author = "Verum Omnis",
-                        text = "Evidence vault ready. Constitution v${Constitution.VERSION} loaded. " +
-                            "Ask about the evidence, request a timeline, or run a forensic scan.",
+                        text = "Truth for All. I am the Verum Omnis communicator (Constitution v${Constitution.VERSION}).\n\n" +
+                            "How this works: anything you add with + goes straight to the forensic engine — it is " +
+                            "SHA-512 sealed, GPS-anchored and stored in the vault with its findings JSON before I ever see it. " +
+                            "I only read the SEALED case file, then help with the narrative, the timeline and the legal strategy. " +
+                            "Nothing leaves here unsealed.",
                         fromUser = false
                     )
                 )
             )
         }
+    }
+
+    private fun postEngine(text: String) {
+        _state.update { it.copy(chat = it.chat + ChatMessage("Forensic Engine", text, fromUser = false)) }
+    }
+
+    private fun postAi(text: String) {
+        _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, text, fromUser = false)) }
+    }
+
+    /** A document picked from the + menu goes to the engine (not the chat AI). */
+    fun ingestDocument(fileName: String, mimeType: String, text: String) {
+        val type = when {
+            mimeType.contains("pdf") -> "pdf"
+            mimeType.startsWith("text") -> "document"
+            else -> "document"
+        }
+        ingestText(fileName, type, text)
+    }
+
+    /**
+     * Seal everything added so far through the forensic engine and store it in the
+     * vault (findings JSON + forensic report). Only now may the AI read the case.
+     */
+    fun sealCase(now: Instant = Instant.now()) {
+        if (documents.isEmpty() && audios.isEmpty() && medias.isEmpty()) {
+            postEngine("Nothing to seal yet — add evidence with the + button first.")
+            return
+        }
+        runScan(now)
+        generateReport(now = now)
+        val r = _state.value.scanResult
+        postEngine(
+            "Sealed ${_state.value.files.size} item(s) into the vault. " +
+                "SHA-512 + GPS recorded, findings JSON written, forensic report generated" +
+                (r?.let { " (seal ${it.seal.shortcode})" } ?: "") +
+                ". The AI may now read the sealed case file."
+        )
+    }
+
+    /** Verify an uploaded file's hash against the sealed vault. */
+    fun verifyUploaded(fileName: String, sha512: String) {
+        val vaulted = documents.map { it.sha512 } + audios.map { it.sha512 } + medias.map { it.sha512 }
+        val msg = when {
+            vaulted.contains(sha512) -> "VERIFIED · $fileName matches a sealed vault record (SHA-512 ${sha512.take(12)}…)."
+            _state.value.scanResult?.seal?.sha512 == sha512 -> "VERIFIED · matches the case seal."
+            else -> "NOT FOUND · $fileName (SHA-512 ${sha512.take(12)}…) is not in this sealed vault. If it claims a Verum seal, the content may be TAMPERED."
+        }
+        postEngine(msg)
+    }
+
+    /** Deep research: the AI reads the SEALED case file and drafts narrative help. */
+    fun deepResearch(now: Instant = Instant.now()) {
+        if (_state.value.scanResult == null) sealCase(now)
+        val f = _state.value.scanResult?.findings ?: return
+        postAi(
+            "Deep research over the sealed case file: ${f.documentsAnalyzed} evidence item(s), " +
+                "${f.contradictions.size} contradiction(s) anchored to person + page + statute, " +
+                "${f.timeline.size} timeline event(s), jurisdiction ${f.jurisdiction}. " +
+                "I can now help draft the narrative and legal strategy, and flag anything the engine may have missed. " +
+                "Every claim I make cites sealed evidence; ordinal confidence only."
+        )
+    }
+
+    /** Tax return: Verum fee is 50% of the local accountant benchmark. */
+    fun runTaxReturn(entityType: String, jurisdiction: String, revenue: Double, expenses: Double, income: Double, age: Int) {
+        val (label, tax) = if (entityType == "individual") {
+            "Individual" to TaxModule.calculateIndividualTaxZA(income, age)
+        } else {
+            "Company" to TaxModule.calculateCompanyTaxZA(revenue, expenses)
+        }
+        val accountant = TaxModule.estimateAccountantFee(jurisdiction, "tax_return", "moderate", if (entityType == "individual") "individual" else "corporate")
+        val verum = TaxModule.verumServiceFee(jurisdiction, "tax_return", "moderate", if (entityType == "individual") "individual" else "corporate")
+        postEngine(
+            "$label tax (${tax.jurisdiction}): liability R%,.2f. ".format(tax.taxLiability) +
+                "Accountant benchmark in $jurisdiction ≈ R%,.0f; Verum Omnis fee is 50%% = R%,.0f. Sealed to the vault."
+                    .format(accountant.estimatedFee, verum.estimatedFee)
+        )
     }
 
     fun configureDevice(ramGb: Int) {

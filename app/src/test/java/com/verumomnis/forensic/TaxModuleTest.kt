@@ -45,6 +45,13 @@ class TaxModuleTest {
     }
 
     @Test
+    fun verumServiceFeeIsHalfOfAccountantBenchmark() {
+        val accountant = TaxModule.estimateAccountantFee("ZA-KZN", "tax_return", "moderate", "individual")
+        val verum = TaxModule.verumServiceFee("ZA-KZN", "tax_return", "moderate", "individual")
+        assertEquals(accountant.estimatedFee * 0.5, verum.estimatedFee, 0.001)
+    }
+
+    @Test
     fun commissionIsTwentyPercent() {
         val c = TaxModule.calculateCommission(500_000.0, embeddedAt = 0L)
         assertEquals(100_000.0, c.verumCommission, 0.001)

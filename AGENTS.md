@@ -21,6 +21,16 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
 - Lint: `./gradlew lintDebug`
 - Debug APK: `./gradlew assembleDebug` (output `app/build/outputs/apk/debug/app-debug.apk`)
 
+## App UX model (important)
+- The app is a chat room. The front **Story** screen leads to the **Chat** home. The chat input has a **+**
+  that opens a "Sealed actions" bottom sheet: seal a document, add photo/video, verify a document, deep
+  research, draft sealed email, tax return, view report, open vault. Report/Email/Tax/Vault are sub-screens
+  reached from the sheet or top bar (back arrow returns to chat).
+- Constitutional boundary (enforced by design): anything the user adds goes to the **forensic engine only**
+  (`ForensicService`/`NineBrainEngine`) → SHA-512 sealed + GPS-anchored + vaulted with findings JSON + report.
+  The chat AI (`VerumViewModel.respond`) reads ONLY the sealed `scanResult`/report — never raw uploads. Keep
+  it that way: never feed un-sealed evidence bytes/text into the chat context.
+
 ## Cursor Cloud specific instructions
 - Java 17+ is required (VM has JDK 21); the Android Gradle Plugin toolchain targets JVM 17.
 - The Android SDK is provisioned by the startup update script into `$HOME/android-sdk`, and

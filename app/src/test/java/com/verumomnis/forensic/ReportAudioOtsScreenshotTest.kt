@@ -39,7 +39,7 @@ class ReportAudioOtsScreenshotTest {
             runScan()
             generateReport()
         }
-        composeRule.setContent { VerumOmnisTheme { VerumApp(vm, initialTab = 1) } }
+        composeRule.setContent { VerumOmnisTheme { VerumApp(vm, initialScreen = "REPORT") } }
         composeRule.onRoot().captureRoboImage("build/screenshots/09_report_audio_ots.png")
     }
 }

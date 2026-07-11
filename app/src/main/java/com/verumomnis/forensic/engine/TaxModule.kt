@@ -87,6 +87,20 @@ object TaxModule {
         return FeeEstimate(estimatedFee, baseRate, hours, jurisdiction)
     }
 
+    /**
+     * Verum Omnis tax-service fee: 50% of what a local accountant would charge in
+     * that geographical area (same deal for companies and private citizens).
+     */
+    fun verumServiceFee(
+        jurisdiction: String,
+        serviceType: String = "tax_return",
+        complexity: String = "moderate",
+        entityType: String = "individual"
+    ): FeeEstimate {
+        val accountant = estimateAccountantFee(jurisdiction, serviceType, complexity, entityType)
+        return accountant.copy(estimatedFee = accountant.estimatedFee * 0.5)
+    }
+
     /** 20% recovered-fraud commission, embedded at seal time (spec 9.3). */
     fun calculateCommission(fraudAmount: Double, embeddedAt: Long = System.currentTimeMillis()): Commission {
         val commission = fraudAmount * 0.20

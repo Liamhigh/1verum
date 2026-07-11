@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
@@ -46,19 +47,30 @@ class UiScreenshotTest {
         draftAndSendEmail("investigator@saps.gov.za", "Sealed forensic report")
     }
 
-    private fun renderTab(tab: Int, name: String) {
+    private fun renderScreen(screen: String, name: String) {
         val vm = populatedViewModel()
         composeRule.setContent {
-            VerumOmnisTheme { VerumApp(vm, initialTab = tab) }
+            VerumOmnisTheme { VerumApp(vm, initialScreen = screen) }
         }
         composeRule.onRoot().captureRoboImage("$outDir/$name")
     }
 
-    @Test fun dashboard() = renderTab(0, "01_dashboard.png")
-    @Test fun report() = renderTab(1, "02_report.png")
-    @Test fun chat() = renderTab(2, "03_chat.png")
-    @Test fun email() = renderTab(3, "04_email.png")
-    @Test fun vault() = renderTab(4, "05_vault.png")
+    @Test fun story() = renderScreen("STORY", "00_story.png")
+    @Test fun chat() = renderScreen("CHAT", "03_chat.png")
+    @Test fun report() = renderScreen("REPORT", "02_report.png")
+    @Test fun email() = renderScreen("EMAIL", "04_email.png")
+    @Test fun vault() = renderScreen("VAULT", "05_vault.png")
+    @Test fun tax() = renderScreen("TAX", "11_tax.png")
+
+    @Test
+    fun plusActionsMenu() {
+        val vm = populatedViewModel()
+        composeRule.setContent {
+            VerumOmnisTheme { VerumApp(vm, initialScreen = "CHAT", initialMenuOpen = true) }
+        }
+        composeRule.waitForIdle()
+        captureScreenRoboImage("$outDir/12_plus_actions.png")
+    }
 
     @Test
     fun emailAntiHarassmentEscalation() {
@@ -66,7 +78,7 @@ class UiScreenshotTest {
         // Repeated sends to the same recipient escalate ALLOW → WARN → BLOCK.
         repeat(6) { vm.draftAndSendEmail("investigator@saps.gov.za", "Sealed forensic report") }
         composeRule.setContent {
-            VerumOmnisTheme { VerumApp(vm, initialTab = 3) }
+            VerumOmnisTheme { VerumApp(vm, initialScreen = "EMAIL") }
         }
         composeRule.onRoot().captureRoboImage("$outDir/06_email_anti_harassment.png")
     }

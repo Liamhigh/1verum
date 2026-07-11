@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import com.verumomnis.forensic.core.DeadManSwitch
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.ui.VerumApp
@@ -17,6 +18,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: VerumViewModel
     private val pdfExporter by lazy { SealedPdfExporter(this) }
+    private val deadManSwitch = DeadManSwitch()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +35,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Any user activity resets the 72h Dead-Man Switch (Constitution safeguard).
+        deadManSwitch.recordActivity()
     }
 
     fun captureLocation() {

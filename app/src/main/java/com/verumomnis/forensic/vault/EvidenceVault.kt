@@ -3,6 +3,7 @@ package com.verumomnis.forensic.vault
 import android.content.Context
 import com.verumomnis.forensic.crypto.Sha512
 import java.io.File
+import javax.crypto.SecretKey
 
 /**
  * Evidence Vault (Part VII). Local storage following the specified directory
@@ -53,6 +54,18 @@ class EvidenceVault(private val root: File) {
     fun storeSeal(name: String, json: String) {
         initialize()
         File(seals, name).writeText(json)
+    }
+
+    /** Encrypted chat session at rest (AES-256-GCM), stored under chat_sessions as .json.enc. */
+    fun storeChatSession(name: String, json: String, key: SecretKey) {
+        initialize()
+        val fileName = if (name.endsWith(".enc")) name else "$name.enc"
+        File(chatSessions, fileName).writeBytes(VaultEncryption.encrypt(json.toByteArray(), key))
+    }
+
+    fun readChatSession(name: String, key: SecretKey): String {
+        val fileName = if (name.endsWith(".enc")) name else "$name.enc"
+        return String(VaultEncryption.decrypt(File(chatSessions, fileName).readBytes(), key))
     }
 
     fun documentCount(): Int =

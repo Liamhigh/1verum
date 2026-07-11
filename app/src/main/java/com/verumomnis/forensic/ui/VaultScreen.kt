@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 
 @Composable
@@ -44,6 +46,17 @@ fun VaultScreen(state: UiState) {
             if (state.scanResult == null && state.report == null && state.emails.isEmpty()) {
                 Text("No seals yet.", color = VoTextMuted, fontSize = 13.sp)
             }
+        }
+
+        VoCard(title = "CONSTITUTIONAL SAFEGUARDS", icon = Icons.Filled.Shield) {
+            InfoRow("Dead-Man Switch", "${Constitution.DEAD_MAN_SWITCH_HOURS}h → INTERPOL")
+            InfoRow("Ethics kill switch", "bias > ${Constitution.ETHICS_HALT_THRESHOLD * 100}% = halt")
+            InfoRow("Profit firewall", "${Constitution.PROFIT_TO_FOUNDATION}% to Foundation")
+            InfoRow("Recovered-fraud commission", "${Constitution.COMMISSION_PERCENT}%")
+            InfoRow("Guardian Council", "${Constitution.GUARDIAN_COUNCIL_SIZE} members")
+            InfoRow("Anti-War Doctrine", "Article X · supreme")
+            Spacer(Modifier.height(4.dp))
+            Text("Constitution v${Constitution.VERSION} · FINAL — immutable; any change invalidates all seals.", color = VoTextMuted, fontSize = 11.sp)
         }
 
         VoCard(title = "VAULT STRUCTURE", icon = Icons.Filled.Lock) {

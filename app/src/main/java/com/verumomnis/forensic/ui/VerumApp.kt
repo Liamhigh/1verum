@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -43,10 +43,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
@@ -126,12 +128,11 @@ private fun VerumHeader(state: UiState) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape).background(VoGold),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Shield, contentDescription = "Verum Omnis", tint = VoBackground, modifier = Modifier.size(20.dp))
-            }
+            Image(
+                painter = painterResource(R.drawable.vo_globe),
+                contentDescription = "Verum Omnis",
+                modifier = Modifier.size(38.dp).clip(CircleShape)
+            )
             Spacer(Modifier.width(10.dp))
             Column {
                 Text(

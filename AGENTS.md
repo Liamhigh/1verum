@@ -44,3 +44,14 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
   a `Bitmap` instead (see `SealedPdfTest.rendersSealedPageWithWatermarkToArtifact`).
 - The watermark asset was extracted from a real sealed report and made transparent; to swap in an exact
   brand file, replace `app/src/main/res/drawable-nodpi/watermark_portrait.png` (transparent background).
+- Bitcoin anchoring is real (`blockchain/OpenTimestampsService`): it POSTs the SHA-256 of the evidence
+  SHA-512 bytes to the OpenTimestamps calendars and assembles a standards-compliant detached `.ots`
+  proof (`MAGIC|0x01|0x08|digest|calendar-timestamp`) verifiable by the `ots` client. It needs network;
+  offline it returns an OFFLINE result. Anchoring is a separate step from the deterministic seal — call
+  `VerumViewModel.anchorSealToBitcoin()` (runs on `Dispatchers.IO`); never anchor inside `EvidenceSealer`
+  (keeps sealing deterministic for tests). Unit tests cover the digest/proof/offline paths; the live
+  calendar submission is validated manually (see PR), not in CI.
+- B8 audio (`engine/AudioBrain` + `Transcriber`): tamper/voice-stress/diarization run on `AudioEvidence`.
+  Transcription is pluggable — `ProvidedTranscriptTranscriber` parses an imported `[mm:ss] Speaker: text`
+  transcript (which is folded into the doc set so B1 cross-references it); a real on-device Whisper model
+  implements `Transcriber` for live STT, and `NoModelTranscriber` returns INSUFFICIENT when absent.

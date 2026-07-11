@@ -40,10 +40,34 @@ object ForensicService {
         expenses = expenses
     )
 
-    fun scan(documents: List<EvidenceDocument>, now: Instant = Instant.now()): ScanResult {
-        val findings = NineBrainEngine.analyze(documents, now)
-        // Seal the deterministic fingerprint of the entire evidence set.
-        val corpusFingerprint = documents.joinToString("|") { it.sha512 }
+    fun ingestAudio(
+        id: String,
+        fileName: String,
+        bytes: ByteArray,
+        gps: GpsRecord? = null,
+        transcript: String? = null,
+        creationDateMillis: Long? = null,
+        modificationDateMillis: Long? = null,
+        sampleRates: List<Int> = emptyList(),
+        silenceGapsSec: List<Double> = emptyList()
+    ): AudioEvidence = AudioEvidence(
+        id = id, fileName = fileName, sha512 = Sha512.hash(bytes), gps = gps, transcript = transcript,
+        creationDateMillis = creationDateMillis, modificationDateMillis = modificationDateMillis,
+        sampleRates = sampleRates, silenceGapsSec = silenceGapsSec
+    )
+
+    /** Backward-compatible overload (documents only). */
+    fun scan(documents: List<EvidenceDocument>, now: Instant): ScanResult =
+        scan(documents, emptyList(), now)
+
+    fun scan(
+        documents: List<EvidenceDocument>,
+        audio: List<AudioEvidence> = emptyList(),
+        now: Instant = Instant.now()
+    ): ScanResult {
+        val findings = NineBrainEngine.analyze(documents, audio, now)
+        // Seal the deterministic fingerprint of the entire evidence set (docs + audio).
+        val corpusFingerprint = (documents.map { it.sha512 } + audio.map { it.sha512 }).joinToString("|")
         val corpusHash = Sha512.hash(corpusFingerprint)
         val reference = "VO-AF-${now.toString().take(10).replace("-", "")}-FOR"
         val seal = EvidenceSealer.sealFromHash(

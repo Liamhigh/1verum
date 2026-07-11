@@ -20,9 +20,9 @@ object SubjectClassifier {
     private val RULES = listOf(
         Rule(
             ContradictionCategory.GOODWILL_VALUE,
-            triggers = listOf("goodwill", "compensable", "entrenched value", "brand fee"),
+            triggers = listOf("goodwill", "compensable", "entrenched value", "brand fee", "forfeiture", "extension fee"),
             negative = listOf("no compensable goodwill", "goodwill has no value", "no value", "not compensable", "no compensable"),
-            positive = listOf("demanded", "brand fee", "extension fee", "forfeit goodwill", "quantifiable asset", "pay r", "r3.8m", "r3.25m")
+            positive = listOf("demanded", "brand fee", "extension fee", "forfeit goodwill", "forfeiture", "quantifiable asset", "pay r", "r3.8m", "r3.25m")
         ),
         Rule(
             ContradictionCategory.SIGNATURE_STATUS,

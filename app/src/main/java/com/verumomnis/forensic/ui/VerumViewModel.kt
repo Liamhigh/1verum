@@ -1,12 +1,15 @@
 package com.verumomnis.forensic.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.verumomnis.forensic.blockchain.OpenTimestampsService
 import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.core.DeviceTier
 import com.verumomnis.forensic.core.Llm
 import com.verumomnis.forensic.core.ModelLoader
 import com.verumomnis.forensic.crypto.VerificationResult
 import com.verumomnis.forensic.engine.AntiHarassmentMonitor
+import com.verumomnis.forensic.engine.AudioEvidence
 import com.verumomnis.forensic.engine.EmailModule
 import com.verumomnis.forensic.engine.EvidenceDocument
 import com.verumomnis.forensic.engine.ForensicService
@@ -15,11 +18,15 @@ import com.verumomnis.forensic.engine.ScanResult
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.HarassmentVerdict
+import com.verumomnis.forensic.model.OtsAnchorResult
+import com.verumomnis.forensic.model.OtsStatus
 import com.verumomnis.forensic.model.SealedEmail
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.Instant
 
 data class FileEntry(
@@ -47,7 +54,10 @@ data class UiState(
     val chat: List<ChatMessage> = emptyList(),
     val report: ForensicReport? = null,
     val emails: List<SealedEmail> = emptyList(),
-    val emailStatus: String = "Draft a sealed forensic email. Every draft is delivered as a sealed PDF and logged."
+    val emailStatus: String = "Draft a sealed forensic email. Every draft is delivered as a sealed PDF and logged.",
+    val otsResult: OtsAnchorResult? = null,
+    val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
+    val anchoring: Boolean = false
 )
 
 class VerumViewModel : ViewModel() {
@@ -56,6 +66,7 @@ class VerumViewModel : ViewModel() {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private val documents = mutableListOf<EvidenceDocument>()
+    private val audios = mutableListOf<AudioEvidence>()
     private val harassmentMonitor = AntiHarassmentMonitor()
 
     init {
@@ -121,12 +132,12 @@ class VerumViewModel : ViewModel() {
     }
 
     fun runScan(now: Instant = Instant.now()) {
-        if (documents.isEmpty()) {
+        if (documents.isEmpty() && audios.isEmpty()) {
             _state.update { it.copy(scanLog = "No evidence to scan. Upload documents first.") }
             return
         }
         _state.update { it.copy(scanning = true, scanLog = "Nine-Brain forensic analysis in progress…") }
-        val result = ForensicService.scan(documents, now)
+        val result = ForensicService.scan(documents, audios, now)
         _state.update { s ->
             s.copy(
                 scanning = false,
@@ -194,8 +205,35 @@ class VerumViewModel : ViewModel() {
     fun verifyCurrentSeal(): VerificationResult? {
         val result = _state.value.scanResult ?: return null
         // The seal is computed over the corpus fingerprint; re-supply the same bytes.
-        val corpus = documents.joinToString("|") { it.sha512 }
+        val corpus = (documents.map { it.sha512 } + audios.map { it.sha512 }).joinToString("|")
         return ForensicService.verify(corpus.toByteArray(), result.seal)
+    }
+
+    /** Anchor the current report/evidence seal to Bitcoin via OpenTimestamps (network I/O). */
+    fun anchorSealToBitcoin() {
+        val seal = _state.value.report?.seal ?: _state.value.scanResult?.seal
+        if (seal == null) {
+            _state.update { it.copy(otsStatus = "Run a scan (or generate a report) before anchoring.") }
+            return
+        }
+        if (_state.value.anchoring) return
+        _state.update { it.copy(anchoring = true, otsStatus = "Submitting SHA-256 digest to OpenTimestamps calendars…") }
+        viewModelScope.launch(Dispatchers.IO) {
+            val res = runCatching { OpenTimestampsService.anchor(seal.sha512) }.getOrElse {
+                OtsAnchorResult(
+                    status = OtsStatus.FAILED, sha512 = seal.sha512, sha256Digest = "",
+                    calendarUrls = emptyList(), submittedAt = java.time.Instant.now().toString(),
+                    message = it.message ?: "Anchoring failed"
+                )
+            }
+            val status = when (res.status) {
+                OtsStatus.PENDING -> "PENDING · digest ${res.sha256Digest.take(12)}… submitted to ${res.calendarUrls.size} calendar(s). Proof: ${res.otsProofFile}"
+                OtsStatus.OFFLINE -> "OFFLINE · ${res.message}"
+                OtsStatus.CONFIRMED -> "CONFIRMED on Bitcoin."
+                OtsStatus.FAILED -> "FAILED · ${res.message}"
+            }
+            _state.update { it.copy(anchoring = false, otsResult = res, otsStatus = status) }
+        }
     }
 
     fun sendChat(text: String) {
@@ -263,5 +301,32 @@ class VerumViewModel : ViewModel() {
                 "There was no Section 12B referral to Gary Highcock.\n" +
                 "Gary was non-committal and negotiated for more time; three executives removed his only witness."
         )
+        addAudioNote()
+    }
+
+    private fun addAudioNote() {
+        val transcript = """
+            [00:12] Speaker A: I'm mentally broken. I can't take this anymore.
+            [00:18] Speaker B: Calm down. It's just business.
+            [00:22] Speaker A: You took everything. The site, the goodwill... my wife left.
+            [00:28] Speaker B: The goodwill has no value. You know that.
+            [00:33] Speaker A: Then why did you make me sign the forfeiture clause? Why did I pay R3.8 million?
+            [00:39] Speaker B: That was for the extension. Different thing entirely.
+        """.trimIndent()
+        val audio = ForensicService.ingestAudio(
+            id = "AUD001",
+            fileName = "voice_note_allfuels.m4a",
+            bytes = transcript.toByteArray(),
+            gps = _state.value.gps,
+            transcript = transcript,
+            creationDateMillis = 1_700_000_000_000,
+            modificationDateMillis = 1_700_000_500_000, // modified after creation -> tamper signal
+            sampleRates = listOf(44_100, 48_000),        // splice signal
+            silenceGapsSec = listOf(0.2, 1.4)            // edit-point signal
+        )
+        audios += audio
+        _state.update {
+            it.copy(files = it.files + FileEntry(audio.fileName, "audio", "queued", audio.sha512, it.gps?.let { g -> "%.4f, %.4f".format(g.latitude, g.longitude) } ?: ""))
+        }
     }
 }

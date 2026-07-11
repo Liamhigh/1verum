@@ -137,6 +137,17 @@ object ReportGenerator {
             appendLine("   Behavioural score: ${"%.2f".format(b.score)}")
             appendLine()
         }
+        findings.audio?.let { a ->
+            appendLine("7b. AUDIO FORENSICS (B8)")
+            appendLine("   Files: ${a.filesAnalyzed} · Speakers: ${a.speakerCount} · Utterances: ${a.segments.size} · Transcript: ${if (a.transcriptionAvailable) "available" else "INSUFFICIENT"}")
+            a.tamperSignals.forEach { appendLine("   [${it.severity}] ${it.type}: ${it.description}") }
+            a.voiceStress.forEach { appendLine("   Voice stress (${it.speaker}) @${it.timestamp}: ${it.description}") }
+            if (a.fullTranscript.isNotBlank()) {
+                appendLine("   Transcript:")
+                a.fullTranscript.lines().take(12).forEach { appendLine("     $it") }
+            }
+            appendLine()
+        }
         if (findings.documentForensics.isNotEmpty() || findings.communications.isNotEmpty()) {
             appendLine("8. DOCUMENT & COMMUNICATIONS FORENSICS (B2/B3)")
             findings.documentForensics.forEach { appendLine("   $it") }

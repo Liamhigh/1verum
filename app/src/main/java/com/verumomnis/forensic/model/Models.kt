@@ -169,6 +169,7 @@ data class ForensicFindings(
     val jurisdiction: String,
     val financial: FinancialAnalysis? = null,
     val behavioral: BehavioralAnalysis? = null,
+    val audio: AudioAnalysis? = null,
     val documentForensics: List<String> = emptyList(),
     val communications: List<String> = emptyList(),
     val rndValidation: List<String> = emptyList(),

@@ -31,18 +31,35 @@ object NineBrainEngine {
     private val MONEY_REGEX =
         Regex("""\bR\s?([\d][\d,\s]{2,})(?:\.\d+)?\b""")
 
-    fun analyze(documents: List<EvidenceDocument>, now: Instant = Instant.now()): ForensicFindings {
+    fun analyze(
+        documents: List<EvidenceDocument>,
+        audio: List<AudioEvidence> = emptyList(),
+        now: Instant = Instant.now()
+    ): ForensicFindings {
         val timestamp = now.toString()
-        val jurisdiction = detectJurisdiction(documents)
 
-        val atoms = buildEvidenceAtoms(documents, jurisdiction, timestamp)
-        val contradictions = ContradictionExtractor.extract(documents, now)          // B1
-        val documentForensics = documentBrain(documents)                             // B2
-        val timeline = reconstructTimeline(documents)                                // B5
+        // B8 audio: tamper/voice-stress + diarised transcript, which is folded into
+        // the document set so B1/B4 can cross-reference what was said.
+        val audioAnalysis = AudioBrain.analyze(audio)
+        val audioDocs = audio.mapNotNull { a ->
+            a.transcript?.takeIf { it.isNotBlank() }?.let {
+                EvidenceDocument(
+                    evidenceId = a.id, fileName = a.fileName, type = "audio_transcript",
+                    text = it, sha512 = a.sha512, gps = a.gps, documentKind = "audio_transcript"
+                )
+            }
+        }
+        val allDocs = documents + audioDocs
+        val jurisdiction = detectJurisdiction(allDocs)
+
+        val atoms = buildEvidenceAtoms(allDocs, jurisdiction, timestamp)
+        val contradictions = ContradictionExtractor.extract(allDocs, now)            // B1
+        val documentForensics = documentBrain(allDocs)                               // B2
+        val timeline = reconstructTimeline(allDocs)                                  // B5
         val communications = communicationsBrain(timeline)                           // B3
-        val behavioral = BehavioralBrain.analyze(documents)                          // B4
-        val financial = analyzeFinancials(documents)                                 // B6
-        val legalMappings = mapLegalFramework(documents, jurisdiction)               // B7
+        val behavioral = BehavioralBrain.analyze(allDocs)                            // B4
+        val financial = analyzeFinancials(allDocs)                                   // B6
+        val legalMappings = mapLegalFramework(allDocs, jurisdiction)                 // B7
         val rndValidation = rndBrain(contradictions, financial, behavioral)          // B9
 
         val brainVerdicts = linkedMapOf(
@@ -53,12 +70,12 @@ object NineBrainEngine {
             "B5-Timeline" to "${timeline.size} EVENTS",
             "B6-Financial" to if (financial?.flaggedAnomalies.isNullOrEmpty()) "NO ANOMALIES" else "${financial!!.flaggedAnomalies.size} FLAGGED",
             "B7-LegalMapping" to "${legalMappings.size} MAPPINGS",
-            "B8-Audio" to "N/A (no audio)",
+            "B8-Audio" to audioVerdict(audio, audioAnalysis),
             "B9-RnD" to "${rndValidation.size} NOTES"
         )
 
         return ForensicFindings(
-            documentsAnalyzed = documents.size,
+            documentsAnalyzed = allDocs.size,
             evidenceAtoms = atoms,
             contradictions = contradictions,
             timeline = timeline,
@@ -66,11 +83,19 @@ object NineBrainEngine {
             jurisdiction = jurisdiction,
             financial = financial,
             behavioral = behavioral.takeUnless { it.isEmpty() },
+            audio = audioAnalysis.takeUnless { it.isEmpty() },
             documentForensics = documentForensics,
             communications = communications,
             rndValidation = rndValidation,
             brainVerdicts = brainVerdicts
         )
+    }
+
+    private fun audioVerdict(audio: List<AudioEvidence>, a: com.verumomnis.forensic.model.AudioAnalysis): String = when {
+        audio.isEmpty() -> "N/A (no audio)"
+        a.tamperSignals.isNotEmpty() -> "${a.tamperSignals.size} TAMPER · ${a.segments.size} utterances"
+        a.transcriptionAvailable -> "${a.speakerCount} speakers · ${a.segments.size} utterances"
+        else -> "INSUFFICIENT (no transcript)"
     }
 
     private fun buildEvidenceAtoms(

@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
@@ -105,6 +107,40 @@ fun ReportScreen(
                     Text(c.legalSignificance, color = VoTextMuted, fontSize = 11.sp)
                 }
             }
+        }
+
+        state.scanResult?.findings?.audio?.let { a ->
+            VoCard(title = "AUDIO FORENSICS (B8)", icon = Icons.Filled.GraphicEq) {
+                InfoRow("Files", a.filesAnalyzed.toString())
+                InfoRow("Speakers", a.speakerCount.toString())
+                InfoRow("Transcript", if (a.transcriptionAvailable) "available" else "INSUFFICIENT")
+                a.tamperSignals.forEach {
+                    Text("[${it.severity}] ${it.type}", color = VoRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                a.voiceStress.forEach {
+                    Text("Voice stress (${it.speaker}) @${it.timestamp}: ${it.description}", color = VoTextMuted, fontSize = 10.sp)
+                }
+                if (a.fullTranscript.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(a.fullTranscript, color = VoTextPrimary, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                }
+            }
+        }
+
+        VoCard(title = "BITCOIN ANCHOR (OpenTimestamps)", icon = Icons.Filled.Link) {
+            Text(state.otsStatus, color = VoTextMuted, fontSize = 12.sp)
+            state.otsResult?.let { ots ->
+                Spacer(Modifier.height(4.dp))
+                Text("SHA-256 digest: ${ots.sha256Digest}", color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                Text("Calendars: ${ots.calendarUrls.joinToString(", ").ifEmpty { "—" }}", color = VoTextMuted, fontSize = 10.sp)
+                Text("Proof: ${ots.otsProofFile}", color = VoTextMuted, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { viewModel.anchorSealToBitcoin() },
+                enabled = !state.anchoring,
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+            ) { Text(if (state.anchoring) "Anchoring…" else "Anchor Seal to Bitcoin") }
         }
     }
 }

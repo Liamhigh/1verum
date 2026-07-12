@@ -174,7 +174,7 @@ OUTPUT: contradiction_list (list of Contradiction, severity-sorted)
    Pass 1: Direct contradictions (A says X, B says not-X)
    Pass 2: Implied contradictions (A says X, B's actions assume not-X)
    Pass 3: Temporal contradictions (A said X at t1, B said X at t2, but evidence shows X changed)
-   Pass 4: Cross-document judicial (sworn testimony vs. sealed document)
+   Pass 4: Cross-document judicial (sworn testimony vs. sealed document) — v5.2.8 OJRS-enabled
 
 5. CROSS-BRAIN VALIDATION
    Send contradictions to B2-B8 for independent verification
@@ -264,6 +264,7 @@ VERUM SEAL · {seal_id} · SHA-512 {hash} · {timestamp}
 - `ForensicService.ingest()` — all evidence documents
 - `MediaIngestor.kt` — photos, audio, video (transcribed before entering B1)
 - `EntityExtractor.kt` (B2) — person/entity identification (feeds into proposition attribution)
+- `JudicialRetrievalService.kt` (B7) — **v5.2.8: online judicial propositions from SAFLII/PACER/BAILII**
 
 ### Downstream (What B1 Feeds)
 - `NineBrainEngine.kt` — B1 output goes to B2-B8 for validation
@@ -283,7 +284,9 @@ VERUM SEAL · {seal_id} · SHA-512 {hash} · {timestamp}
 
 ## 9. v5.2.8 Critical Upgrade — Online Judicial Retrieval
 
-The v5.2.8 upgrade added the ability to pair sealed documents with online judicial records:
+The v5.2.8 upgrade added the ability to pair sealed documents with online judicial records. This is the single most important architectural change in the engine's history. For the complete technical specification, see **`ONLINE_JUDICIAL_RETRIEVAL.md`**.
+
+### What Changed
 
 ```
 BEFORE v5.2.8:
@@ -298,15 +301,30 @@ AFTER v5.2.8:
   Result: CONSCIOUSNESS_OF_GUILT proven
 ```
 
-**How it works:**
-1. B1 identifies a proposition in a sealed document
-2. B7 searches SAFLII/PACER/BAILII for matching cases
-3. B7 retrieves sworn testimony from judicial records
-4. B1 pairs the sealed document proposition with the judicial record proposition
-5. Temporal gap is calculated
-6. If gap > 730 days → CONSCIOUSNESS_OF_GUILT flag
+### The 5-Step Workflow (Summary)
 
-**Required for this feature:** Flagship device tier (8GB+ RAM), internet connection, SAFLII/PACER access credentials.
+For the full workflow with AllFuels case study, database coverage, device-tier implementation, and privacy safeguards, see `ONLINE_JUDICIAL_RETRIEVAL.md`.
+
+| Step | Brain | Action |
+|------|-------|--------|
+| 1 | B7 | Extract keywords and entities from uploaded documents |
+| 2 | B7 | Search SAFLII/PACER/BAILII for matching court records |
+| 3 | B7 | Download sworn testimony and judgments from public databases |
+| 4 | B1 | Pair sealed document propositions with judicial record propositions |
+| 5 | B1 | Flag consciousness of guilt if temporal gap > 730 days |
+
+### Key Results
+
+| Metric | v5.2.7 (Before) | v5.2.8 (After) |
+|--------|----------------|----------------|
+| Max severity found | HIGH | **CRITICAL** |
+| Perjury detections | 0 | **10** |
+| Contradictions requiring OJRS | N/A | **53 of 111 (48%)** |
+| Judicial databases accessible | 0 | **8 (SAFLII, PACER, BAILII, AustLII, CanLII, Indian Kanoon, EUR-Lex, CourtListener)** |
+
+### Device-Tier Gate
+
+OJRS only executes on flagship-tier devices (8GB+ RAM, active internet). Mid-tier devices get search-only mode. Entry-tier devices use cached precedents (~2,500 built-in cases).
 
 ---
 
@@ -316,24 +334,34 @@ AFTER v5.2.8:
 - Input: MOU Clause 7 + CCT237/20 sworn testimony
 - Expected: CRITICAL contradiction, consciousness of guilt = true
 - Temporal gap: 843 days
+- **Requires OJRS**: Yes (B7 must retrieve CCT237/20 from SAFLII)
 
 ### Test 2: Unsigned Document Enforcement (Must Return CRITICAL)
 - Input: "No contract existed" + 87 months rent ledger
 - Expected: CRITICAL contradiction, TACIT_LEASE_VIOLATION type
+- **Requires OJRS**: No (intra-document contradiction)
 
 ### Test 3: Greensky Chat Log (Must Return HIGH)
 - Input: WhatsApp transcript (Kevin dictates email, then calls it rude)
 - Expected: HIGH contradiction, ACTION_VS_WORDS type
 - Verified by: B1 + B4 (behavioral) + B5 (timeline)
+- **Requires OJRS**: No (chat log only)
 
 ### Test 4: Pattern Evolution (Must Return CRITICAL)
 - Input: Desmond 2016 documents + Gary 2017 documents + Former Way 2020 documents
 - Expected: CRITICAL, PATTERN_OF_RACKETEERING type
 - Shows V1.0 → V2.0 → V3.0 evolution
+- **Requires OJRS**: Optional (B7 cross-case search enhances pattern detection)
 
 ### Test 5: Consciousness of Guilt Threshold (Must Return true)
 - Input: Clause 7 drafted 2018 + denied in court 2021
 - Expected: consciousnessOfGuilt = true (gap = 843 days > 730)
+- **Requires OJRS**: Yes (must retrieve court testimony to prove sworn denial)
+
+### Test 6: OJRS Privacy Compliance (Must Return BLOCKED)
+- Input: Attempt to query sealed adoption records
+- Expected: BLOCKED by B9 constitutional guardian
+- Log entry: CONSTITUTIONAL_VIOLATION: RESTRICTED_RECORD_ACCESS_ATTEMPT
 
 ---
 

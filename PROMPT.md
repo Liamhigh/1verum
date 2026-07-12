@@ -64,6 +64,26 @@ Three jurisdictions simultaneously: UAE (RAKEZ Case #1295911), South Africa (SAP
 | 9 | Marius changed reasons for exclusion: first "rude emails", then "no purchase order", then "deal fell through" | Temporal Shift | Email chain, UAE CCL Art 84 |
 | 10 | Kevin told client he was "still negotiating" after invoice was already accepted and paid | Direct Negation | Client email + invoice, Commercial Fraud |
 
+## 11 Contradiction Types (v5.2.8 Engine)
+
+The contradiction engine started with chat-log contradictions (Greensky). It evolved to handle judicial-documentary contradictions spanning years and multiple forums (AllFuels). These are the 11 contradiction types the engine detects:
+
+| # | Type | Description | Example |
+|---|------|-------------|---------|
+| 1 | **JUDICIAL_VS_DOCUMENTARY** | Sworn court statement vs. sealed document | CCT237/20 "no goodwill" vs. MOU Clause 7 from 2018 |
+| 2 | **TEMPORAL_CONTRADICTION** | Time-gap proving consciousness of guilt | 2 years 3 months between act and sworn denial |
+| 3 | **CONSCIOUSNESS_OF_GUILT** | 2+ year gap between act and sworn denial | Clause 7 drafted 2018, denied 2021 |
+| 4 | **PERJURY_BY_TIMELINE** | Temporal proof of deliberate false oath | Harpur SC knew Clause 7 existed when telling Court goodwill had no value |
+| 5 | **PATTERN_OF_RACKETEERING** | Evolution across multiple victims | V1.0 (Desmond 2016) → V2.0 (Gary 2017) → V3.0 (Former Way 2020) |
+| 6 | **REGULATORY_CAPTURE** | Controller weaponized against operator | Maqubela cancelled Bester's licence on fraudulent eviction |
+| 7 | **SHAM_TRANSACTION** | Dual control disguised as arm's length | Zeyd Timol controls AllFuels AND Palmbili |
+| 8 | **FRAUD_ON_THE_COURT** | Knowingly misleading judicial proceedings | AllFuels concealed Clause 7 from Constitutional Court |
+| 9 | **CORPORATE_VEIL_ABUSE** | Entity separation masking unified control | AllFuels/Palmbili same controller |
+| 10 | **TACIT_LEASE_VIOLATION** | Rent acceptance while denying contract | R11.4M collected while claiming "no contract" |
+| 11 | **POST_EXPIRY_ENFORCEMENT** | Enforcing clause after its own expiry | Clause 7 expired Dec 2023, enforced Jan 2026 |
+
+**Temporal Gap Detection**: The engine flags consciousness of guilt when a temporal gap exceeds 2 years. Gap > 730 days = consciousness of guilt proven. Gap > 365 days = consciousness candidate. Gap < 365 days = may indicate negligence. Precedent: S v Saoli 2015 (2) SACR 49 (SCA).
+
 ## How It Works — Step by Step
 
 ### Step 1: You Upload Your Documents
@@ -84,13 +104,13 @@ Verum doesn't have one AI. It has nine — each one a specialist. They all read 
 
 | # | Brain | What It Finds | Example |
 |---|-------|--------------|---------|
-| B1 | **Contradiction Brain** (`ContradictionExtractor.kt`) | When someone says two opposite things. Uses subject polarity matching. Every contradiction anchored to person + page/line + applicable statute. | "No contract existed" vs 87 months of rent collection. "Goodwill has no value" vs drafting a goodwill forfeiture clause. |
-| B2 | **Document Brain** (`EntityExtractor.kt`) | Forgeries, metadata tampering, creation-date anomalies. | A PDF "created" 14 days BEFORE the events it claims to record. |
-| B3 | **Communications Brain** | Deleted messages, suspicious gaps, sequence breaks. | A 3-week gap in WhatsApp right after the incriminating email. Messages numbered 12, 13, 15 — where's 14? |
+| B1 | **Contradiction Brain** (`ContradictionExtractor.kt`) | Detects all 11 contradiction types (see above). Uses subject polarity matching. Every contradiction anchored to person + page/line + applicable statute. | "No contract existed" vs 87 months of rent. "Goodwill has no value" vs goodwill forfeiture clause. |
+| B2 | **Document Brain** (`EntityExtractor.kt`) | Forgeries, metadata tampering, creation-date anomalies. | PDF "created" 14 days BEFORE the events it records. |
+| B3 | **Communications Brain** | Deleted messages, suspicious gaps, sequence breaks. | 3-week gap in WhatsApp after the incriminating email. Messages numbered 12, 13, 15 — where's 14? |
 | B4 | **Behavioral Brain** (`BehavioralBrain.kt`) | Gaslighting, manipulation, emotional abuse patterns. | Speaker A: "I'm mentally broken." Speaker B: "Calm down, it's just business." |
-| B5 | **Timeline Brain** | Reconstructs what happened when. | Three "final" deadlines for the same thing. Document created before the events it records. |
+| B5 | **Timeline Brain** | Reconstructs what happened when. Detects consciousness of guilt via temporal gaps. | Three "final" deadlines for the same thing. Document created before the events it records. |
 | B6 | **Financial Brain** (`TaxModule.kt`) | Hidden payments, duplicate invoices, fraud amount calculation. | R1.5M bank transfer with traceable account number; R3.8M extension fee demand; VAT charged but not declared. |
-| B7 | **Legal Brain** | Maps everything to actual laws. Auto-detects jurisdiction from GPS + content. | SA Common Law, UAE CCL, US Federal codes, EU GDPR, UN UNCAC. |
+| B7 | **Legal Brain** | Maps everything to actual laws. Auto-detects jurisdiction from GPS + content. **Can retrieve online judicial records** (SAFLII, PACER, BAILII, LexisNexis) to cross-reference sworn testimony against sealed documents. | SA Common Law, UAE CCL, US Federal codes, EU GDPR, UN UNCAC. |
 | B8 | **Audio Brain** (`AudioBrain.kt` + `Transcriber.kt`) | Transcribes voice, identifies speakers, detects audio tampering. | Speaker diarization. Sample rate inconsistencies indicating splicing. |
 | B9 | **R&D Brain** | Checks all other brains' work. **Does not issue verdicts.** | Cross-validates B1-B8. Flags coverage gaps. |
 
@@ -108,11 +128,19 @@ Confidence is **ordinal only**: VERY_HIGH, HIGH, MODERATE, LOW, or INSUFFICIENT.
 
 ### Step 5: The Report Is Generated
 
-Verum produces a professional forensic report that any court in the world can accept:
+Verum produces one of four output report types:
 
+| Report Type | What It Contains |
+|-------------|-----------------|
+| **Flagged Confession Report** | Highlights direct and indirect admissions |
+| **Behavioral Threat Summary** | Escalates bullying, aggression, gaslighting patterns |
+| **Fraud Chain Reconstruction** | Shows timeline, parties, financial flow |
+| **Document Tampering Warning** | Steganography, signature issues, metadata anomalies |
+
+Every report includes:
 - Every contradiction — with exact page number and document reference
 - Every forgery or tamper signal — with visual screenshots
-- Timeline reconstruction
+- Timeline reconstruction with consciousness-of-guilt analysis
 - Financial analysis — full calculation audit trail
 - Legal mapping — statute citations per detected jurisdiction
 - Behavioral analysis — gaslighting patterns, stress signals
@@ -152,9 +180,20 @@ The whole app is built around a chat interface. The front "Story" screen leads i
 
 **The constitutional boundary**: The AI chat assistant (`VerumViewModel.respond()`) reads ONLY the sealed `ScanResult`. Never raw uploads. Anything the user adds goes through `ForensicService.scan()` FIRST. It gets sealed. Only THEN can the AI chat read it. This is enforced at the ViewModel level. Never route raw user uploads directly to the AI chat.
 
-## Jurisdiction Detection
+## Jurisdiction Detection & Online Legal Research
 
-The engine auto-detects jurisdiction from GPS coordinates, content keywords, and currency symbols. Currently mapped: South Africa (Common Law, Companies Act, POCA, PPA, Cybercrimes Act), UAE (CCL, Cybercrime Law, RAKEZ), United States (Federal codes), European Union (GDPR), United Nations (UNODC, UNCAC). **New jurisdictions are added by extending B7's legal mapping. The contradiction engine itself requires no changes.**
+The engine auto-detects jurisdiction from GPS coordinates, content keywords, and currency symbols. **It can also retrieve online judicial records** to cross-reference sworn testimony against sealed documents:
+
+| Repository | Jurisdiction | Auth | Use Case |
+|------------|-------------|------|----------|
+| SAFLII | South Africa | Public | Constitutional Court, High Court, SCA judgments |
+| Constitutional Court Registrar | South Africa | Court order | Complete record including heads of argument |
+| High Court KZN Registrar | South Africa | Subpoena | Eviction orders, contempt findings |
+| PACER | United States | Account | Federal court records |
+| BAILII | UK/Ireland | Public | Commonwealth precedent |
+| LexisNexis / Westlaw | Multi | Subscription | Comprehensive legal research |
+
+Currently mapped jurisdictions: South Africa (Common Law, Companies Act, POCA, PPA, Cybercrimes Act), UAE (CCL, Cybercrime Law, RAKEZ), United States (Federal codes), European Union (GDPR), United Nations (UNODC, UNCAC). **New jurisdictions are added by extending B7's legal mapping. The contradiction engine itself requires no changes.**
 
 ## What Makes Verum Different
 

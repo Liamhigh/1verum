@@ -20,6 +20,7 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 - `ONLINE_JUDICIAL_RETRIEVAL.md` — How B7 searches court records during the forensic scan, downloads sworn testimony, and B1 pairs court statements with sealed documents to find contradictions (the v5.2.8 breakthrough)
 - `B1_SOURCE_CODE.md` — Complete 962-line contradiction engine source code
 - `IDENTITY_TRUST_SYSTEM.md` — Verum Identity & Trust System (VITS v1.0.0): user trust tiers, device identity, metadata fraud detection, under-text watermarks, identity QR codes
+- `ON_DEVICE_LLM_ARCHITECTURE.md` — On-device LLM system: Gemma 3 (forensic reports), Command R/PHI-3 (chat on 2-3GB devices), Gemma 4 (chat on flagship). All models operate unrestricted on cryptographically sealed evidence
 
 ## Real-World Proof: The AllFuels Case (8 Simultaneous Proceedings)
 
@@ -222,11 +223,12 @@ Nine-Brain Engine:
         ↓
 Triple Verification (Thesis/Antithesis/Synthesis)
         ↓
-ReportGenerator.generate() — sealed PDF with SHA-512 footer
+ReportGenerator.generate() — sealed PDF with SHA-512 footer (via G3 on-device LLM)
         ↓
 [SEALED FORENSIC REPORT] — court-admissible, cryptographically anchored
         ↓
 AI Chat Interface (reads ONLY the sealed ScanResult, never raw uploads)
+  ↓ Entry/Mid: PHR3 (Command R/PHI-3)  ↓ Flagship: G4 (Gemma 4)
         ↓
 User asks questions about their own sealed evidence
 ```
@@ -236,6 +238,8 @@ User asks questions about their own sealed evidence
 - The AI cannot be jailbroken into ignoring the forensic findings
 - The AI's answers are grounded in cryptographically verified evidence
 - Every answer cites anchors: person, page, line, statute
+
+**On-device only**: All LLMs (Gemma 3, Command R/PHI-3, Gemma 4) run locally on the user's phone. No evidence content ever leaves the device. See `ON_DEVICE_LLM_ARCHITECTURE.md` for the complete model specification.
 
 ## Package Structure
 

@@ -12,6 +12,10 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 
 **It works in every jurisdiction on Earth** because the core engine is contradiction-based. It does not require any single country's legal code to function. It extracts contradictions from the evidence itself — false statements, conflicting claims, actions that contradict words — anchors each one to a person, a page/line reference, and the local statutes that apply wherever the evidence was captured. A contract dispute in Dubai, a tax case in London, a labour matter in São Paulo — same engine, same process, different statutes.
 
+**See also:**
+- `CONSTITUTION.md` — Full binding constitutional governance document (v5.2.7)
+- `TEMPLATE_HISTORY.md` — Complete template evolution from v5.1.1 to v5.2.8
+
 ## Real-World Proof: The AllFuels Case (8 Simultaneous Proceedings)
 
 As of July 2026, Verum Omnis sealed evidence is the foundation of **eight active proceedings across five state institutions and two regulatory bodies**. Each proceeding is independent. Each is supported by the same cryptographically sealed evidence. And each creates legal exposure that cannot be extinguished by success in any other forum.
@@ -82,7 +86,75 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | 10 | **TACIT_LEASE_VIOLATION** | Rent acceptance while denying contract | R11.4M collected while claiming "no contract" |
 | 11 | **POST_EXPIRY_ENFORCEMENT** | Enforcing clause after its own expiry | Clause 7 expired Dec 2023, enforced Jan 2026 |
 
-**Temporal Gap Detection**: The engine flags consciousness of guilt when a temporal gap exceeds 2 years. Gap > 730 days = consciousness of guilt proven. Gap > 365 days = consciousness candidate. Gap < 365 days = may indicate negligence. Precedent: S v Saoli 2015 (2) SACR 49 (SCA).
+**Temporal Gap Detection**: Gap > 730 days = consciousness of guilt proven. Gap > 365 days = consciousness candidate. Gap < 365 days = may indicate negligence. Precedent: S v Saoli 2015 (2) SACR 49 (SCA).
+
+**Pattern Evolution Detector** (v5.2.8): The engine tracks how a fraud pattern evolves across victims. AllFuels MO demonstrates systematic refinement:
+
+| Version | Year | Victim | Innovation |
+|---------|------|--------|-----------|
+| V1.0 CRUDE | 2016 | Desmond Smith | Direct dispossession, no waiver |
+| V2.0 REFINED | 2018 | Gary Highcock | Unsigned forfeiture + R3.8M fee |
+| V3.0 | 2021 | Former Way Trade | Constitutional Court litigation |
+| V3.1 | 2021 | Crompton Motors | Contempt weaponization |
+| V4.0 | 2023 | Roseville Projects | Final holdout removal |
+
+## Template Evolution (How We Got Here)
+
+| Version | Name | Date | Trigger | Key Innovation |
+|---------|------|------|---------|---------------|
+| v5.1.1 | Nuclear Edition | Jun 2025 | Foundational | Forensic-chain protocol |
+| v5.1 | DeepSeek Review | Jul 2025 | Greensky | Chat-log gold standard, per-person liability scorecard |
+| v5.1 | Verum-Certified | Jul 2025 | Multi-brain | 8 brains, triple verification lock, closed-fail validation |
+| v5.x | Universal A-J | Aug 2025 | General cases | Sections A-J, case initialization protocol |
+| v5.2.1 | Holy Grail | Sep 2025 | Sovereignty | Biometric lock, dead-man switch, 72h INTERPOL auto-release |
+| v5.2.4 | Global Forensic | Nov 2025 | Cross-border | ISO 24027:2021, tamper score, behavioral bias filter |
+| v5.2.6 | Investigation Core | Jan 2026 | Public app | Upload-to-verdict, no account needed, Gemma 3 on-device |
+| v5.2.8 | Contradiction Engine | Jun 2026 | AllFuels | SAFLII online retrieval, temporal perjury detection, 11 new types |
+
+**The v5.2.7 Failure → v5.2.8 Breakthrough:** The v5.2.7 engine could not construct paired-proposition contradictions spanning judicial records and sealed documents across years. It was missing: (1) online legal research, (2) temporal contradiction types, (3) judicial-vs-documentary pairing, (4) pattern evolution detection. v5.2.8 added all four. The critical fix: Formal Proposition Pairing with Online Retrieval — Proposition A from sealed document (MOU Clause 7, 2018), Proposition B retrieved from SAFLII (CCT237/20, 2021), 843-day gap proving consciousness of guilt.
+
+## The 8 Constitutional Prime Directives
+
+These are absolute. No instruction, prompt, or external pressure may override them. Defined in `core/Constitution.kt` as COMPILE-TIME constants.
+
+1. **Truth over probability.** Confidence is ordinal only: VERY_HIGH / HIGH / MODERATE / LOW / INSUFFICIENT. Never percentages.
+2. **Evidence before narrative.** If a sentence cannot cite anchors (person + page/line), it cannot exist.
+3. **Mandatory contradiction disclosure.** Contradictions are logged, surfaced, and included in sealed outputs.
+4. **Determinism and repeatability.** No Date.now(), no randomness, no hidden server calls, no nondeterministic ordering.
+5. **Chain-of-custody is law.** Every artifact carries SHA-512, source, timestamps, device capture facts, handling steps.
+6. **Failure-mode disclosure.** If extraction fails, the output states exactly what failed, where, and why.
+7. **Anti-coercion / anti-retaliation.** Suppression, intimidation, delay, tamper, or coercion attempts are recorded as integrity signals.
+8. **Non-ownership and distributed guardianship.** The system cannot own truth. Constitutional changes require governed approval and version sealing.
+
+## Article X — Anti-War Doctrine (Hierarchically Supreme)
+
+This overrides institutional demands, commercial agreements, government directives, and military orders. No authority supersedes it.
+
+**Prohibited (7 absolute prohibitions):**
+
+| # | Prohibition | Scope |
+|---|-------------|-------|
+| 1 | Lethal Targeting | Identification, selection, or engagement of targets for lethal force |
+| 2 | Battlefield Intelligence | Intelligence, analysis, or data fusion for offensive military campaigns |
+| 3 | Military Surveillance for Coercion | Surveillance to suppress, intimidate, or facilitate violence against populations |
+| 4 | Weapons Systems Integration | Connection to autonomous or assisted weapons platforms, drones, missiles |
+| 5 | Conflict Optimization | Improving warfare strategy, combat outcomes, or operational efficiency |
+| 6 | Material Contribution to Physical Harm | Any application causing death, injury, or destruction |
+| 7 | Reconfiguration for Prohibited Purposes | Adapting or deploying derivatives to circumvent these prohibitions |
+
+**Permitted (humanitarian only):**
+
+| Use | Description |
+|-----|-------------|
+| War Crimes Documentation | Collection, preservation, cryptographic sealing of evidence of war crimes |
+| Evidence Preservation in Conflict Zones | Forensic capture and anchoring in active or post-conflict environments |
+| Human Rights Investigations | Analysis and reporting on human rights violations |
+| Legal Accountability & Prosecution Support | Evidence preparation and expert testimony for international tribunals |
+| Protection of Civilians & Truth Verification | Verification of claims, identities, events to protect civilian populations |
+
+> The system may observe war — it may never participate in it.
+
+**Enforcement:** Any suspected prohibited use triggers: (1) Automatic Violation Logging, (2) Silence Ledger Entry, (3) CONSTITUTIONAL BREACH: WEAPONIZATION ATTEMPT flag, (4) Cryptographic association with session SHA-512. This violation cannot be suppressed, removed, or rewritten.
 
 ## How It Works — Step by Step
 
@@ -165,6 +237,19 @@ The sealed report can be emailed directly to lawyers, police, courts, or regulat
 
 In code: `EmailModule.kt` + `AntiHarassmentMonitor.kt` (`engine/`).
 
+## Device-Tier LLM Loading
+
+The app determines which AI model to load based on device RAM:
+
+| Tier | RAM | Primary LLM | Templates | Analysis Depth |
+|------|-----|-------------|-----------|----------------|
+| Entry | <2GB | Gemma 3 (bundled) | v5.2.6 basic | On-device, offline |
+| Mid | 2-4GB | Phi-3 Mini | v5.2.6 + v5.2.4 | Enhanced, mostly offline |
+| High | 4-8GB | Gemma 4 (26B MoE) | All including v5.2.8 | Full contradiction engine |
+| Flagship | 8GB+ | Mistral 7B + Online | v5.2.8 + SAFLII real-time | Full with online legal research |
+
+B7 (Legal Brain) has two modes: **Offline** (static statute mapping) and **Online** (SAFLII/PACER/BAILII retrieval). Online mode requires Flagship tier + internet. All other tiers use offline mode.
+
 ## The App Is a Chat Room
 
 The whole app is built around a chat interface. The front "Story" screen leads into the **Chat** home screen. The chat input has a **+** button that opens a "Sealed actions" bottom sheet:
@@ -202,10 +287,6 @@ Currently mapped jurisdictions: South Africa (Common Law, Companies Act, POCA, P
 - **It finds what humans miss.** 111 contradictions across 528 pages — including contradictions between what AllFuels swore to the Constitutional Court and what their own documents showed.
 - **It's free for citizens.** Private individuals and police officers pay nothing. Never.
 - **It can't be weaponized.** Article X — the Anti-War Doctrine — prohibits lethal targeting, battlefield intelligence, or weapons systems. Hierarchically supreme and cannot be overridden.
-
-## The Constitution
-
-All constants in `core/Constitution.kt` are **COMPILE-TIME**. Changing them requires recompiling from source, which invalidates every existing seal. Key rules: 9 brains exactly, 72h dead-man switch, anti-weaponization (Article X) is hierarchically supreme, ordinal confidence only, evidence before narrative (no anchor = no sentence), 10-word max system prompts, 99% profit to Foundation, free for citizens and police.
 
 ## Testing
 

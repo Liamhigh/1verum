@@ -17,6 +17,9 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 - `TEMPLATE_HISTORY.md` — Complete template evolution from v5.1.1 to v5.2.8
 - `NINE_BRAIN_RULES.md` — Brain-specific operational rules, v5.2.7 vs v6.0 comparison, White Paper mapping
 - `B1_ENGINE.md` — B1 Contradiction Brain: all 38 primary contradictions, algorithm, output format
+- `ONLINE_JUDICIAL_RETRIEVAL.md` — How B7 searches court records during the forensic scan, downloads sworn testimony, and B1 pairs court statements with sealed documents to find contradictions (the v5.2.8 breakthrough)
+- `B1_SOURCE_CODE.md` — Complete 962-line contradiction engine source code
+- `IDENTITY_TRUST_SYSTEM.md` — Verum Identity & Trust System (VITS v1.0.0): user trust tiers, device identity, metadata fraud detection, under-text watermarks, identity QR codes
 
 ## Real-World Proof: The AllFuels Case (8 Simultaneous Proceedings)
 
@@ -162,7 +165,7 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | B4 | Detects evasion, gaslighting, manipulation | **Voting** | LIWC++ algorithms. Per-person liability scorecard (0-10). Voice tone analysis for threats, stress, deception. |
 | B5 | Reconstructs event sequences | **Voting** | Identifies missing/deleted entries. ISP, GPS, device log anchoring. 2+ year gap = consciousness of guilt flag. |
 | B6 | Flags hidden payments, duplicates | **Voting** | Every transaction reconciled against ledgers/tax codes. Simulates fraud patterns. Auto-generates tax returns. Rent tracing (v5.2.8). |
-| B7 | Maps facts to legal categories | **Voting** | Jurisdiction-specific (UAE, SA, US, EU, UN). Auto-maps statutes, precedents, treaties. SAFLII/PACER/BAILII retrieval (v5.2.8). |
+| B7 | Maps facts to legal categories | **Voting** | Jurisdiction-specific (UAE, SA, US, EU, UN). Auto-maps statutes, precedents, treaties. SAFLII/PACER/BAILII retrieval (v5.2.8). See `ONLINE_JUDICIAL_RETRIEVAL.md` for full workflow. |
 | B8 | Checks audio for edits, deepfakes | **Voting** | Whisper.cpp on-device transcription. Speaker diarization. Synthetic audio detection. |
 | B9 | Trains, validates, red-teams | **NON-VOTING** | Cannot issue verdicts. Trains and calibrates all other brains via simulation. Adversarial red-team testing. v5.2.8 upgrade: B9 votes ONLY on online judicial record authentication. |
 
@@ -177,13 +180,62 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | 3 — Signature Status | 18 | Presenting unsigned documents as enforceable while refusing to countersign |
 | 4 — Section 12B Arbitration | 12 | Failing to offer statutory arbitration while claiming compliance with the Petroleum Products Act |
 | 5 — Compensation Demands | 11 | Demanding operators pay for extensions while claiming operators have no compensable interest |
-| 6 | **Non-ownership and distributed guardianship** | The system cannot own truth. Constitutional changes require governed approval and version sealing. |
-| 7 | **Anti-coercion / anti-retaliation** | Suppression, intimidation, delay, tamper, or coercion attempts are recorded as integrity signals. |
-| 8 | **Failure-mode disclosure** | If extraction fails, the output states exactly what failed, where, and why. |
-| 9 | **Free for citizens and law enforcement** | Hard-coded. No paywalls. No licenses required. |
-| 10 | **Template immutability** | Sealed template versions are unmodifiable. Only new versions can be created. |
-| 11 | **B9 non-voting lock** | B9 (R&D) cannot issue verdicts. It trains, validates, and red-teams only. |
-| 12 | **Pattern detection mandatory** | The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator. |
+| 6 — Perjury / Constitutional Court | 10 | Sworn statements to the Constitutional Court contradicted by AllFuels' own sealed documents. **All 10 found via OJRS** — see `ONLINE_JUDICIAL_RETRIEVAL.md` |
+| 7 — Coercion & Fabricated Consent | 8 | Claiming operator was "grateful" when contemporaneous evidence proves he was non-committal |
+| **TOTAL** | **111** | |
+
+## 12 Coding Rules for Code Assistants
+
+1. **Respect the constitutional boundary**: Never route raw user uploads directly to the AI chat. Always go through `ForensicService.scan()` first.
+2. **Keep it deterministic**: Same evidence = same findings = same seal. Pass a fixed `Instant` to `ForensicService.scan()` and `ReportGenerator.generate()` in tests.
+3. **Don't break the seal format**: The per-page footer format and seal structure are part of the protocol. Changing them invalidates existing seals.
+4. **Pure Kotlin for business logic**: The engine has no Android dependencies. Keep it that way.
+5. **10-word system prompts max**: Per Constitution, no AI system prompt exceeds 10 words.
+6. **No randomness, no Date.now()**: Use injected `Instant` parameters everywhere.
+7. **Jurisdiction-agnostic**: The contradiction engine works everywhere. New jurisdictions are added by extending B7's legal mapping, not by changing B1.
+8. **Free for citizens, paid for institutions**: This is a constitutional rule. Don't add paywalls for private individuals or police.
+9. **Anti-weaponization is supreme**: Article X cannot be overridden. Don't add features that could be used for lethal targeting or battlefield intelligence.
+10. **B9 cannot issue verdicts**: B9 is trainer/validator only. It does not count toward the 3-brain quorum.
+11. **7 contradiction categories are constitutional**: Do not add or remove the 7 categories (Goodwill Value, Contract Validity, Signature Status, Section 12B, Compensation, Perjury, Coercion).
+12. **Pattern detection mandatory**: The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator.
+
+## The Data Flow
+
+This is the most important architectural rule in the entire system. It is what separates Verum Omnis from every other AI tool on Earth.
+
+```
+User uploads documents
+        ↓
+[Evidence Vault] — AES-256-GCM encrypted, hardware-backed keystore
+        ↓
+ForensicService.scan() — deterministic, timestamp-injected
+        ↓
+Nine-Brain Engine:
+  B1: Contradiction extraction
+  B2: Document/metadata verification
+  B3: Chat/communication analysis
+  B4: Behavioral pattern detection
+  B5: Timeline reconstruction
+  B6: Financial analysis
+  B7: Legal statute mapping (+ Online Judicial Retrieval on flagship devices)
+  B8: Audio/video forensics
+        ↓
+Triple Verification (Thesis/Antithesis/Synthesis)
+        ↓
+ReportGenerator.generate() — sealed PDF with SHA-512 footer
+        ↓
+[SEALED FORENSIC REPORT] — court-admissible, cryptographically anchored
+        ↓
+AI Chat Interface (reads ONLY the sealed ScanResult, never raw uploads)
+        ↓
+User asks questions about their own sealed evidence
+```
+
+**The constitutional boundary**: Raw user uploads never touch the AI chat. The AI only ever sees the sealed `ScanResult` object. This means:
+- The AI cannot hallucinate about documents it hasn't scanned
+- The AI cannot be jailbroken into ignoring the forensic findings
+- The AI's answers are grounded in cryptographically verified evidence
+- Every answer cites anchors: person, page, line, statute
 
 ## Package Structure
 
@@ -206,18 +258,3 @@ com.verumomnis.forensic/
   vault/          EvidenceVault.kt
   MainActivity.kt
 ```
-
-## What To Do When Asked To Modify Code
-
-1. **Respect the constitutional boundary**: Never route raw user uploads directly to the AI chat. Always go through `ForensicService.scan()` first.
-2. **Keep it deterministic**: Same evidence = same findings = same seal. Pass a fixed `Instant` to `ForensicService.scan()` and `ReportGenerator.generate()` in tests.
-3. **Don't break the seal format**: The per-page footer format and seal structure are part of the protocol. Changing them invalidates existing seals.
-4. **Pure Kotlin for business logic**: The engine has no Android dependencies. Keep it that way.
-5. **10-word system prompts max**: Per Constitution, no AI system prompt exceeds 10 words.
-6. **No randomness, no Date.now()**: Use injected `Instant` parameters everywhere.
-7. **Jurisdiction-agnostic**: The contradiction engine works everywhere. New jurisdictions are added by extending B7's legal mapping, not by changing B1.
-8. **Free for citizens, paid for institutions**: This is a constitutional rule. Don't add paywalls for private individuals or police.
-9. **Anti-weaponization is supreme**: Article X cannot be overridden. Don't add features that could be used for lethal targeting or battlefield intelligence.
-10. **B9 cannot issue verdicts**: B9 is trainer/validator only. It does not count toward the 3-brain quorum.
-11. **7 contradiction categories are constitutional**: Do not add or remove the 7 categories (Goodwill Value, Contract Validity, Signature Status, Section 12B, Compensation, Perjury, Coercion).
-12. **Pattern detection mandatory**: The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator.

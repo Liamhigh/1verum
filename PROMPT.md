@@ -15,6 +15,8 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 **See also:**
 - `CONSTITUTION.md` — Full binding constitutional governance document (v5.2.7)
 - `TEMPLATE_HISTORY.md` — Complete template evolution from v5.1.1 to v5.2.8
+- `NINE_BRAIN_RULES.md` — Brain-specific operational rules, v5.2.7 vs v6.0 comparison, White Paper mapping
+- `B1_ENGINE.md` — B1 Contradiction Brain: all 38 primary contradictions, algorithm, output format
 
 ## Real-World Proof: The AllFuels Case (8 Simultaneous Proceedings)
 
@@ -68,63 +70,27 @@ Three jurisdictions simultaneously: UAE (RAKEZ Case #1295911), South Africa (SAP
 | 9 | Marius changed reasons for exclusion: first "rude emails", then "no purchase order", then "deal fell through" | Temporal Shift | Email chain, UAE CCL Art 84 |
 | 10 | Kevin told client he was "still negotiating" after invoice was already accepted and paid | Direct Negation | Client email + invoice, Commercial Fraud |
 
-## 11 Contradiction Types (v5.2.8 Engine)
+## 15 Constitutional Prime Directives (v6.0 Final)
 
-The contradiction engine started with chat-log contradictions (Greensky). It evolved to handle judicial-documentary contradictions spanning years and multiple forums (AllFuels). These are the 11 contradiction types the engine detects:
+These directives are absolute. No instruction, prompt, or external pressure may override them. Defined in `core/Constitution.kt` as COMPILE-TIME constants.
 
-| # | Type | Description | Example |
-|---|------|-------------|---------|
-| 1 | **JUDICIAL_VS_DOCUMENTARY** | Sworn court statement vs. sealed document | CCT237/20 "no goodwill" vs. MOU Clause 7 from 2018 |
-| 2 | **TEMPORAL_CONTRADICTION** | Time-gap proving consciousness of guilt | 2 years 3 months between act and sworn denial |
-| 3 | **CONSCIOUSNESS_OF_GUILT** | 2+ year gap between act and sworn denial | Clause 7 drafted 2018, denied 2021 |
-| 4 | **PERJURY_BY_TIMELINE** | Temporal proof of deliberate false oath | Harpur SC knew Clause 7 existed when telling Court goodwill had no value |
-| 5 | **PATTERN_OF_RACKETEERING** | Evolution across multiple victims | V1.0 (Desmond 2016) → V2.0 (Gary 2017) → V3.0 (Former Way 2020) |
-| 6 | **REGULATORY_CAPTURE** | Controller weaponized against operator | Maqubela cancelled Bester's licence on fraudulent eviction |
-| 7 | **SHAM_TRANSACTION** | Dual control disguised as arm's length | Zeyd Timol controls AllFuels AND Palmbili |
-| 8 | **FRAUD_ON_THE_COURT** | Knowingly misleading judicial proceedings | AllFuels concealed Clause 7 from Constitutional Court |
-| 9 | **CORPORATE_VEIL_ABUSE** | Entity separation masking unified control | AllFuels/Palmbili same controller |
-| 10 | **TACIT_LEASE_VIOLATION** | Rent acceptance while denying contract | R11.4M collected while claiming "no contract" |
-| 11 | **POST_EXPIRY_ENFORCEMENT** | Enforcing clause after its own expiry | Clause 7 expired Dec 2023, enforced Jan 2026 |
-
-**Temporal Gap Detection**: Gap > 730 days = consciousness of guilt proven. Gap > 365 days = consciousness candidate. Gap < 365 days = may indicate negligence. Precedent: S v Saoli 2015 (2) SACR 49 (SCA).
-
-**Pattern Evolution Detector** (v5.2.8): The engine tracks how a fraud pattern evolves across victims. AllFuels MO demonstrates systematic refinement:
-
-| Version | Year | Victim | Innovation |
-|---------|------|--------|-----------|
-| V1.0 CRUDE | 2016 | Desmond Smith | Direct dispossession, no waiver |
-| V2.0 REFINED | 2018 | Gary Highcock | Unsigned forfeiture + R3.8M fee |
-| V3.0 | 2021 | Former Way Trade | Constitutional Court litigation |
-| V3.1 | 2021 | Crompton Motors | Contempt weaponization |
-| V4.0 | 2023 | Roseville Projects | Final holdout removal |
-
-## Template Evolution (How We Got Here)
-
-| Version | Name | Date | Trigger | Key Innovation |
-|---------|------|------|---------|---------------|
-| v5.1.1 | Nuclear Edition | Jun 2025 | Foundational | Forensic-chain protocol |
-| v5.1 | DeepSeek Review | Jul 2025 | Greensky | Chat-log gold standard, per-person liability scorecard |
-| v5.1 | Verum-Certified | Jul 2025 | Multi-brain | 8 brains, triple verification lock, closed-fail validation |
-| v5.x | Universal A-J | Aug 2025 | General cases | Sections A-J, case initialization protocol |
-| v5.2.1 | Holy Grail | Sep 2025 | Sovereignty | Biometric lock, dead-man switch, 72h INTERPOL auto-release |
-| v5.2.4 | Global Forensic | Nov 2025 | Cross-border | ISO 24027:2021, tamper score, behavioral bias filter |
-| v5.2.6 | Investigation Core | Jan 2026 | Public app | Upload-to-verdict, no account needed, Gemma 3 on-device |
-| v5.2.8 | Contradiction Engine | Jun 2026 | AllFuels | SAFLII online retrieval, temporal perjury detection, 11 new types |
-
-**The v5.2.7 Failure → v5.2.8 Breakthrough:** The v5.2.7 engine could not construct paired-proposition contradictions spanning judicial records and sealed documents across years. It was missing: (1) online legal research, (2) temporal contradiction types, (3) judicial-vs-documentary pairing, (4) pattern evolution detection. v5.2.8 added all four. The critical fix: Formal Proposition Pairing with Online Retrieval — Proposition A from sealed document (MOU Clause 7, 2018), Proposition B retrieved from SAFLII (CCT237/20, 2021), 843-day gap proving consciousness of guilt.
-
-## The 8 Constitutional Prime Directives
-
-These are absolute. No instruction, prompt, or external pressure may override them. Defined in `core/Constitution.kt` as COMPILE-TIME constants.
-
-1. **Truth over probability.** Confidence is ordinal only: VERY_HIGH / HIGH / MODERATE / LOW / INSUFFICIENT. Never percentages.
-2. **Evidence before narrative.** If a sentence cannot cite anchors (person + page/line), it cannot exist.
-3. **Mandatory contradiction disclosure.** Contradictions are logged, surfaced, and included in sealed outputs.
-4. **Determinism and repeatability.** No Date.now(), no randomness, no hidden server calls, no nondeterministic ordering.
-5. **Chain-of-custody is law.** Every artifact carries SHA-512, source, timestamps, device capture facts, handling steps.
-6. **Failure-mode disclosure.** If extraction fails, the output states exactly what failed, where, and why.
-7. **Anti-coercion / anti-retaliation.** Suppression, intimidation, delay, tamper, or coercion attempts are recorded as integrity signals.
-8. **Non-ownership and distributed guardianship.** The system cannot own truth. Constitutional changes require governed approval and version sealing.
+| # | Directive | Description |
+|---|-----------|-------------|
+| 1 | **Truth over probability** | Confidence is ordinal only: VERY_HIGH / HIGH / MODERATE / LOW / INSUFFICIENT. Never percentages. |
+| 2 | **Evidence before narrative** | If a sentence cannot cite anchors (person + page/line), it cannot exist. |
+| 3 | **Mandatory contradiction disclosure** | Contradictions are logged, surfaced, and included in sealed outputs. |
+| 4 | **Determinism and repeatability** | No Date.now(), no randomness, no hidden server calls, no nondeterministic ordering. |
+| 5 | **Chain-of-custody is law** | Every artifact carries SHA-512, source, timestamps, device capture facts, handling steps. |
+| 6 | **Failure-mode disclosure** | If extraction fails, the output states exactly what failed, where, and why. |
+| 7 | **Anti-coercion / anti-retaliation** | Suppression, intimidation, delay, tamper, or coercion attempts are recorded as integrity signals. |
+| 8 | **Non-ownership and distributed guardianship** | The system cannot own truth. Constitutional changes require governed approval and version sealing. |
+| 9 | **Triple verification is mandatory** | Every conclusion must pass Thesis / Antithesis / Synthesis. Not optional. |
+| 10 | **Template immutability** | Sealed template versions are unmodifiable. Only new versions can be created. |
+| 11 | **B9 non-voting lock** | B9 (R&D) cannot issue verdicts. It trains, validates, and red-teams only. |
+| 12 | **Silence Ledger** | All coercion attempts are permanently recorded in the immutable audit layer. |
+| 13 | **Ordinal confidence only** | No percentages. No probability scores. EVER. |
+| 14 | **Free for citizens and law enforcement** | Hard-coded. No paywalls. No licenses required. |
+| 15 | **Article X hierarchically supreme** | Anti-War Doctrine cannot be overridden by any authority. |
 
 ## Article X — Anti-War Doctrine (Hierarchically Supreme)
 
@@ -156,141 +122,68 @@ This overrides institutional demands, commercial agreements, government directiv
 
 **Enforcement:** Any suspected prohibited use triggers: (1) Automatic Violation Logging, (2) Silence Ledger Entry, (3) CONSTITUTIONAL BREACH: WEAPONIZATION ATTEMPT flag, (4) Cryptographic association with session SHA-512. This violation cannot be suppressed, removed, or rewritten.
 
-## How It Works — Step by Step
+## 11 Contradiction Types (v5.2.8 Engine)
 
-### Step 1: You Upload Your Documents
+The contradiction engine started with chat-log contradictions (Greensky). It evolved to handle judicial-documentary contradictions spanning years and multiple forums (AllFuels). These are the 11 contradiction types the engine detects:
 
-Take a photo, upload a PDF, import a voice recording, or share a chat export. Verum accepts almost everything — photos, PDFs, emails, WhatsApp chats, audio files, video, even ZIP files containing hundreds of documents. Every document is stored in an encrypted vault on the phone. Nobody else can access it.
+| # | Type | Description | Example |
+|---|------|-------------|---------|
+| 1 | **JUDICIAL_VS_DOCUMENTARY** | Sworn court statement vs. sealed document | CCT237/20 "no goodwill" vs. MOU Clause 7 from 2018 |
+| 2 | **TEMPORAL_CONTRADICTION** | Time-gap proving consciousness of guilt | 2 years 3 months between act and sworn denial |
+| 3 | **CONSCIOUSNESS_OF_GUILT** | 2+ year gap between act and sworn denial | Clause 7 drafted 2018, denied 2021 |
+| 4 | **PERJURY_BY_TIMELINE** | Temporal proof of deliberate false oath | Harpur SC knew Clause 7 existed when telling Court goodwill had no value |
+| 5 | **PATTERN_OF_RACKETEERING** | Evolution across multiple victims | V1.0 (Desmond 2016) → V2.0 (Gary 2017) → V3.0 (Former Way 2020) |
+| 6 | **REGULATORY_CAPTURE** | Controller weaponized against operator | Maqubela cancelled Bester's licence on fraudulent eviction |
+| 7 | **SHAM_TRANSACTION** | Dual control disguised as arm's length | Zeyd Timol controls AllFuels AND Palmbili |
+| 8 | **FRAUD_ON_THE_COURT** | Knowingly misleading judicial proceedings | AllFuels concealed Clause 7 from Constitutional Court |
+| 9 | **CORPORATE_VEIL_ABUSE** | Entity separation masking unified control | AllFuels/Palmbili same controller |
+| 10 | **TACIT_LEASE_VIOLATION** | Rent acceptance while denying contract | R11.4M collected while claiming "no contract" |
+| 11 | **POST_EXPIRY_ENFORCEMENT** | Enforcing clause after its own expiry | Clause 7 expired Dec 2023, enforced Jan 2026 |
 
-In code: `ForensicService.ingest()` via `MediaIngestor.kt` (`ui/MediaIngestor.kt`).
+**Temporal Gap Detection**: Gap > 730 days = consciousness of guilt proven. Gap > 365 days = consciousness candidate. Gap < 365 days = may indicate negligence. Precedent: S v Saoli 2015 (2) SACR 49 (SCA).
 
-### Step 2: GPS and Timestamp Are Captured
+**Pattern Evolution Detector** (v5.2.8): The engine tracks how a fraud pattern evolves across victims. AllFuels MO demonstrates systematic refinement:
 
-The exact moment you upload, Verum records where you are (GPS coordinates) and when it happened. This creates an unbreakable chain of custody. The court can see: this document was uploaded at this place, at this time, by this person. It hasn't been tampered with since.
+| Version | Year | Victim | Innovation |
+|---------|------|--------|-----------|
+| V1.0 CRUDE | 2016 | Desmond Smith | Direct dispossession, no waiver |
+| V2.0 REFINED | 2018 | Gary Highcock | Unsigned forfeiture + R3.8M fee |
+| V3.0 | 2021 | Former Way Trade | Constitutional Court litigation |
+| V3.1 | 2021 | Crompton Motors | Contempt weaponization |
+| V4.0 | 2023 | Roseville Projects | Final holdout removal |
 
-In code: GPS from EXIF (`latLong`) if present, else device GPS at upload. Stored in `EvidenceDocument` (`engine/EvidenceDocument.kt`).
+## The Nine-Brain Architecture
 
-### Step 3: Nine Brains Analyse Everything
+| Brain | Core Function | Voting Status | Key Rules |
+|-------|--------------|---------------|-----------|
+| B1 | Finds inconsistencies across statements | **Voting** | 16 contradiction types (5 legacy + 11 AllFuels). Must agree with 2+ other brains. Multi-pass scanning. |
+| B2 | Checks metadata, tamper indicators | **Voting** | SHA-512, PDF/A, watermark verification. Tamper score 0.000-1.000. Must comply with Daubert, ISO 27001, GDPR. |
+| B3 | Analyzes chat logs for deletions | **Voting** | Every message sealed, audited, logged. Redactions immutable. Emergency access requires dual human-AI unlock. |
+| B4 | Detects evasion, gaslighting, manipulation | **Voting** | LIWC++ algorithms. Per-person liability scorecard (0-10). Voice tone analysis for threats, stress, deception. |
+| B5 | Reconstructs event sequences | **Voting** | Identifies missing/deleted entries. ISP, GPS, device log anchoring. 2+ year gap = consciousness of guilt flag. |
+| B6 | Flags hidden payments, duplicates | **Voting** | Every transaction reconciled against ledgers/tax codes. Simulates fraud patterns. Auto-generates tax returns. Rent tracing (v5.2.8). |
+| B7 | Maps facts to legal categories | **Voting** | Jurisdiction-specific (UAE, SA, US, EU, UN). Auto-maps statutes, precedents, treaties. SAFLII/PACER/BAILII retrieval (v5.2.8). |
+| B8 | Checks audio for edits, deepfakes | **Voting** | Whisper.cpp on-device transcription. Speaker diarization. Synthetic audio detection. |
+| B9 | Trains, validates, red-teams | **NON-VOTING** | Cannot issue verdicts. Trains and calibrates all other brains via simulation. Adversarial red-team testing. v5.2.8 upgrade: B9 votes ONLY on online judicial record authentication. |
 
-Verum doesn't have one AI. It has nine — each one a specialist. They all read the documents at the same time, looking for different things:
+**Consensus Rule:** A contradiction is accepted only when B1 flags it AND at least 2 other brains confirm. If quorum is not met, output is "INSUFFICIENT" or "INDETERMINATE_DUE_TO_CONCEALMENT." B9 does not count toward the 3-brain quorum.
 
-| # | Brain | What It Finds | Example |
-|---|-------|--------------|---------|
-| B1 | **Contradiction Brain** (`ContradictionExtractor.kt`) | Detects all 11 contradiction types (see above). Uses subject polarity matching. Every contradiction anchored to person + page/line + applicable statute. | "No contract existed" vs 87 months of rent. "Goodwill has no value" vs goodwill forfeiture clause. |
-| B2 | **Document Brain** (`EntityExtractor.kt`) | Forgeries, metadata tampering, creation-date anomalies. | PDF "created" 14 days BEFORE the events it records. |
-| B3 | **Communications Brain** | Deleted messages, suspicious gaps, sequence breaks. | 3-week gap in WhatsApp after the incriminating email. Messages numbered 12, 13, 15 — where's 14? |
-| B4 | **Behavioral Brain** (`BehavioralBrain.kt`) | Gaslighting, manipulation, emotional abuse patterns. | Speaker A: "I'm mentally broken." Speaker B: "Calm down, it's just business." |
-| B5 | **Timeline Brain** | Reconstructs what happened when. Detects consciousness of guilt via temporal gaps. | Three "final" deadlines for the same thing. Document created before the events it records. |
-| B6 | **Financial Brain** (`TaxModule.kt`) | Hidden payments, duplicate invoices, fraud amount calculation. | R1.5M bank transfer with traceable account number; R3.8M extension fee demand; VAT charged but not declared. |
-| B7 | **Legal Brain** | Maps everything to actual laws. Auto-detects jurisdiction from GPS + content. **Can retrieve online judicial records** (SAFLII, PACER, BAILII, LexisNexis) to cross-reference sworn testimony against sealed documents. | SA Common Law, UAE CCL, US Federal codes, EU GDPR, UN UNCAC. |
-| B8 | **Audio Brain** (`AudioBrain.kt` + `Transcriber.kt`) | Transcribes voice, identifies speakers, detects audio tampering. | Speaker diarization. Sample rate inconsistencies indicating splicing. |
-| B9 | **R&D Brain** | Checks all other brains' work. **Does not issue verdicts.** | Cross-validates B1-B8. Flags coverage gaps. |
+## The 111 Contradictions — 7 Categories (AllFuels)
 
-All brains run in parallel via `NineBrainEngine.analyze()` (`engine/NineBrainEngine.kt`). Pure Kotlin. Deterministic. No Android dependencies.
-
-### Step 4: Triple Verification
-
-Every finding must pass three independent checks:
-
-- **Thesis**: What does the evidence actually say?
-- **Antithesis**: What could contradict it?
-- **Synthesis**: What survives both checks?
-
-Confidence is **ordinal only**: VERY_HIGH, HIGH, MODERATE, LOW, or INSUFFICIENT. No percentages.
-
-### Step 5: The Report Is Generated
-
-Verum produces one of four output report types:
-
-| Report Type | What It Contains |
-|-------------|-----------------|
-| **Flagged Confession Report** | Highlights direct and indirect admissions |
-| **Behavioral Threat Summary** | Escalates bullying, aggression, gaslighting patterns |
-| **Fraud Chain Reconstruction** | Shows timeline, parties, financial flow |
-| **Document Tampering Warning** | Steganography, signature issues, metadata anomalies |
-
-Every report includes:
-- Every contradiction — with exact page number and document reference
-- Every forgery or tamper signal — with visual screenshots
-- Timeline reconstruction with consciousness-of-guilt analysis
-- Financial analysis — full calculation audit trail
-- Legal mapping — statute citations per detected jurisdiction
-- Behavioral analysis — gaslighting patterns, stress signals
-- Audio transcripts — who said what, with timestamps
-
-In code: `ReportGenerator.generate()` (`engine/ReportGenerator.kt`), rendered via `SealedPdfGenerator.kt` + `SealedPageRenderer.kt`.
-
-### Step 6: The Document Is Sealed
-
-- **SHA-512 hash** computed — unique fingerprint (`Sha512.hash()`, `crypto/Sha512.kt`)
-- **Hash anchored to the Bitcoin blockchain** via OpenTimestamps (`OpenTimestampsService.kt`, `blockchain/`)
-- **Watermark on every page** at ~20% opacity (`res/drawable-nodpi/watermark_portrait.png`)
-- **Seal footer on every page**: `VERUM SEAL · {sealId} · SHA-512 {hash} · {timestamp} · Page {n} of {total}`
-
-Once sealed, the document cannot be altered without breaking the seal. Verify at verumglobal.foundation.
-
-In code: `EvidenceSealer.sealFromHash()` (`crypto/EvidenceSealer.kt`).
-
-### Step 7: You Share It
-
-The sealed report can be emailed directly to lawyers, police, courts, or regulators. Monitored by anti-harassment system (10 emails/hour max, escalation: ALLOW → WARN → BLOCK). The recipient receives a tamper-proof, court-ready forensic document.
-
-In code: `EmailModule.kt` + `AntiHarassmentMonitor.kt` (`engine/`).
-
-## Device-Tier LLM Loading
-
-The app determines which AI model to load based on device RAM:
-
-| Tier | RAM | Primary LLM | Templates | Analysis Depth |
-|------|-----|-------------|-----------|----------------|
-| Entry | <2GB | Gemma 3 (bundled) | v5.2.6 basic | On-device, offline |
-| Mid | 2-4GB | Phi-3 Mini | v5.2.6 + v5.2.4 | Enhanced, mostly offline |
-| High | 4-8GB | Gemma 4 (26B MoE) | All including v5.2.8 | Full contradiction engine |
-| Flagship | 8GB+ | Mistral 7B + Online | v5.2.8 + SAFLII real-time | Full with online legal research |
-
-B7 (Legal Brain) has two modes: **Offline** (static statute mapping) and **Online** (SAFLII/PACER/BAILII retrieval). Online mode requires Flagship tier + internet. All other tiers use offline mode.
-
-## The App Is a Chat Room
-
-The whole app is built around a chat interface. The front "Story" screen leads into the **Chat** home screen. The chat input has a **+** button that opens a "Sealed actions" bottom sheet:
-
-- Seal a document (upload + scan)
-- Add photo/video evidence
-- Verify a document (check hash against vault)
-- Deep research (AI reads sealed case, helps with narrative)
-- Draft sealed email (sent as PDF, tracked)
-- Tax return calculation
-- View report
-- Open vault
-
-**The constitutional boundary**: The AI chat assistant (`VerumViewModel.respond()`) reads ONLY the sealed `ScanResult`. Never raw uploads. Anything the user adds goes through `ForensicService.scan()` FIRST. It gets sealed. Only THEN can the AI chat read it. This is enforced at the ViewModel level. Never route raw user uploads directly to the AI chat.
-
-## Jurisdiction Detection & Online Legal Research
-
-The engine auto-detects jurisdiction from GPS coordinates, content keywords, and currency symbols. **It can also retrieve online judicial records** to cross-reference sworn testimony against sealed documents:
-
-| Repository | Jurisdiction | Auth | Use Case |
-|------------|-------------|------|----------|
-| SAFLII | South Africa | Public | Constitutional Court, High Court, SCA judgments |
-| Constitutional Court Registrar | South Africa | Court order | Complete record including heads of argument |
-| High Court KZN Registrar | South Africa | Subpoena | Eviction orders, contempt findings |
-| PACER | United States | Account | Federal court records |
-| BAILII | UK/Ireland | Public | Commonwealth precedent |
-| LexisNexis / Westlaw | Multi | Subscription | Comprehensive legal research |
-
-Currently mapped jurisdictions: South Africa (Common Law, Companies Act, POCA, PPA, Cybercrimes Act), UAE (CCL, Cybercrime Law, RAKEZ), United States (Federal codes), European Union (GDPR), United Nations (UNODC, UNCAC). **New jurisdictions are added by extending B7's legal mapping. The contradiction engine itself requires no changes.**
-
-## What Makes Verum Different
-
-- **It's on your phone.** Everything happens on the device. No cloud. No data harvesting.
-- **It's court-validated.** Accepted by Port Shepstone H208/25, RAKEZ UAE 1295911, SAPS CAS 126/4/2025, Public Protector CMS-88494/2026. Meets Daubert Standard, ECT Act, and ISO 27037.
-- **It finds what humans miss.** 111 contradictions across 528 pages — including contradictions between what AllFuels swore to the Constitutional Court and what their own documents showed.
-- **It's free for citizens.** Private individuals and police officers pay nothing. Never.
-- **It can't be weaponized.** Article X — the Anti-War Doctrine — prohibits lethal targeting, battlefield intelligence, or weapons systems. Hierarchically supreme and cannot be overridden.
-
-## Testing
-
-75 unit tests covering: SHA-512 determinism, seal verification/tampering, contradiction extraction against AllFuels-style evidence, B8 audio tamper signals, media GPS anchoring, tax calculations, anti-harassment escalation (ALLOW → WARN → BLOCK), OTS proof structure, AES-GCM round-trip, dead-man switch 72h trigger. Roborazzi screenshot tests for all 7 screens. Run: `./gradlew testDebugUnitTest`. Lint: `./gradlew lintDebug` (zero errors). No emulator needed — all forensic logic is pure Kotlin/JVM.
+| Category | Count | Description |
+|----------|-------|-------------|
+| 1 — Goodwill Value Claims | 28 | Denying goodwill has value while taking actions that only make sense if goodwill has value |
+| 2 — Contract Validity | 24 | Asserting binding contracts when collecting rent, then denying binding contracts when operators assert rights |
+| 3 — Signature Status | 18 | Presenting unsigned documents as enforceable while refusing to countersign |
+| 4 — Section 12B Arbitration | 12 | Failing to offer statutory arbitration while claiming compliance with the Petroleum Products Act |
+| 5 — Compensation Demands | 11 | Demanding operators pay for extensions while claiming operators have no compensable interest |
+| 6 | **Non-ownership and distributed guardianship** | The system cannot own truth. Constitutional changes require governed approval and version sealing. |
+| 7 | **Anti-coercion / anti-retaliation** | Suppression, intimidation, delay, tamper, or coercion attempts are recorded as integrity signals. |
+| 8 | **Failure-mode disclosure** | If extraction fails, the output states exactly what failed, where, and why. |
+| 9 | **Free for citizens and law enforcement** | Hard-coded. No paywalls. No licenses required. |
+| 10 | **Template immutability** | Sealed template versions are unmodifiable. Only new versions can be created. |
+| 11 | **B9 non-voting lock** | B9 (R&D) cannot issue verdicts. It trains, validates, and red-teams only. |
+| 12 | **Pattern detection mandatory** | The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator. |
 
 ## Package Structure
 
@@ -325,3 +218,6 @@ com.verumomnis.forensic/
 7. **Jurisdiction-agnostic**: The contradiction engine works everywhere. New jurisdictions are added by extending B7's legal mapping, not by changing B1.
 8. **Free for citizens, paid for institutions**: This is a constitutional rule. Don't add paywalls for private individuals or police.
 9. **Anti-weaponization is supreme**: Article X cannot be overridden. Don't add features that could be used for lethal targeting or battlefield intelligence.
+10. **B9 cannot issue verdicts**: B9 is trainer/validator only. It does not count toward the 3-brain quorum.
+11. **7 contradiction categories are constitutional**: Do not add or remove the 7 categories (Goodwill Value, Contract Validity, Signature Status, Section 12B, Compensation, Perjury, Coercion).
+12. **Pattern detection mandatory**: The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator.

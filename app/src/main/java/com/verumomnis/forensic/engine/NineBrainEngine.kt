@@ -3,18 +3,23 @@ package com.verumomnis.forensic.engine
 import com.verumomnis.forensic.model.BehavioralAnalysis
 import com.verumomnis.forensic.model.Confidence
 import com.verumomnis.forensic.model.Contradiction
+import com.verumomnis.forensic.model.ContradictionCategory
+import com.verumomnis.forensic.model.ContradictionClaim
+import com.verumomnis.forensic.model.ContradictionType
 import com.verumomnis.forensic.model.EvidenceAtom
 import com.verumomnis.forensic.model.FinancialAnalysis
 import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.model.TimelineEvent
+import com.verumomnis.forensic.engine.contradiction.VerumContradictionEngine
+import com.verumomnis.forensic.engine.contradiction.formatReport
 import java.time.Instant
 
 /**
  * The 9-Brain forensic engine (build spec Sections 5, 8). Deterministic and
  * always-on — it is the third verifier in Triple-AI consensus on every device.
  *
- *  - B1 Contradiction   -> [ContradictionExtractor]
+ *  - B1 Contradiction   -> [VerumContradictionEngine v5.2.9] + legacy fallback
  *  - B2 Document         -> creator-tool / metadata tamper signals
  *  - B3 Communications   -> timeline-gap analysis across dated statements
  *  - B4 Behavioral       -> [BehavioralBrain]
@@ -35,12 +40,12 @@ object NineBrainEngine {
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
-        now: Instant = Instant.now()
+        now: Instant = Instant.now(),
+        caseName: String = ""  // "allfuels" or "greensky" for v5.2.9 case config
     ): ForensicFindings {
         val timestamp = now.toString()
 
-        // B8 audio: tamper/voice-stress + diarised transcript, which is folded into
-        // the document set so B1/B4 can cross-reference what was said.
+        // B8 audio: tamper/voice-stress + diarised transcript
         val audioAnalysis = AudioBrain.analyze(audio)
         val audioDocs = audio.mapNotNull { a ->
             a.transcript?.takeIf { it.isNotBlank() }?.let {
@@ -54,18 +59,25 @@ object NineBrainEngine {
         val jurisdiction = detectJurisdiction(allDocs)
 
         val atoms = buildEvidenceAtoms(allDocs, jurisdiction, timestamp)
-        val contradictions = ContradictionExtractor.extract(allDocs, now)            // B1
-        val documentForensics = documentBrain(allDocs)                               // B2
-        val timeline = reconstructTimeline(allDocs)                                  // B5
-        val communications = communicationsBrain(timeline)                           // B3
-        val behavioral = BehavioralBrain.analyze(allDocs)                            // B4
-        val financial = analyzeFinancials(allDocs)                                   // B6
-        val legalMappings = mapLegalFramework(allDocs, jurisdiction)                 // B7
-        val rndValidation = rndBrain(contradictions, financial, behavioral)          // B9
-        val mediaExhibits = buildMediaExhibits(media, jurisdiction)                  // photographic/video evidence
+
+        // B1: v5.2.9 Contradiction Engine (primary) + legacy fallback
+        val v529Report = runV529Engine(allDocs, caseName, now)
+        val legacyContradictions = ContradictionExtractor.extract(allDocs, now)
+
+        // Merge: v5.2.9 contradictions take priority, fill gaps with legacy
+        val contradictions = mergeContradictions(v529Report, legacyContradictions, timestamp)
+
+        val documentForensics = documentBrain(allDocs)
+        val timeline = reconstructTimeline(allDocs)
+        val communications = communicationsBrain(timeline)
+        val behavioral = BehavioralBrain.analyze(allDocs)
+        val financial = analyzeFinancials(allDocs)
+        val legalMappings = mapLegalFramework(allDocs, jurisdiction)
+        val rndValidation = rndBrain(contradictions, financial, behavioral) +
+            v529Report.actorProfiles.map { "PROFILE: ${it.name} dishonesty=${it.dishonestyScore}/100" }
 
         val brainVerdicts = linkedMapOf(
-            "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND",
+            "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND (v5.2.9)",
             "B2-Document" to if (documentForensics.isEmpty()) "NO TAMPER" else "${documentForensics.size} SIGNALS",
             "B3-Communications" to if (communications.isEmpty()) "NO GAPS" else "${communications.size} GAPS",
             "B4-Behavioral" to if (behavioral.isEmpty()) "CLEAR" else "score ${"%.2f".format(behavioral.score)}",
@@ -89,12 +101,116 @@ object NineBrainEngine {
             documentForensics = documentForensics,
             communications = communications,
             rndValidation = rndValidation,
-            mediaExhibits = mediaExhibits,
+            mediaExhibits = buildMediaExhibits(media, jurisdiction),
             brainVerdicts = brainVerdicts
         )
     }
 
-    /** Anchor each photograph/video to GPS + timestamp + SHA-512 (chain of custody). */
+    /**
+     * Run the v5.2.9 contradiction engine on the document set.
+     * Converts EvidenceDocuments to text strings for the engine.
+     */
+    private fun runV529Engine(
+        documents: List<EvidenceDocument>,
+        caseName: String,
+        now: Instant
+    ): com.verumomnis.forensic.engine.contradiction.EngineForensicReport {
+        val texts = documents.map { it.text }
+        val sources = documents.map { it.fileName }
+        return VerumContradictionEngine(
+            caseId = "VO-${now.toEpochMilli()}",
+            caseName = caseName,
+            injectedTimestamp = now.toEpochMilli()
+        ).processFromTexts(texts, sources)
+    }
+
+    /**
+     * Merge v5.2.9 engine contradictions with legacy extractor results.
+     * v5.2.9 takes priority; legacy fills any gaps.
+     */
+    private fun mergeContradictions(
+        v529Report: com.verumomnis.forensic.engine.contradiction.EngineForensicReport,
+        legacy: List<Contradiction>,
+        timestamp: String
+    ): List<Contradiction> {
+        // Convert v5.2.9 contradictions to legacy format
+        val v529Converted = v529Report.contradictions.map { ec ->
+            val category = when {
+                ec.type.name.contains("GOODWILL") || ec.propositionAText.contains("goodwill", true) ->
+                    ContradictionCategory.GOODWILL_VALUE
+                ec.type.name.contains("CONTRACT") || ec.propositionAText.contains("contract", true) ->
+                    ContradictionCategory.CONTRACT_VALIDITY
+                ec.type.name.contains("SIGNATURE") || ec.propositionAText.contains("signature", true) ->
+                    ContradictionCategory.SIGNATURE_STATUS
+                ec.type.name.contains("PERJURY") || ec.type.name.contains("JUDICIAL") ->
+                    ContradictionCategory.PERJURY
+                ec.type.name.contains("COERCION") || ec.propositionAText.contains("threat", true) ->
+                    ContradictionCategory.COERCION
+                ec.type.name.contains("RACKETEERING") -> ContradictionCategory.COERCION
+                else -> ContradictionCategory.OTHER
+            }
+
+            val legacyType = when {
+                ec.type == com.verumomnis.forensic.engine.contradiction.EngineContradictionType.STATEMENT_VS_STATEMENT ->
+                    ContradictionType.DIRECT_NEGATION
+                ec.type == com.verumomnis.forensic.engine.contradiction.EngineContradictionType.TEMPORAL_CONTRADICTION ->
+                    ContradictionType.TEMPORAL_SHIFT
+                ec.type == com.verumomnis.forensic.engine.contradiction.EngineContradictionType.BEHAVIORAL ->
+                    ContradictionType.ROLE_INCONSISTENCY
+                else -> ContradictionType.DIRECT_NEGATION
+            }
+
+            val severity = when (ec.severity) {
+                com.verumomnis.forensic.engine.contradiction.EngineSeverity.VERY_HIGH -> Severity.VERY_HIGH
+                com.verumomnis.forensic.engine.contradiction.EngineSeverity.HIGH -> Severity.HIGH
+                com.verumomnis.forensic.engine.contradiction.EngineSeverity.MODERATE -> Severity.MODERATE
+                com.verumomnis.forensic.engine.contradiction.EngineSeverity.LOW -> Severity.LOW
+                com.verumomnis.forensic.engine.contradiction.EngineSeverity.INSUFFICIENT -> Severity.LOW
+            }
+
+            Contradiction(
+                contradictionId = ec.contradictionId,
+                brainSource = "B1-v5.2.9",
+                category = category,
+                type = legacyType,
+                respondent = ec.propositionAActor,
+                claimA = ContradictionClaim(
+                    text = ec.propositionAText,
+                    source = ec.detectedFact.sourceDocument,
+                    evidenceId = "",
+                    page = ec.detectedFact.sourcePage,
+                    sha512 = ec.detectedFact.sha512Hash
+                ),
+                claimB = ContradictionClaim(
+                    text = ec.propositionBText,
+                    source = ec.detectedFact.sourceDocument,
+                    evidenceId = "",
+                    page = 0,
+                    sha512 = ec.detectedFact.sha512Hash
+                ),
+                severity = severity,
+                description = ec.conflictDescription,
+                legalSignificance = ec.legalHypothesis?.suggestedOffence ?: "",
+                confidence = when (ec.confidence) {
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.DETERMINISTIC -> Confidence.VERY_HIGH
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.VERY_HIGH -> Confidence.VERY_HIGH
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.HIGH -> Confidence.HIGH
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.MODERATE -> Confidence.MODERATE
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.LOW -> Confidence.LOW
+                    com.verumomnis.forensic.engine.contradiction.EngineConfidence.INSUFFICIENT -> Confidence.LOW
+                },
+                patternIndicator = ec.type.name.contains("RACKETEERING"),
+                timestamp = timestamp
+            )
+        }
+
+        // If v5.2.9 found contradictions, use those (they're more detailed)
+        // Otherwise fall back to legacy
+        return if (v529Converted.isNotEmpty()) v529Converted else legacy
+    }
+
+    // ==================== B2-B9 (unchanged) ====================
+
     private fun buildMediaExhibits(
         media: List<MediaEvidence>,
         fallbackJurisdiction: String
@@ -147,12 +263,10 @@ object NineBrainEngine {
             jurisdiction = jurisdiction,
             confidence = Confidence.VERY_HIGH,
             extractedBy = "B2-DocumentBrain",
-            gps = doc.gps,
             timestamp = timestamp
         )
     }
 
-    /** B2 — document forensics: creator-tool mismatch for financial documents. */
     private fun documentBrain(documents: List<EvidenceDocument>): List<String> {
         val signals = mutableListOf<String>()
         documents.forEach { doc ->
@@ -167,10 +281,10 @@ object NineBrainEngine {
         return signals
     }
 
-    /** B3 — communications: unexplained gaps between dated events (>30 days). */
     private fun communicationsBrain(timeline: List<TimelineEvent>): List<String> {
-        val dated = timeline.mapNotNull { ev -> EntityExtractor.extractDate(ev.dateTime)?.let { it to ev } }
-            .sortedBy { it.first }
+        val dated = timeline.mapNotNull { ev ->
+            EntityExtractor.extractDate(ev.dateTime)?.let { it to ev }
+        }.sortedBy { it.first }
         val gaps = mutableListOf<String>()
         for (i in 1 until dated.size) {
             val days = dated[i - 1].first.until(dated[i].first).days +
@@ -183,7 +297,6 @@ object NineBrainEngine {
         return gaps
     }
 
-    /** B9 — R&D validation (no verdicts): coverage / cross-brain sanity checks. */
     private fun rndBrain(
         contradictions: List<Contradiction>,
         financial: FinancialAnalysis?,
@@ -247,7 +360,9 @@ object NineBrainEngine {
     private fun analyzeFinancials(documents: List<EvidenceDocument>): FinancialAnalysis? {
         val anomalies = mutableListOf<String>()
         val amounts = documents.flatMap { doc ->
-            MONEY_REGEX.findAll(doc.text).map { it.groupValues[1].replace(Regex("[,\\s]"), "").toDoubleOrNull() ?: 0.0 }
+            MONEY_REGEX.findAll(doc.text).map {
+                it.groupValues[1].replace(Regex("[,\\s]"), "").toDoubleOrNull() ?: 0.0
+            }
         }.filter { it > 0 }
         amounts.groupBy { it }.filter { it.value.size > 1 }.forEach { (amount, occ) ->
             anomalies += "Duplicate amount R%,.2f appears %d times".format(amount, occ.size)

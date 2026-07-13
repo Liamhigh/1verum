@@ -14,14 +14,29 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 
 **See also:**
 - **`WHAT_THIS_APP_IS.md`** — **START HERE.** The master build reference. Complete overview of architecture, 9-brain system, 3-model LLM, fraud categories, evidence flow, tech stack, and file structure. This is the document any code assistant should read first.
+- **`AI_BUILD_INSTRUCTIONS.md`** — **READ SECOND.** Strict rules for coding assistants: no TODOs, no placeholders, fix compile errors first, every button connected, every screen reachable, continue until done.
+- **`BUILD_STATUS.md`** — **READ THIRD.** Feature completion matrix. 118 features tracked across 10 categories. Shows what's done and what's missing. The coding assistant works through this systematically.
+- **`MASTER_TASK_LIST.md`** — **READ FOURTH.** 91 tasks organized by priority (P0-P4). The coding assistant checks these off as they are completed. 41 tasks are mandatory.
+- **`PROMPT.md`** — This file. The main prompt with 15 Prime Directives, 11 contradiction types, real-world proof, data flow, 12 coding rules.
+
+**Reference documents (read as needed):**
+- `FUNCTIONAL_REQUIREMENTS.md` — How every screen and function should behave (40 requirements)
+- `ARCHITECTURE.md` — 6-layer system architecture, data flows, component communication
+- `DEPENDENCIES.md` — Every library, SDK, model, and version required
+- `TEST_PLAN.md` — 114 tests that must pass (unit, integration, determinism, constitutional, UI, instrumented, performance)
+- `BUILD_RULES.md` — 15 non-negotiable build rules (no placeholders, no TODOs, all tests pass, etc.)
+- `PROJECT_STRUCTURE.md` — Purpose of every folder and package. Where new files belong.
+- `KNOWN_BUGS.md` — 12 known issues and technical debt items
+- `DONE_CRITERIA.md` — 10 measurable criteria that define "finished" (0/10 currently met)
 - `CONSTITUTION.md` — Full binding constitutional governance document (v5.2.7)
-- `TEMPLATE_HISTORY.md` — Complete template evolution from v5.1.1 to v5.2.8
-- `NINE_BRAIN_RULES.md` — Brain-specific operational rules, v5.2.7 vs v6.0 comparison, White Paper mapping
+- `NINE_BRAIN_RULES.md` — Brain-specific operational rules, v5.2.7 vs v6.0 comparison
 - `B1_ENGINE.md` — B1 Contradiction Brain: all 38 primary contradictions, algorithm, output format
-- `ONLINE_JUDICIAL_RETRIEVAL.md` — How B7 searches court records during the forensic scan, downloads sworn testimony, and B1 pairs court statements with sealed documents to find contradictions (the v5.2.8 breakthrough)
 - `B1_SOURCE_CODE.md` — Complete 962-line contradiction engine source code
-- `IDENTITY_TRUST_SYSTEM.md` — Verum Identity & Trust System (VITS v1.0.0): user trust tiers, device identity, metadata fraud detection, under-text watermarks, identity QR codes
-- `ON_DEVICE_LLM_ARCHITECTURE.md` — On-device LLM system: Gemma 3 (forensic reports), Command R/PHI-3 (chat on 2-3GB devices), Gemma 4 (chat on flagship). All models operate unrestricted on cryptographically sealed evidence
+- `ONLINE_JUDICIAL_RETRIEVAL.md` — B7 OJRS workflow: court record search, proposition pairing, consciousness of guilt
+- `ON_DEVICE_LLM_ARCHITECTURE.md` — 3-model LLM system: Gemma 3 (reports), PHI-3/Command R (chat), Gemma 4 (flagship chat)
+- `IDENTITY_TRUST_SYSTEM.md` — VITS v1.0.0: user trust tiers, device identity, metadata fraud detection
+- `TEMPLATE_HISTORY.md` — Template evolution from v5.1.1 to v5.2.8
+- `AGENTS.md` — Rules for AI agents operating within the framework
 
 ## Real-World Proof: The AllFuels Case (8 Simultaneous Proceedings)
 
@@ -182,7 +197,7 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | 3 — Signature Status | 18 | Presenting unsigned documents as enforceable while refusing to countersign |
 | 4 — Section 12B Arbitration | 12 | Failing to offer statutory arbitration while claiming compliance with the Petroleum Products Act |
 | 5 — Compensation Demands | 11 | Demanding operators pay for extensions while claiming operators have no compensable interest |
-| 6 — Perjury / Constitutional Court | 10 | Sworn statements to the Constitutional Court contradicted by AllFuels' own sealed documents. **All 10 found via OJRS** — see `ONLINE_JUDICIAL_RETRIEVAL.md` |
+| 6 | **Perjury / Constitutional Court** | **10** | **Sworn statements to the Constitutional Court contradicted by AllFuels' own sealed documents. All 10 found via OJRS — see `ONLINE_JUDICIAL_RETRIEVAL.md`** |
 | 7 — Coercion & Fabricated Consent | 8 | Claiming operator was "grateful" when contemporaneous evidence proves he was non-committal |
 | **TOTAL** | **111** | |
 

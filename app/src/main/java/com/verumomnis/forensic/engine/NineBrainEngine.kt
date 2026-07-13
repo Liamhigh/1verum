@@ -19,7 +19,7 @@ import java.time.Instant
  * The 9-Brain forensic engine (build spec Sections 5, 8). Deterministic and
  * always-on — it is the third verifier in Triple-AI consensus on every device.
  *
- *  - B1 Contradiction   -> [VerumContradictionEngine v5.2.9] + legacy fallback
+ *  - B1 Contradiction   -> [VerumContradictionEngine v5.3.1c] + legacy fallback
  *  - B2 Document         -> creator-tool / metadata tamper signals
  *  - B3 Communications   -> timeline-gap analysis across dated statements
  *  - B4 Behavioral       -> [BehavioralBrain]
@@ -41,7 +41,7 @@ object NineBrainEngine {
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
         now: Instant = Instant.now(),
-        caseName: String = ""  // "allfuels" or "greensky" for v5.2.9 case config
+        caseName: String = ""  // "allfuels", "greensky", "southbridge", "digsim", etc.
     ): ForensicFindings {
         val timestamp = now.toString()
 
@@ -60,12 +60,12 @@ object NineBrainEngine {
 
         val atoms = buildEvidenceAtoms(allDocs, jurisdiction, timestamp)
 
-        // B1: v5.2.9 Contradiction Engine (primary) + legacy fallback
-        val v529Report = runV529Engine(allDocs, caseName, now)
+        // B1: v5.3.1c Contradiction Engine (primary) + legacy fallback
+        val v531cReport = runV531cEngine(allDocs, caseName, now)
         val legacyContradictions = ContradictionExtractor.extract(allDocs, now)
 
-        // Merge: v5.2.9 contradictions take priority, fill gaps with legacy
-        val contradictions = mergeContradictions(v529Report, legacyContradictions, timestamp)
+        // Merge: v5.3.1c contradictions take priority, fill gaps with legacy
+        val contradictions = mergeContradictions(v531cReport, legacyContradictions, timestamp)
 
         val documentForensics = documentBrain(allDocs)
         val timeline = reconstructTimeline(allDocs)
@@ -74,10 +74,10 @@ object NineBrainEngine {
         val financial = analyzeFinancials(allDocs)
         val legalMappings = mapLegalFramework(allDocs, jurisdiction)
         val rndValidation = rndBrain(contradictions, financial, behavioral) +
-            v529Report.actorProfiles.map { "PROFILE: ${it.name} dishonesty=${it.dishonestyScore}/100" }
+            v531cReport.actorProfiles.map { "PROFILE: ${it.name} dishonesty=${it.dishonestyScore}/100" }
 
         val brainVerdicts = linkedMapOf(
-            "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND (v5.2.9)",
+            "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND (v5.3.1c)",
             "B2-Document" to if (documentForensics.isEmpty()) "NO TAMPER" else "${documentForensics.size} SIGNALS",
             "B3-Communications" to if (communications.isEmpty()) "NO GAPS" else "${communications.size} GAPS",
             "B4-Behavioral" to if (behavioral.isEmpty()) "CLEAR" else "score ${"%.2f".format(behavioral.score)}",
@@ -107,10 +107,10 @@ object NineBrainEngine {
     }
 
     /**
-     * Run the v5.2.9 contradiction engine on the document set.
+     * Run the v5.3.1c contradiction engine on the document set.
      * Converts EvidenceDocuments to text strings for the engine.
      */
-    private fun runV529Engine(
+    private fun runV531cEngine(
         documents: List<EvidenceDocument>,
         caseName: String,
         now: Instant
@@ -125,16 +125,16 @@ object NineBrainEngine {
     }
 
     /**
-     * Merge v5.2.9 engine contradictions with legacy extractor results.
-     * v5.2.9 takes priority; legacy fills any gaps.
+     * Merge v5.3.1c engine contradictions with legacy extractor results.
+     * v5.3.1c takes priority; legacy fills any gaps.
      */
     private fun mergeContradictions(
-        v529Report: com.verumomnis.forensic.engine.contradiction.EngineForensicReport,
+        v531cReport: com.verumomnis.forensic.engine.contradiction.EngineForensicReport,
         legacy: List<Contradiction>,
         timestamp: String
     ): List<Contradiction> {
-        // Convert v5.2.9 contradictions to legacy format
-        val v529Converted = v529Report.contradictions.map { ec ->
+        // Convert v5.3.1c contradictions to legacy format
+        val v531cConverted = v531cReport.contradictions.map { ec ->
             val category = when {
                 ec.type.name.contains("GOODWILL") || ec.propositionAText.contains("goodwill", true) ->
                     ContradictionCategory.GOODWILL_VALUE
@@ -170,7 +170,7 @@ object NineBrainEngine {
 
             Contradiction(
                 contradictionId = ec.contradictionId,
-                brainSource = "B1-v5.2.9",
+                brainSource = "B1-v5.3.1c",
                 category = category,
                 type = legacyType,
                 respondent = ec.propositionAActor,
@@ -204,9 +204,9 @@ object NineBrainEngine {
             )
         }
 
-        // If v5.2.9 found contradictions, use those (they're more detailed)
+        // If v5.3.1c found contradictions, use those (they're more detailed)
         // Otherwise fall back to legacy
-        return if (v529Converted.isNotEmpty()) v529Converted else legacy
+        return if (v531cConverted.isNotEmpty()) v531cConverted else legacy
     }
 
     // ==================== B2-B9 (unchanged) ====================

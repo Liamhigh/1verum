@@ -1,0 +1,22 @@
+ALLFUELS (PTY) LTD — RENT LEDGER
+Site: Port Shepstone
+Period: January 2014 — March 2021 (87 months)
+
+Month        | Invoice #    | Amount       | Status
+-------------|--------------|--------------|--------
+Jan 2014     | INV-001      | R131,249.43  | Paid
+Feb 2014     | INV-002      | R131,249.43  | Paid
+Mar 2014     | INV-003      | R131,249.43  | Paid
+...          | ...          | ...          | ...
+Dec 2020     | INV-084      | R131,249.43  | Paid
+Jan 2021     | INV-085      | R131,249.43  | Paid
+Feb 2021     | INV-086      | R131,249.43  | Paid
+Mar 2021     | INV-087      | R131,249.43  | Paid
+
+TOTAL: R11,418,650.56 (87 months)
+AVERAGE MONTHLY: R131,249.43
+
+NOTES FOR TESTING:
+- 87 consecutive months proves ongoing contractual relationship
+- Total R11,418,650.56 contradicts "no contract existed"
+- Expected contradiction: HIGH severity, category CONTRACT_VALIDITY

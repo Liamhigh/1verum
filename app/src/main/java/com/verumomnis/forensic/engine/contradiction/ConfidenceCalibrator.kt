@@ -1,13 +1,15 @@
 package com.verumomnis.forensic.engine.contradiction
 
 /**
- * Confidence Calibrator — v5.2.9.
- * Per-detector false-positive rates from validation against 111 AllFuels contradictions.
+ * Confidence Calibrator — v5.3.1c.
+ * Per-detector false-positive rates from validation against
+ * 111 AllFuels contradictions + 47 DIGSIM contradictions.
  */
 object ConfidenceCalibrator {
 
-    /** Per-detector FP rates — calibrated against AllFuels 111 contradictions. */
+    /** Per-detector FP rates — calibrated against AllFuels 111 + DIGSIM 47 contradictions. */
     private val FP_RATES = mapOf(
+        // v5.2.9 base types (16 types)
         "STATEMENT_VS_STATEMENT" to 0.15,
         "STATEMENT_VS_EVIDENCE" to 0.10,
         "FINANCIAL_IRREGULARITY" to 0.05,
@@ -23,7 +25,14 @@ object ConfidenceCalibrator {
         "REGULATORY_CAPTURE" to 0.12,
         "FRAUD_ON_THE_COURT" to 0.05,
         "CORPORATE_VEIL_ABUSE" to 0.10,
-        "PERJURY_BY_TIMELINE" to 0.08
+        "PERJURY_BY_TIMELINE" to 0.08,
+        // v5.3.1c DIGSIM types (6 new types)
+        "DEFECTIVE_JURAT" to 0.05,
+        "PROTECTION_ORDER_AS_LEVERAGE" to 0.08,
+        "FALSE_ALLEGATION_IN_AFFIDAVIT" to 0.06,
+        "TEMPORAL_PRECEDENCE_CONFLICT" to 0.10,
+        "PROCESS_REMEDY_CONFLICT" to 0.07,
+        "CHARACTER_ASSASSINATION" to 0.15
     )
 
     private const val SEMANTIC_AGREEMENT_BOOST = 0.20
@@ -46,10 +55,13 @@ object ConfidenceCalibrator {
 
     /** Returns calibration report for audit trail. */
     fun reportCalibration(): Map<String, String> = mapOf(
-        "methodology" to "Per-detector false-positive rates from validation against 111 AllFuels contradictions (528-page bundle)",
-        "lastCalibrated" to "2026-07-12",
-        "validationCase" to "ALLFUELS-2026 (111 contradictions, 528-page bundle)",
-        "engineVersion" to "v5.2.9",
+        "methodology" to "Per-detector false-positive rates from validation against 111 AllFuels + 47 DIGSIM contradictions",
+        "lastCalibrated" to "2026-07-13",
+        "validationCases" to "ALLFUELS-2026 (111 contradictions) + DIGSIM-2026 (47 contradictions)",
+        "engineVersion" to "v5.3.1c",
+        "constitution" to "v6.0 Final",
+        "detectorCount" to "16",
+        "typeCount" to "43",
         "semanticAgreementBoost" to SEMANTIC_AGREEMENT_BOOST.toString()
     )
 }

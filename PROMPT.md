@@ -13,6 +13,7 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 **It works in every jurisdiction on Earth** because the core engine is contradiction-based. It does not require any single country's legal code to function. It extracts contradictions from the evidence itself — false statements, conflicting claims, actions that contradict words — anchors each one to a person, a page/line reference, and the local statutes that apply wherever the evidence was captured. A contract dispute in Dubai, a tax case in London, a labour matter in São Paulo — same engine, same process, different statutes.
 
 **See also:**
+- **`WHAT_THIS_APP_IS.md`** — **START HERE.** The master build reference. Complete overview of architecture, 9-brain system, 3-model LLM, fraud categories, evidence flow, tech stack, and file structure. This is the document any code assistant should read first.
 - `CONSTITUTION.md` — Full binding constitutional governance document (v5.2.7)
 - `TEMPLATE_HISTORY.md` — Complete template evolution from v5.1.1 to v5.2.8
 - `NINE_BRAIN_RULES.md` — Brain-specific operational rules, v5.2.7 vs v6.0 comparison, White Paper mapping

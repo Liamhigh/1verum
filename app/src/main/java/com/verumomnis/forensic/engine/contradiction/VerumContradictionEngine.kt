@@ -1,16 +1,20 @@
 package com.verumomnis.forensic.engine.contradiction
 
 /**
- * Verum Contradiction Engine v5.2.9 — Master Orchestrator.
+ * Verum Contradiction Engine v5.3.1c — Master Orchestrator.
+ *
+ * Seal: VO-CE-v531c-DIGSIM-20260713
+ * Constitution: v6.0 Final
+ * 43 types | 16 detectors | 17 serial patterns | 7 cases | B1-B11
  *
  * Dual interface:
  *  - processFromFiles(): reads files from disk (CLI/background)
  *  - processFromTexts(): creates atoms from text strings (Android UI)
  *
- * Full pipeline: atoms -> claims -> 10 detectors -> dedup ->
+ * Full pipeline: atoms -> claims -> 16 detectors -> dedup ->
  * triple verification -> actor profiles -> corpus hash -> report.
  *
- * This is the Kotlin port of the Python v5.2.9 engine, adapted
+ * This is the Kotlin port of the Python v5.3.1c engine, adapted
  * to integrate with the existing NineBrainEngine as B1's
  * enhanced contradiction detection system.
  */
@@ -25,7 +29,7 @@ class VerumContradictionEngine(
         ContradictionDetectors.resetCounter()
     }
 
-    /** Set case configuration by name ("allfuels" or "greensky"). */
+    /** Set case configuration by name ("allfuels", "greensky", "southbridge", "digsim", etc.). */
     fun setCase(caseName: String) {
         caseConfig = getCaseConfig(caseName)
     }
@@ -69,7 +73,7 @@ class VerumContradictionEngine(
         // Step 1: Extract claims
         val claims = ClaimExtractor.extractClaims(atoms, caseConfig)
 
-        // Step 2: Detect all contradictions (10 detectors)
+        // Step 2: Detect all contradictions (16 detectors: 10 base + 6 DIGSIM)
         val contradictions = ContradictionDetectors.detectAll(claims)
 
         // Step 3: Triple verification

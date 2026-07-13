@@ -3,7 +3,7 @@ package com.verumomnis.forensic.engine.contradiction
 import kotlin.math.sqrt
 
 /**
- * Semantic Analyzer — v5.2.9.
+ * Semantic Analyzer — v5.3.1c.
  * Deterministic word embeddings + negation detection.
  * No external ML dependencies. Same input = same output, always.
  */

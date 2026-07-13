@@ -1,0 +1,31 @@
+AFFIDAVIT IN THE CONSTITUTIONAL COURT OF SOUTH AFRICA
+
+Case: CCT237/20
+Date: 18 June 2021
+Deponent: Director A, AllFuels (Pty) Ltd
+
+I, the undersigned, being duly sworn, do hereby depose and say:
+
+1. I am a director of AllFuels (Pty) Ltd and have personal knowledge of the facts herein.
+
+2. The Memorandum of Understanding referred to by the Applicant was merely a discussion document.
+
+3. There was never any intention to transfer ownership of the Company to the Applicant.
+
+4. The document was never intended to be legally binding.
+
+5. No goodwill was ever transferred, and in any event, the goodwill of the site had no quantifiable value.
+
+6. The Applicant's claim to ownership is based on a misunderstanding of the nature of the document.
+
+7. I verily believe that what is stated above is true.
+
+Sworn to and signed before me on this 18th day of June 2021.
+
+Commissioner of Oaths
+
+NOTES FOR TESTING:
+- This testimony contradicts MOU Clause 7 which explicitly transfers goodwill
+- Temporal gap: 15 March 2018 (MOU) to 18 June 2021 (testimony) = 1,191 days
+- Consciousness of guilt threshold (730 days) exceeded
+- Expected contradiction: CRITICAL severity, category PERJURY

@@ -1,5 +1,9 @@
 package com.verumomnis.forensic.engine.contradiction
 
+// Engine: v5.3.1c | Seal: VO-CE-v531c-DIGSIM-20260713
+// 7 cases: AllFuels, Greensky, Southbridge, Louw v Moolla,
+//          Liebenberg v Standard Bank, Louw v Olivier, Mostert v Digsim
+
 /** AllFuels Energy (Pty) Ltd — Petroleum franchise fraud. */
 fun allfuelsConfig() = CaseConfig(
     name = "AllFuels Energy (Pty) Ltd",
@@ -74,11 +78,108 @@ fun greenskyConfig() = CaseConfig(
     )
 )
 
-/** Get configuration by case name — defaults to AllFuels. */
+/** Southbridge — Cross-border systematic fraud (VO-HR-2025/11). */
+fun southbridgeConfig() = CaseConfig(
+    name = "Southbridge (VO-HR-2025/11)",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "proceeded", "executed", "agreed", "accepted"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "no such agreement", "never existed"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "bcc", "blind copy", "never disclosed"),
+    topicKeywords = listOf("Southbridge", "cross-border", "systematic", "fraud", "remedy", "denied", "institutional", "mandate", "abandoned", "silence", "bounce", "submission"),
+    entityKeywords = listOf("Southbridge", "VO-HR-2025/11", "cross-border", "institutional silence", "mandate abandonment"),
+    legalSubjects = mapOf(
+        "Cross-Border Fraud" to listOf("cross-border", "jurisdiction", "international", "treaty", "extradition", "mutual legal assistance"),
+        "Mandate Abandonment" to listOf("abandoned", "failed to act", "mandate", "duty", "responsibility", "negligence"),
+        "Institutional Silence" to listOf("silence", "no response", "bounced", "ignored", "failed to respond", "remains silent"),
+        "Effective Remedy Denial" to listOf("effective remedy", "ICCPR", "Article 2(3)", "denied remedy", "no recourse")
+    )
+)
+
+/** Louw v Moolla — South Africa (SAPS 1754). */
+fun louwVMoollaConfig() = CaseConfig(
+    name = "Louw v Moolla (SAPS 1754)",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "proceeded"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "never authorized"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "never disclosed", "concealed"),
+    topicKeywords = listOf("Louw", "Moolla", "SAPS 1754", "South Africa", "contract", "breach", "fraud", "misrepresentation", "property", "dispute"),
+    entityKeywords = listOf("Louw", "Moolla", "SAPS", "South Africa", "Section 1754"),
+    legalSubjects = mapOf(
+        "Contract Breach" to listOf("contract", "breach", "violation", "terms", "agreement", "failed to perform"),
+        "Misrepresentation" to listOf("misrepresent", "false statement", "deceive", "fraudulent", "induce"),
+        "Property Dispute" to listOf("property", "title", "ownership", "transfer", "conveyance", "deed")
+    )
+)
+
+/** Liebenberg v Standard Bank — South Africa. */
+fun liebenbergVStandardBankConfig() = CaseConfig(
+    name = "Liebenberg v Standard Bank",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "no such record"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "concealed", "destroyed"),
+    topicKeywords = listOf("Liebenberg", "Standard Bank", "South Africa", "banking", "fraud", "account", "transaction", "unauthorized", "debit", "credit"),
+    entityKeywords = listOf("Liebenberg", "Standard Bank", "South Africa", "banking fraud", "unauthorized transaction"),
+    legalSubjects = mapOf(
+        "Banking Fraud" to listOf("bank", "account", "unauthorized", "debit", "credit", "transaction", "fraudulent"),
+        "Financial Misconduct" to listOf("misconduct", "negligence", "breach of duty", "fiduciary", "banking regulations"),
+        "Consumer Protection" to listOf("consumer", "protection", "NCA", "FAIS", "ombudsman", "complaint")
+    )
+)
+
+/** Louw v Olivier — South Africa (SAPS 147/12/2025). */
+fun louwVOlivierConfig() = CaseConfig(
+    name = "Louw v Olivier (SAPS 147/12/2025)",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "proceeded"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "no knowledge"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "concealed", "never disclosed"),
+    topicKeywords = listOf("Louw", "Olivier", "SAPS 147/12/2025", "South Africa", "criminal", "fraud", "theft", "forgery", "document", "false"),
+    entityKeywords = listOf("Louw", "Olivier", "SAPS", "South Africa", "criminal fraud", "forgery"),
+    legalSubjects = mapOf(
+        "Criminal Fraud" to listOf("fraud", "criminal", "theft", "deceive", "dishonest", "unlawful"),
+        "Forgery" to listOf("forge", "fabricated", "false document", "signature", "counterfeit", "altered"),
+        "Document Tampering" to listOf("tamper", "alter", "modify", "destroy", "conceal document", "evidence destruction")
+    )
+)
+
+/** Mostert v Digsim — Protection from Harassment Act (PHA 2026/06). */
+fun mostertVDigsimConfig() = CaseConfig(
+    name = "Mostert v Digsim (PHA 2026/06)",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "used", "leverage", "pressure"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "no protection order"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "concealed purpose", "misrepresented"),
+    topicKeywords = listOf(
+        "Mostert", "Digsim", "PHA 2026/06", "South Africa",
+        "Protection from Harassment Act", "protection order",
+        "leverage", "bargaining", "commercial dispute",
+        "jurat", "defective", "oath", "commissioner",
+        "harassment", "interdict", "restrain",
+        "character", "assassination", "credibility"
+    ),
+    entityKeywords = listOf("Mostert", "Digsim", "PHA", "South Africa", "Protection from Harassment Act", "defective jurat", "commissioner", "oath"),
+    legalSubjects = mapOf(
+        "Protection Order Abuse" to listOf("protection order", "harassment act", "interdict", "restrain", "leverage", "bargaining tool", "commercial dispute", "misuse"),
+        "Defective Jurat" to listOf("jurat", "oath", "commissioner", "defective", "missing jurat", "no oath", "sworn", "before me", "Justice of the Peace"),
+        "Character Assassination" to listOf("character", "reputation", "dishonest", "untrustworthy", "mental health", "emotional", "personal attack", "credibility", "irrelevant"),
+        "False Allegation in Affidavit" to listOf("false allegation", "sworn", "affidavit", "contradicted", "contemporaneous evidence", "perjury"),
+        "Process Remedy Denial" to listOf("effective remedy", "ICCPR", "mandatory duty", "institutional silence", "bounce", "no response", "denied remedy")
+    )
+)
+
+/** Get configuration by case name — supports all 7 cases. Defaults to AllFuels. */
 fun getCaseConfig(caseName: String): CaseConfig {
     val normalized = caseName.lowercase().trim()
-    return if ("greensky" in normalized || "green sky" in normalized || "rakez" in normalized)
-        greenskyConfig()
-    else
-        allfuelsConfig()
+    return when {
+        "greensky" in normalized || "green sky" in normalized || "rakez" in normalized ->
+            greenskyConfig()
+        "southbridge" in normalized || "vo-hr-2025" in normalized ->
+            southbridgeConfig()
+        "louw" in normalized && "moolla" in normalized ->
+            louwVMoollaConfig()
+        "louw" in normalized && "olivier" in normalized ->
+            louwVOlivierConfig()
+        "liebenberg" in normalized || "standard bank" in normalized ->
+            liebenbergVStandardBankConfig()
+        "mostert" in normalized || "digsim" in normalized || "pha 2026" in normalized ->
+            mostertVDigsimConfig()
+        else ->
+            allfuelsConfig()
+    }
 }

@@ -2,8 +2,8 @@
 
 **Document Purpose:** A living tracker of every feature's implementation status. The coding assistant works through this systematically until every row is COMPLETE.
 
-**Last Updated:** 2026-07-13  
-**Version:** v5.2.8  
+**Last Updated:** 2026-07-13
+**Version:** v5.3.1c
 **Repository:** `github.com/Liamhigh/1verum`
 
 ---
@@ -28,7 +28,7 @@
 | SHA-512 Hash Generation | ✅ | ✅ | ⚠️ | ✅ | Core hashing works, needs more edge case tests |
 | Blockchain Anchoring (OpenTimestamps) | ⚠️ | ⬜ | ❌ | ⚠️ | OpenTimestampsService.kt exists, needs Bitcoin confirmation handling |
 | QR Code Generation (seal verification) | ❌ | ❌ | ❌ | ❌ | Requires zxing integration + seal footer rendering |
-| **B1 — Contradiction Engine** | ⚠️ | ✅ | ❌ | ⚠️ | 962-line source documented, needs integration into app |
+| **B1 — Contradiction Engine** | ⚠️ | ✅ | ❌ | ⚠️ | v5.3.1c: 16 detectors (10 base + 6 DIGSIM), 43 types, 7 cases, 17 serial patterns |
 | **B2 — Document Forensics** | ❌ | ❌ | ❌ | ❌ | PDF metadata, tamper detection, EXIF analysis needed |
 | **B3 — Communication Analysis** | ❌ | ❌ | ❌ | ❌ | Chat log parsing, deletion detection, timing analysis |
 | **B4 — Behavioral Brain** | ❌ | ❌ | ❌ | ❌ | LIWC++ integration, evasion pattern detection |
@@ -202,6 +202,8 @@
 
 ---
 
+*Engine: v5.3.1c | Constitution: v6.0 Final | Seal: VO-CE-v531c-DIGSIM-20260713*
+
 ## Priority Order for Coding Assistant
 
 1. **P0 — Critical Path** (Must complete before anything else)
@@ -212,7 +214,7 @@
    - Sealed PDF generation with per-page hash footer
 
 2. **P1 — Core Functionality**
-   - B1 Contradiction Engine integration (source code exists)
+   - B1 Contradiction Engine integration (v5.3.1c — 16 detectors, 43 types)
    - Evidence Vault with hardware keystore
    - SHA-512 hashing + OpenTimestamps anchoring
    - Chat interface wiring to PHR3/G4

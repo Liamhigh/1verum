@@ -1,0 +1,36 @@
+BDO SOUTH AFRICA — INDEPENDENT VALUATION CERTIFICATE
+
+Client: The Operator
+Date: 19 June 2018
+Subject: Goodwill Valuation — Port Shepstone Site
+
+1. EXECUTIVE SUMMARY
+
+Based on our independent valuation, the goodwill associated with the Port Shepstone fuel site is valued at:
+
+   R4,200,000.00 (Four Million Two Hundred Thousand Rand)
+
+2. METHODOLOGY
+
+The valuation was conducted using:
+- Discounted Cash Flow analysis (8-year trading history)
+- Comparable site analysis (3 comparable transactions)
+- Customer database valuation (2,400 active accounts)
+
+3. KEY ASSUMPTIONS
+
+- Trading history: 8 years at R2.1M annual turnover
+- Customer retention rate: 78%
+- Brand recognition: Established local presence
+
+4. CONCLUSION
+
+The goodwill has quantifiable value derived from customer relationships, trading history, and brand recognition.
+
+Signed: BDO Valuation Partner
+Date: 19 June 2018
+
+NOTES FOR TESTING:
+- Valuation R4.2M directly contradicts "no goodwill value" sworn testimony
+- Customer database (2,400 accounts) contradicts "no customer list"
+- Expected contradiction: CRITICAL, category GOODWILL_VALUE

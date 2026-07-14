@@ -3,8 +3,8 @@
 ## Document Metadata
 - **System**: Verum Omnis Constitutional Forensic Platform
 - **Component**: Contradiction Engine taxonomy extension candidates + GHRP promotion-path amendment
-- **Version**: 1.0.0
-- **Status**: PROPOSED — CANDIDATE (awaiting founder ratification)
+- **Version**: 1.1.0
+- **Status**: RATIFIED — BINDING (founder directive, 2026-07-14) — IMPLEMENTED & VALIDATED on all three platforms
 - **Evidence basis**: Engine run VO-GS-CASE126-REVIEW (2026-07-14) over case126 (SAPS correspondence) + greenskyabass (EIB complaint, WhatsApp record, H208/25 judgment)
 - **Constitutional Authority**: Prime Directive 2 (Evidence Before Narrative), 3-Layer Output Model, GHRP two-tier rule
 
@@ -165,8 +165,8 @@ the same collision signature.
 **Recommendation (non-breaking).** In the detector lexicon matching, match on
 word boundaries (`\blease\b` semantics) rather than raw substrings, for all
 keyword lists whose terms are short English words. This is a precision-only
-change — it removes false positives without weakening any true detection, and
-it can ship as a companion-layer filter without touching the sealed engine.
+change — it removes false positives without weakening any true detection, and it
+can ship as a companion-layer filter without touching the sealed engine.
 
 **Evidence.** Run VO-GS-CASE126-REVIEW: 15 findings, of which at least 3 trace
 to substring collisions (lease/please class). Triage table in §7.
@@ -201,20 +201,55 @@ report readability and are noted honestly here.
 
 ---
 
-## 8. Signature Block
+## 8. Ratification & Implementation Record
+
+**Ratified** by founder directive on 2026-07-14. The forensic chain is binding:
+
+> **extraction → contradiction → PERSON → PAGE → LOCAL LAW (statute)**
+
+Every finding carries all four anchors. The three candidate types are now live
+detectors built **onto** the sealed engine; the engine file remains
+byte-identical. The GHRP amendment (JUDICIALLY-CONFIRMED) is implemented in the
+candidate registry. The word-boundary precision fix ships in the companion layer.
+
+**Implemented & validated (2026-07-14):**
+
+| Platform | Modules | Validation |
+|---|---|---|
+| Python (1verum) | `verum_v6_detectors.py`, `verum_statutes.py`, `verum_ghrp.py` (+`confirm_judicially`) | 24 unit tests pass; 4 findings on the real case126/greensky corpus |
+| TypeScript (firebase) | `engine/v6Detectors.ts`, `engine/statuteMap.ts`, emitter + pipeline JUDICIALLY-CONFIRMED | 14 unit tests pass; typecheck clean; runtime smoke pass |
+| Kotlin (Android) | `engine/contradiction/V6Detectors.kt`, `StatuteMap.kt`, `V6DetectorsTest.kt` | Compiles to JVM bytecode; 12 JUnit tests pass |
+
+**Statute accuracy (ZA).** Perjury — s 9 Justices of the Peace and
+Commissioners of Oaths Act 16 of 1963; common-law perjury; s 319 Criminal
+Procedure Act 51 of 1977. Cybercrime — Cybercrimes Act 19 of 2020 (ss 2, 3, 5,
+10, 11); RICA 70 of 2002 s 2; ECTA 25 of 2002 s 86 (legacy). Leverage —
+Cybercrimes Act s 10; extortion (common law); Intimidation Act 72 of 1982 s 1;
+defeating the ends of justice (common law); PRECCA 12 of 2004. A GENERIC
+common-law fallback closes the chain on unmapped jurisdictions. All citations
+are hypotheses for legal review, not legal advice.
+
+**Two real-text defects found & fixed during validation** (regression-tested):
+multi-word entity capture in DEVICE_ATTRIBUTION_CHAIN ("South Coast Aquaculture"
+was truncated to "South"), and straight-vs-curly quote handling for device
+identifiers — both required to fire on the genuine case126 text.
+
+---
+
+## 9. Signature Block
 
 This document is part of the Verum Omnis Constitutional Governance Framework.
-It is PROPOSED: the three candidate types, the GHRP amendment, and the
-word-boundary recommendation take effect only on founder ratification, and are
-then implemented **onto** the engine (new detectors / registry methods) — the
-sealed v5.3.1c engine file remains byte-identical.
+It is **RATIFIED — BINDING**. The three types, the GHRP amendment, and the
+word-boundary fix are implemented **onto** the engine (new detectors / registry
+methods); the sealed v5.3.1c engine file remains byte-identical.
 
-**System Version**: v5.3.1c + GHRP 1.0.0
-**Document Version**: 1.0.0
+**System Version**: v5.3.1c + GHRP 1.0.0 + v6 detectors 1.0.0
+**Document Version**: 1.1.0
 **Drafted**: 2026-07-14
-**Status**: PROPOSED — CANDIDATE
+**Ratified**: 2026-07-14
+**Status**: RATIFIED — BINDING
 
 ```
-VERUM OMNIS — CANDIDATE CONTRADICTION TYPES v6
+VERUM OMNIS — CONTRADICTION TYPES v6 (RATIFIED)
 "The taxonomy grows by evidence. Every candidate is anchored. Nothing enters unverified."
 ```

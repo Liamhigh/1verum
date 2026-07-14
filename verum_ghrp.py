@@ -43,6 +43,7 @@ __all__ = [
     "GHRP_STATUS_G3_CANDIDATE",
     "GHRP_STATUS_CANDIDATE_PROMOTED",
     "GHRP_STATUS_CANDIDATE_REJECTED",
+    "GHRP_STATUS_JUDICIALLY_CONFIRMED",
     "FindingsJsonEmitter",
     "G3CandidateRegistry",
     "VerumContradictionEngineGHRP",
@@ -56,6 +57,10 @@ GHRP_STATUS_ENGINE_VERIFIED = "ENGINE-VERIFIED"
 GHRP_STATUS_G3_CANDIDATE = "G3-RAISED CANDIDATE - PENDING VERIFICATION"
 GHRP_STATUS_CANDIDATE_PROMOTED = "CANDIDATE PROMOTED - ENGINE-VERIFIED"
 GHRP_STATUS_CANDIDATE_REJECTED = "CANDIDATE REJECTED - REASON LOGGED"
+# Highest evidentiary tier: a contradiction that a court has itself confirmed.
+# Anchored by a sealed judgment reference (e.g. H208/25).  Promotable from any
+# tier; never deleted; the judgment anchor is itself sealed with the record.
+GHRP_STATUS_JUDICIALLY_CONFIRMED = "JUDICIALLY-CONFIRMED"
 
 
 class FindingsJsonEmitter:
@@ -287,6 +292,46 @@ class G3CandidateRegistry:
         })
         return record
 
+    def confirm_judicially(
+        self,
+        candidate_id: str,
+        judgment_ref: str,
+        court: str = "",
+        case_number: str = "",
+    ) -> Dict[str, Any]:
+        """Confirm a record as JUDICIALLY-CONFIRMED — a court has itself found
+        the fact.  This is the highest evidentiary tier, above ENGINE-VERIFIED.
+
+        Requires a judgment reference (e.g. the sealed judgment H208/25).  The
+        record is never deleted; the judgment anchor is sealed with it.
+        Promotable from any tier (a G3 candidate or an engine-verified finding).
+        """
+        if not judgment_ref or not str(judgment_ref).strip():
+            raise ValueError(
+                "Judicial confirmation requires a judgment reference "
+                "(e.g. sealed judgment H208/25). The court anchor is itself evidence."
+            )
+        record = self._candidates.get(candidate_id)
+        if record is None:
+            raise ValueError(f"Unknown candidate {candidate_id}")
+        now = datetime.now(timezone.utc).isoformat()
+        record["verification_status"] = GHRP_STATUS_JUDICIALLY_CONFIRMED
+        record["judicial_confirmation"] = {
+            "judgment_ref": str(judgment_ref).strip(),
+            "court": court,
+            "case_number": case_number,
+            "confirmed_utc": now,
+        }
+        self._audit.append({
+            "action": "JUDICIALLY-CONFIRMED",
+            "candidate_id": candidate_id,
+            "judgment_ref": str(judgment_ref).strip(),
+            "court": court,
+            "case_number": case_number,
+            "utc": now,
+        })
+        return record
+
     def pending(self) -> List[Dict[str, Any]]:
         return [r for r in self._candidates.values()
                 if r["verification_status"] == GHRP_STATUS_G3_CANDIDATE]
@@ -311,7 +356,13 @@ class G3CandidateRegistry:
             1 for r in findings["contradictions"]
             if r.get("verification_status") == GHRP_STATUS_G3_CANDIDATE
         )
-        findings["engine_verified_count"] = len(findings["contradictions"]) - findings["g3_candidate_count"]
+        findings["judicially_confirmed_count"] = sum(
+            1 for r in findings["contradictions"]
+            if r.get("verification_status") == GHRP_STATUS_JUDICIALLY_CONFIRMED
+        )
+        findings["engine_verified_count"] = (
+            len(findings["contradictions"]) - findings["g3_candidate_count"]
+        )
         findings["g3_candidate_audit"] = self.audit_trail()
         return findings
 

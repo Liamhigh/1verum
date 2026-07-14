@@ -255,7 +255,9 @@ class G3CandidateRegistry:
 
     def promote(self, candidate_id: str, method: str = "human_signoff") -> Dict[str, Any]:
         """Promote a candidate to engine-verified after re-run or human sign-off."""
-        record = self._candidates[candidate_id]
+        record = self._candidates.get(candidate_id)
+        if record is None:
+            raise ValueError(f"Unknown candidate {candidate_id}")
         record["verification_status"] = GHRP_STATUS_CANDIDATE_PROMOTED
         record["promotion_method"] = method
         record["promoted_utc"] = datetime.now(timezone.utc).isoformat()
@@ -271,7 +273,9 @@ class G3CandidateRegistry:
         """Reject a candidate. Never deleted — reason sealed with the record."""
         if not reason:
             raise ValueError("Rejection requires a reason. The record of why is itself evidence.")
-        record = self._candidates[candidate_id]
+        record = self._candidates.get(candidate_id)
+        if record is None:
+            raise ValueError(f"Unknown candidate {candidate_id}")
         record["verification_status"] = GHRP_STATUS_CANDIDATE_REJECTED
         record["rejection_reason"] = reason
         record["rejected_utc"] = datetime.now(timezone.utc).isoformat()

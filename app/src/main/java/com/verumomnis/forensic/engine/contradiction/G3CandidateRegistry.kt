@@ -99,7 +99,7 @@ class G3CandidateRegistry(private val g3Model: String = "gemma-3-4b-it") {
         val current = requireNotNull(candidates[candidateId]) { "Unknown candidate $candidateId" }
         val rejected = current.copy(
             verificationStatus = FindingsJsonEmitter.STATUS_CANDIDATE_REJECTED,
-            conflictDescription = current.conflictDescription + " [REJECTED: $reason]"
+            rejectionReason = reason
         )
         candidates[candidateId] = rejected
         audit.add(AuditEntry("REJECTED", candidateId, reason, utc))

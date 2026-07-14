@@ -148,6 +148,61 @@ class TestG3CandidateRegistry(unittest.TestCase):
         )
 
 
+class TestG3CandidateRegistryExtended(unittest.TestCase):
+    """Coverage for pending(), include_rejected, and unknown-candidate behaviour."""
+
+    def setUp(self):
+        self.registry = G3CandidateRegistry()
+
+    def _raise(self, cid=None, a_text="Reply promised by next week"):
+        return self.registry.raise_candidate(
+            contradiction_type="OMISSION",
+            proposition_a_text=a_text,
+            proposition_b_text="No reply exists anywhere in the sealed vault",
+            proposition_a_actor="Standard Bank",
+            proposition_b_actor="Sealed record",
+            conflict_description="Undertaking never honoured in the record.",
+            source_document="ghrp_demo.txt",
+            source_page=3,
+            sha512_anchor="ab" * 64,
+            candidate_id=cid,
+        )
+
+    def test_pending_only_returns_active_candidates(self):
+        c1 = self._raise()
+        c2 = self._raise()
+        c3 = self._raise()
+        self.registry.promote(c3["contradiction_id"])
+        pending = self.registry.pending()
+        for record in pending:
+            self.assertEqual(record["verification_status"], GHRP_STATUS_G3_CANDIDATE)
+        pending_ids = {r["contradiction_id"] for r in pending}
+        self.assertIn(c1["contradiction_id"], pending_ids)
+        self.assertIn(c2["contradiction_id"], pending_ids)
+        self.assertNotIn(c3["contradiction_id"], pending_ids)
+
+    def test_merge_into_includes_rejected_when_flag_set(self):
+        engine = VerumContradictionEngineGHRP(case_id="VO-GHRP-TEST-003")
+        _, findings = engine.process_and_emit_from_texts(DEMO_TEXTS[:2])
+        active = self._raise()
+        self._raise(cid="G3-CAND-REJ")
+        self.registry.reject("G3-CAND-REJ", reason="Not supported by the sealed record")
+        merged = self.registry.merge_into(findings, include_rejected=True)
+        ids = [r["contradiction_id"] for r in merged["contradictions"]]
+        self.assertIn(active["contradiction_id"], ids)
+        self.assertIn("G3-CAND-REJ", ids)
+
+    def test_promote_unknown_candidate_raises_with_id(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.registry.promote("nonexistent-candidate-id")
+        self.assertIn("nonexistent-candidate-id", str(ctx.exception))
+
+    def test_reject_unknown_candidate_raises_with_id(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.registry.reject("nonexistent-candidate-id", reason="some reason")
+        self.assertIn("nonexistent-candidate-id", str(ctx.exception))
+
+
 class TestSchemaFileIntegrity(unittest.TestCase):
     """The shipped schema parses and names the required record fields."""
 

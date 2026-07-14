@@ -51,7 +51,8 @@ object FindingsJsonEmitter {
         @SerialName("sha512_anchor") val sha512Anchor: String,
         @SerialName("extraction_method") val extractionMethod: String,
         @SerialName("legal_hypothesis") val legalHypothesis: FindingsLegalHypothesis? = null,
-        @SerialName("verification_status") val verificationStatus: String
+        @SerialName("verification_status") val verificationStatus: String,
+        @SerialName("rejection_reason") val rejectionReason: String? = null
     )
 
     @Serializable
@@ -82,6 +83,10 @@ object FindingsJsonEmitter {
 
     /** Convert one engine contradiction into a findings record. */
     fun recordFromContradiction(contradiction: EngineContradiction): FindingsContradictionRecord {
+        require(contradiction.detectedFact.sha512Hash.isNotEmpty()) {
+            "GHRP: contradiction ${contradiction.contradictionId} carries no SHA-512 anchor. " +
+                "If it is not anchored, it is not emitted."
+        }
         val fact = contradiction.detectedFact
         val status = contradiction.verificationStatus["status"] ?: STATUS_ENGINE_VERIFIED
         return FindingsContradictionRecord(
@@ -121,8 +126,11 @@ object FindingsJsonEmitter {
         caseIds: List<String> = emptyList(),
         integrityFindings: List<String> = emptyList(),
         extraRecords: List<FindingsContradictionRecord> = emptyList(),
-        generatedUtc: String = ""
+        generatedUtc: String = java.time.Instant.now().toString()
     ): FindingsJsonDocument {
+        require(generatedUtc.isNotBlank()) {
+            "generatedUtc must be a non-blank UTC timestamp (ISO-8601). Inject a fixed value for deterministic tests."
+        }
         val records = report.contradictions.map { recordFromContradiction(it) } + extraRecords
         val candidateCount = records.count { it.verificationStatus == STATUS_G3_CANDIDATE }
         return FindingsJsonDocument(

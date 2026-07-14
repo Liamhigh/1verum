@@ -25,6 +25,8 @@ object SealVerifier {
         val metadataSource: String?, // "PDF Subject metadata" | "PDF content scan" | null
         val isEncrypted: Boolean,
         val expectedHash: String?,
+        /** SHA-512 recomputed over the uploaded bytes — shown on NO_SEAL, matching verify.html. */
+        val computedSha512: String?,
         val reason: String
     )
 
@@ -85,6 +87,7 @@ object SealVerifier {
                 metadataSource = "PDF Subject metadata",
                 isEncrypted = encrypted,
                 expectedHash = expected,
+                computedSha512 = null,
                 reason = if (match) {
                     "The SHA-512 fingerprint embedded in this document matches the expected hash. The document has NOT been tampered with since it was sealed."
                 } else {
@@ -100,6 +103,7 @@ object SealVerifier {
                 metadataSource = "PDF Subject metadata",
                 isEncrypted = encrypted,
                 expectedHash = expected,
+                computedSha512 = null,
                 reason = "A Verum Omnis seal was found embedded in this document. Compare the Seal ID and SHA-512 prefix with the footer printed on every page to confirm authenticity."
             )
         }
@@ -110,10 +114,13 @@ object SealVerifier {
             metadataSource = null,
             isEncrypted = encrypted,
             expectedHash = expected,
+            // verify.html parity: show the recomputed fingerprint so the user can
+            // compare it with the footer/QR of the document they expected.
+            computedSha512 = if (encrypted) null else SealHasher.sha512Hex(pdfBytes),
             reason = if (encrypted) {
                 "This document is password-protected. Open it with the sender's password, then verify the decrypted copy."
             } else {
-                "No Verum Omnis seal metadata was detected. The document was not sealed by the Verum Omnis system, or the seal metadata was stripped in transit."
+                "No Verum Omnis seal metadata was detected. The document was not sealed by the Verum Omnis system, or the seal metadata was stripped in transit. Compare the recomputed SHA-512 of this file with the Seal ID on your document."
             }
         )
     }

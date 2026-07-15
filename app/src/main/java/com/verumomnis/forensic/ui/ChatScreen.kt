@@ -21,7 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -35,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
@@ -60,6 +65,17 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(state.chat) { msg -> ChatBubble(msg) }
+        }
+
+        if (state.sealStage != SealStage.IDLE) {
+            SealProgressCard(state.sealStage)
+        }
+        if (state.pendingFiles.isNotEmpty()) {
+            PendingPreviewCard(
+                previews = state.pendingFiles,
+                onConfirm = { viewModel.confirmAndSeal() },
+                onCancel = { viewModel.clearPendingFiles() }
+            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -94,6 +110,67 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
                 input = ""
             }) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = VoGold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SealProgressCard(stage: SealStage) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .background(VoSurface, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Text(stage.label, color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { stage.progress },
+            modifier = Modifier.fillMaxWidth(),
+            color = VoGold,
+            trackColor = VoBackground
+        )
+    }
+}
+
+@Composable
+private fun PendingPreviewCard(
+    previews: List<PendingFilePreview>,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .background(VoSurface, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            "READY TO SEAL",
+            color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        previews.forEach { preview ->
+            Text(preview.fileName, color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "%.1f MB · SHA-512 ${preview.sha512.take(12)}…".format(preview.sizeBytes / (1024f * 1024f)),
+                color = VoTextMuted, fontSize = 11.sp
+            )
+            Text(
+                preview.displayText,
+                color = VoTextMuted, fontSize = 11.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            OutlinedButton(onClick = onCancel) { Text("Cancel", color = VoTextMuted) }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = VoGold)) {
+                Text("Seal", color = VoBackground)
             }
         }
     }

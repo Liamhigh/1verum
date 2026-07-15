@@ -3,11 +3,13 @@ package com.verumomnis.forensic.blockchain
 import com.verumomnis.forensic.model.OtsAnchorResult
 import com.verumomnis.forensic.model.OtsStatus
 import com.verumomnis.forensic.model.OtsVerifyResult
-import java.io.DataOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.MessageDigest
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 /**
  * Cryptographic sealing — Bitcoin anchoring via OpenTimestamps (build spec §19).
@@ -19,11 +21,11 @@ import java.time.Instant
  * timestamp>. That proof can be upgraded/verified by any OpenTimestamps client
  * once the Bitcoin attestation confirms (typically 1–2 h + 6 confirmations).
  *
- * Pure JVM (java.net) so the anchoring logic is unit-testable off-device; the
- * offline path returns an OFFLINE result and still produces a local proof stub
- * for later submission.
+ * Pure JVM (java.security + OkHttp) so the anchoring logic is unit-testable
+ * off-device; the offline path returns an OFFLINE result and still produces a
+ * local proof stub for later submission.
  */
-object OpenTimestampsService {
+object OpenTimestampsService : BlockchainService {
 
     val CALENDAR_URLS = listOf(
         "https://alice.btc.calendar.opentimestamps.org",
@@ -40,6 +42,16 @@ object OpenTimestampsService {
     private val PENDING_TAG = hexToBytes("83dfe30d2ef90c8e")
     private val BITCOIN_TAG = hexToBytes("0588960d73d71901")
 
+    private val OCTET_STREAM = "application/octet-stream".toMediaType()
+    private val OTS_MEDIA_TYPE = "application/vnd.opentimestamps.v1".toMediaType()
+
+    private val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+
     /** OTS digest = SHA-256 over the raw bytes of the SHA-512 hex (build spec sha512ToSha256). */
     fun sha256OfSha512(sha512Hex: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(hexToBytes(sha512Hex))
@@ -52,7 +64,14 @@ object OpenTimestampsService {
      * Anchor an evidence SHA-512 to the Bitcoin blockchain via OpenTimestamps.
      * Network I/O — call off the main thread.
      */
-    fun anchor(sha512Hex: String, now: Instant = Instant.now(), timeoutMs: Int = 20_000): OtsAnchorResult {
+    override fun anchor(sha512Hex: String): OtsAnchorResult =
+        anchor(sha512Hex, Instant.now(), 20_000)
+
+    /**
+     * Anchor with explicit timestamp and timeout. Used by tests and by the
+     * public [BlockchainService.anchor] implementation above.
+     */
+    fun anchor(sha512Hex: String, now: Instant, timeoutMs: Int): OtsAnchorResult {
         val digest = sha256OfSha512(sha512Hex)
         val digestHex = toHex(digest)
         var proof: ByteArray? = null
@@ -112,38 +131,132 @@ object OpenTimestampsService {
         )
     }
 
+    override fun verify(otsProofBase64: String): OtsVerifyResult =
+        verifyBase64(otsProofBase64)
+
     fun verifyBase64(otsProofBase64: String, checkBitcoin: Boolean = true): OtsVerifyResult =
         verify(java.util.Base64.getDecoder().decode(otsProofBase64), checkBitcoin)
 
-    private fun submitDigest(calendarUrl: String, digest: ByteArray, timeoutMs: Int): ByteArray? {
-        val conn = (URL("$calendarUrl/digest").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
-            doOutput = true
-            setRequestProperty("Accept", "application/vnd.opentimestamps.v1")
-            setRequestProperty("Content-Type", "application/octet-stream")
-            setRequestProperty("User-Agent", "verum-omnis-seal/1.0")
+    /**
+     * Upgrade a pending .ots proof by submitting it to the calendar upgrade
+     * endpoint. Returns a CONFIRMED result if Bitcoin attestation is available,
+     * otherwise PENDING/OFFLINE.
+     */
+    override fun upgrade(otsProofBase64: String): OtsAnchorResult {
+        val now = Instant.now()
+        val proofBytes = runCatching { java.util.Base64.getDecoder().decode(otsProofBase64) }.getOrElse {
+            return failedResult("", "Invalid Base64 proof")
         }
-        return try {
-            DataOutputStream(conn.outputStream).use { it.write(digest) }
-            if (conn.responseCode in 200..299) conn.inputStream.use { it.readBytes() } else null
-        } finally {
-            conn.disconnect()
+        val digest = extractDigest(proofBytes) ?: return failedResult("", "Could not extract digest from proof")
+        val digestHex = toHex(digest)
+        var upgraded: ByteArray? = null
+        val usedCalendars = mutableListOf<String>()
+        for (url in CALENDAR_URLS) {
+            val result = runCatching { submitUpgrade(url, proofBytes, 20_000) }.getOrNull()
+            if (result != null && result.isNotEmpty()) {
+                usedCalendars += url
+                if (upgraded == null) upgraded = result
+            }
+        }
+        return if (upgraded != null) {
+            val verified = verify(upgraded, checkBitcoin = false)
+            OtsAnchorResult(
+                status = verified.status,
+                sha512 = "",
+                sha256Digest = digestHex,
+                calendarUrls = usedCalendars,
+                otsProofBase64 = java.util.Base64.getEncoder().encodeToString(upgraded),
+                otsProofFile = "seal_${digestHex.take(8)}.ots",
+                submittedAt = now.toString(),
+                message = if (verified.status == OtsStatus.CONFIRMED) {
+                    "Bitcoin attestation confirmed."
+                } else {
+                    "Upgrade submitted; still pending Bitcoin confirmation."
+                }
+            )
+        } else {
+            OtsAnchorResult(
+                status = OtsStatus.OFFLINE,
+                sha512 = "",
+                sha256Digest = digestHex,
+                calendarUrls = emptyList(),
+                otsProofBase64 = otsProofBase64,
+                otsProofFile = "seal_${digestHex.take(8)}.ots.pending",
+                submittedAt = now.toString(),
+                message = "Offline — could not upgrade proof; will retry later."
+            )
+        }
+    }
+
+    private fun submitDigest(calendarUrl: String, digest: ByteArray, timeoutMs: Int): ByteArray? {
+        val callClient = client.newBuilder()
+            .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder()
+            .url("$calendarUrl/digest")
+            .post(digest.toRequestBody(OCTET_STREAM))
+            .header("Accept", "application/vnd.opentimestamps.v1")
+            .header("User-Agent", "verum-omnis-seal/1.0")
+            .build()
+        return callClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) response.body?.bytes() else null
+        }
+    }
+
+    private fun submitUpgrade(calendarUrl: String, proof: ByteArray, timeoutMs: Int): ByteArray? {
+        val callClient = client.newBuilder()
+            .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder()
+            .url("$calendarUrl/upgrade")
+            .post(proof.toRequestBody(OTS_MEDIA_TYPE))
+            .header("Accept", "application/vnd.opentimestamps.v1")
+            .header("User-Agent", "verum-omnis-seal/1.0")
+            .build()
+        return callClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) response.body?.bytes() else null
         }
     }
 
     private fun bitcoinTipHeight(timeoutMs: Int): Long? {
-        val conn = (URL(BITCOIN_TIP_URL).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"; connectTimeout = timeoutMs; readTimeout = timeoutMs
-            setRequestProperty("User-Agent", "verum-omnis-seal/1.0")
-        }
-        return try {
-            if (conn.responseCode in 200..299) conn.inputStream.use { it.readBytes() }.toString(Charsets.UTF_8).trim().toLongOrNull() else null
-        } finally {
-            conn.disconnect()
+        val callClient = client.newBuilder()
+            .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder()
+            .url(BITCOIN_TIP_URL)
+            .header("User-Agent", "verum-omnis-seal/1.0")
+            .build()
+        return callClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                response.body?.string()?.trim()?.toLongOrNull()
+            } else null
         }
     }
+
+    private fun extractDigest(proof: ByteArray): ByteArray? {
+        // Proof layout: MAGIC(16) | VERSION(1) | OP_SHA256(1) | DIGEST(32) | ...
+        val magicSize = MAGIC.size
+        val prefixSize = magicSize + 2 + 32
+        if (proof.size < prefixSize) return null
+        if (!containsSubsequence(proof.copyOfRange(0, magicSize), MAGIC)) return null
+        if (proof[magicSize] != VERSION || proof[magicSize + 1] != OP_SHA256) return null
+        return proof.copyOfRange(magicSize + 2, prefixSize)
+    }
+
+    private fun failedResult(sha512: String, message: String): OtsAnchorResult =
+        OtsAnchorResult(
+            status = OtsStatus.FAILED,
+            sha512 = sha512,
+            sha256Digest = "",
+            calendarUrls = emptyList(),
+            otsProofBase64 = null,
+            otsProofFile = "",
+            submittedAt = Instant.now().toString(),
+            message = message
+        )
 
     private fun containsSubsequence(haystack: ByteArray, needle: ByteArray): Boolean {
         if (needle.isEmpty() || haystack.size < needle.size) return false

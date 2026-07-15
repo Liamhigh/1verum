@@ -2,6 +2,7 @@ package com.verumomnis.forensic.pdf
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfDocument
+import com.verumomnis.forensic.seal.SealMetadataCodec
 import java.io.ByteArrayOutputStream
 
 /**
@@ -26,7 +27,17 @@ object SealedPdfGenerator {
                 SealedPageRenderer.PAGE_WIDTH, SealedPageRenderer.PAGE_HEIGHT, pageNumber++
             ).create()
             val page = document.startPage(info)
-            SealedPageRenderer.drawCover(page.canvas, cover, watermark, logo, content.sealFooter)
+            val qrPayload = if (content.sealHash.isNotBlank()) {
+                val meta = content.sealMetadata ?: SealMetadataCodec.collect(
+                    SealMetadataCodec.SealMetadataInput(
+                        timestampMs = System.currentTimeMillis(),
+                        sealType = "private"
+                    )
+                )
+                SealMetadataCodec.buildVerifyUrl(content.sealHash, meta)
+            } else null
+            val qrCode = qrPayload?.let { QrCodeGenerator.generate(it, 256) }
+            SealedPageRenderer.drawCover(page.canvas, cover, watermark, logo, content.sealFooter, qrCode)
             document.finishPage(page)
         }
 

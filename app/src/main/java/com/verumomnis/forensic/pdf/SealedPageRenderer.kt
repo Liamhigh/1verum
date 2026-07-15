@@ -1,5 +1,6 @@
 package com.verumomnis.forensic.pdf
 
+import com.verumomnis.forensic.core.Constitution
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -48,6 +49,7 @@ object SealedPageRenderer {
         watermark: Bitmap?,
         logo: Bitmap?,
         sealFooter: String,
+        qrCode: Bitmap? = null,
         pageWidth: Int = PAGE_WIDTH,
         pageHeight: Int = PAGE_HEIGHT
     ) {
@@ -87,7 +89,7 @@ object SealedPageRenderer {
             color = coverGold; textSize = 10f; letterSpacing = 0.22f; textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
         }
-        canvas.drawText("CONSTITUTIONAL FORENSIC AI  ·  V5.2.7", center, 200f, caption)
+        canvas.drawText("CONSTITUTIONAL FORENSIC AI  ·  V${Constitution.VERSION}", center, 200f, caption)
 
         goldDivider(canvas, center, 218f)
 
@@ -132,11 +134,24 @@ object SealedPageRenderer {
             color = coverGold; textSize = 10f; letterSpacing = 0.12f; textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
         }
-        canvas.drawText(cover.classification, center, pageHeight - 70f, cls)
+        canvas.drawText(cover.classification, center, pageHeight - 96f, cls)
+
+        // Verification QR code on the cover page.
+        if (qrCode != null) {
+            val qrSize = 56f
+            val qrLeft = center - qrSize / 2f
+            val qrTop = pageHeight - 88f
+            canvas.drawBitmap(
+                qrCode, Rect(0, 0, qrCode.width, qrCode.height),
+                RectF(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+        }
+
         val footer = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = coverMuted; textSize = 7f; textAlign = Paint.Align.CENTER; typeface = Typeface.MONOSPACE
         }
-        canvas.drawText(sealFooter, center, pageHeight - 50f, footer)
+        canvas.drawText(sealFooter, center, pageHeight - 22f, footer)
     }
 
     private fun goldDivider(canvas: Canvas, center: Float, y: Float) {
@@ -241,7 +256,7 @@ object SealedPageRenderer {
         canvas.drawLine(MARGIN, y, pageWidth - MARGIN, y, sep)
         y += 12f
 
-        // Framed image (or placeholder for video / undecoded media).
+        // Framed image (or fallback frame for video / undecoded media).
         val frameLeft = MARGIN
         val frameRight = pageWidth - MARGIN
         val frameTop = y

@@ -3,6 +3,10 @@ package com.verumomnis.forensic
 import com.verumomnis.forensic.engine.ContradictionExtractor
 import com.verumomnis.forensic.engine.EntityExtractor
 import com.verumomnis.forensic.engine.ForensicService
+import com.verumomnis.forensic.engine.contradiction.EngineContradictionType
+import com.verumomnis.forensic.engine.contradiction.EngineSeverity
+import com.verumomnis.forensic.engine.contradiction.VerumContradictionEngine
+import com.verumomnis.forensic.engine.contradiction.getCaseConfig
 import com.verumomnis.forensic.model.ContradictionCategory
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.Severity
@@ -92,5 +96,111 @@ class ContradictionEngineTest {
         assertTrue(e.amounts.any { it >= 3_800_000 })          // R3.8M
         assertTrue(e.dates.contains("14 January 2026"))
         assertTrue(e.people.any { it.contains("Gary") })
+    }
+
+    // ==================== v5.3.1c ported detector tests ====================
+
+    @Test
+    fun hybridEngineDetectsAcknowledgeThenDeny() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-001", caseName = "standardbank")
+        val report = engine.processFromTexts(listOf(
+            "From: Marius Nortje. I deny that Kevin completed the deal on 13 March 2025.",
+            "From: Marius Nortje. I admit that Kevin completed the deal on 13 March 2025."
+        ), listOf("denial.txt", "admission.txt"))
+        assertTrue(
+            "Expected ACKNOWLEDGE_THEN_DENY",
+            report.contradictions.any { it.type == EngineContradictionType.ACKNOWLEDGE_THEN_DENY }
+        )
+    }
+
+    @Test
+    fun hybridEngineDetectsGoodwillForfeitureSwindle() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-002", caseName = "allfuels")
+        val report = engine.processFromTexts(listOf(
+            "AllFuels demanded that the operator forfeit all goodwill upon termination.",
+            "AllFuels demanded R150,000 from the operator personally to take over the company."
+        ), listOf("forfeit.txt", "buyout.txt"))
+        assertTrue(
+            "Expected GOODWILL_FORFEITURE_SWINDLE",
+            report.contradictions.any { it.type == EngineContradictionType.GOODWILL_FORFEITURE_SWINDLE }
+        )
+    }
+
+    @Test
+    fun hybridEngineDetectsFabricatedDecoyEvidence() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-003", caseName = "standardbank")
+        val report = engine.processFromTexts(listOf(
+            "From: Kevin Lappeman. Email containing forged WhatsApp messages and fabricated $28,000 liability."
+        ), listOf("forged.txt"))
+        assertTrue(
+            "Expected FABRICATED_DECOY_EVIDENCE",
+            report.contradictions.any { it.type == EngineContradictionType.FABRICATED_DECOY_EVIDENCE }
+        )
+    }
+
+    @Test
+    fun hybridEngineDetectsSpoliation() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-004", caseName = "standardbank")
+        val report = engine.processFromTexts(listOf(
+            "From: Custodian. We deleted the messages and wiped the device to conceal evidence."
+        ), listOf("spoliation.txt"))
+        assertTrue(
+            "Expected SPOLIATION_OF_EVIDENCE",
+            report.contradictions.any { it.type == EngineContradictionType.SPOLIATION_OF_EVIDENCE }
+        )
+    }
+
+    @Test
+    fun hybridEngineDetectsDefamationThreat() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-005", caseName = "standardbank")
+        val report = engine.processFromTexts(listOf(
+            "From: Southbridge Legal. Grounds for legal action including defamation, fraud and reputational harm. Govern yourself accordingly."
+        ), listOf("threat.txt"))
+        assertTrue(
+            "Expected DEFAMATION_THREAT",
+            report.contradictions.any { it.type == EngineContradictionType.DEFAMATION_THREAT }
+        )
+    }
+
+    @Test
+    fun standardbankSampleProducesCriticalOrHigh() {
+        val engine = VerumContradictionEngine(caseId = "VO-SB-TEST", caseName = "standardbank")
+        val evidenceText = javaClass.classLoader
+            ?.getResourceAsStream("evidence/standardbank_evidence.txt")
+            ?.bufferedReader()
+            ?.use { it.readText() }
+            ?: throw IllegalStateException("Missing test evidence")
+        val report = engine.processFromTexts(
+            evidenceText.lines().filter { it.isNotBlank() },
+            evidenceText.lines().filter { it.isNotBlank() }.mapIndexed { i, _ -> "SB-${i + 1}" }
+        )
+        assertTrue(
+            "Expected at least 5 contradictions from Standard Bank sample, got ${report.contradictions.size}",
+            report.contradictions.size >= 5
+        )
+        assertTrue(
+            "Expected at least one CRITICAL or HIGH severity contradiction",
+            report.contradictions.any { it.severity == EngineSeverity.VERY_HIGH || it.severity == EngineSeverity.HIGH }
+        )
+        val types = report.contradictions.map { it.type }.toSet()
+        assertTrue(
+            "Expected ACKNOWLEDGE_THEN_DENY or FABRICATED_DECOY_EVIDENCE in types: $types",
+            types.contains(EngineContradictionType.ACKNOWLEDGE_THEN_DENY) ||
+                types.contains(EngineContradictionType.FABRICATED_DECOY_EVIDENCE)
+        )
+    }
+
+    @Test
+    fun caseConfigRoutings() {
+        val standardBank = getCaseConfig("standardbank")
+        assertEquals("Standard Bank Master Bundle", standardBank.name)
+        assertTrue(standardBank.entityKeywords.contains("Marius Nortje"))
+
+        val allfuels111 = getCaseConfig("allfuels-111")
+        assertEquals("AllFuels 111-Contradiction Bundle", allfuels111.name)
+        assertTrue(allfuels111.legalSubjects.containsKey("Coercion"))
+
+        val defaultAllfuels = getCaseConfig("unknown")
+        assertEquals("AllFuels Energy (Pty) Ltd", defaultAllfuels.name)
     }
 }

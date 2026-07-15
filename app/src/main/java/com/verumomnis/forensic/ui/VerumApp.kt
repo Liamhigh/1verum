@@ -21,13 +21,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,8 +65,10 @@ import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, CHAT, REPORT, EMAIL, TAX, VAULT }
+private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,14 +77,16 @@ fun VerumApp(
     onCaptureLocation: () -> Unit = {},
     onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
     onExportEmail: (com.verumomnis.forensic.model.SealedEmail) -> Unit = {},
+    onReadConstitution: () -> Unit = {},
     initialScreen: String = "STORY",
     initialMenuOpen: Boolean = false
 ) {
     val state by viewModel.state.collectAsState()
-    var screen by remember { mutableStateOf(runCatching { Screen.valueOf(initialScreen) }.getOrDefault(Screen.STORY)) }
+    var screen by remember { mutableStateOf(runCatching { Screen.valueOf(initialScreen) }.getOrDefault(Screen.SCAN_HOME)) }
     var showMenu by remember { mutableStateOf(initialMenuOpen) }
     val context = LocalContext.current
 
+    val scope = rememberCoroutineScope()
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) onCaptureLocation() }
@@ -89,20 +97,73 @@ fun VerumApp(
         if (granted) onCaptureLocation() else locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
-    // Everything picked goes to the FORENSIC ENGINE (sealed + vaulted), never to the chat AI.
+    // A constitutional hard stop dismisses any open menu and blocks the entire UI.
+    LaunchedEffect(state.guardianBlock) {
+        if (state.guardianBlock != null) showMenu = false
+    }
+
+    // Auto-advance from the scan home to the report once the seal pipeline completes.
+    LaunchedEffect(state.sealStage) {
+        if (screen == Screen.SCAN_HOME && state.sealStage == SealStage.DONE && state.report != null) {
+            screen = Screen.REPORT
+        }
+    }
+
+    // Everything picked is validated, hashed and previewed before the user confirms the seal.
     val sealPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) {
-            uris.forEach { uri ->
-                val mime = context.contentResolver.getType(uri) ?: ""
-                if (mime.startsWith("image") || mime.startsWith("video")) {
-                    runCatching { MediaIngestor(context).ingest(uri, state.gps, viewModel.mediaCount() + 1) }
-                        .onSuccess { viewModel.addMedia(it) }
-                } else {
-                    runCatching { MediaIngestor(context).ingestDocument(uri) }
-                        .onSuccess { viewModel.ingestDocument(it.fileName, it.mime, it.text) }
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        val gps = state.gps
+        val resolver = context.contentResolver
+        scope.launch(Dispatchers.IO) {
+            viewModel.setSealStage(SealStage.HASHING)
+            val ingestor = MediaIngestor(context)
+            val previews = mutableListOf<PendingFilePreview>()
+            val errors = mutableListOf<String>()
+            val baseMediaCount = viewModel.mediaCount()
+            uris.forEachIndexed { index, uri ->
+                val mime = resolver.getType(uri) ?: ""
+                val result = runCatching {
+                    if (mime.startsWith("image") || mime.startsWith("video")) {
+                        ingestor.ingest(uri, gps, baseMediaCount + index + 1)
+                    } else {
+                        ingestor.ingestDocument(uri)
+                    }
+                }.getOrElse { IngestResult.Error.ReadFailed(it.message ?: "unknown error") }
+
+                when (result) {
+                    is IngestResult.DocumentSuccess -> previews += PendingFilePreview(
+                        fileName = result.fileName,
+                        mimeType = result.mimeType,
+                        sizeBytes = result.sizeBytes,
+                        sha512 = result.sha512,
+                        displayText = result.text.take(280) + if (result.text.length > 280) "…" else "",
+                        isMedia = false,
+                        documentText = result.text
+                    )
+                    is IngestResult.MediaSuccess -> previews += PendingFilePreview(
+                        fileName = result.evidence.fileName,
+                        mimeType = result.evidence.mimeType,
+                        sizeBytes = result.sizeBytes,
+                        sha512 = result.evidence.sha512,
+                        displayText = buildString {
+                            append(result.evidence.kind.name)
+                            result.evidence.width?.let { append(" · ${it}×${result.evidence.height ?: 0}") }
+                            result.evidence.durationMs?.let { append(" · ${it / 1000}s") }
+                        },
+                        isMedia = true,
+                        mediaEvidence = result.evidence
+                    )
+                    is IngestResult.Error -> errors += "${uri.lastPathSegment ?: result.javaClass.simpleName}: ${result.message}"
                 }
             }
-            viewModel.sealCase()
+            launch(Dispatchers.Main) {
+                if (previews.isNotEmpty()) {
+                    viewModel.setPendingFiles(previews)
+                } else {
+                    viewModel.setSealStage(SealStage.IDLE)
+                }
+                errors.forEach { viewModel.postEngine("Upload error · $it") }
+            }
         }
     }
     val verifyPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -111,13 +172,19 @@ fun VerumApp(
                 .onSuccess { (name, hash) -> viewModel.verifyUploaded(name, hash) }
         }
     }
+    val websiteSealPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.sealDocumentWebsiteFormat(it, context) }
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = VoBackground) {
         Box(modifier = Modifier.fillMaxSize()) {
             ConstellationBackground(modifier = Modifier.fillMaxSize())
 
             if (screen == Screen.STORY) {
-                StoryScreen(onEnter = { screen = Screen.CHAT })
+                StoryScreen(
+                    onEnter = { screen = Screen.SCAN_HOME },
+                    onReadConstitution = onReadConstitution
+                )
             } else {
                 Scaffold(
                     containerColor = Color.Transparent,
@@ -126,7 +193,7 @@ fun VerumApp(
                         VerumTopBar(
                             state = state,
                             screen = screen,
-                            onHome = { screen = Screen.CHAT },
+                            onHome = { screen = Screen.SCAN_HOME },
                             onVault = { screen = Screen.VAULT },
                             onReport = { screen = Screen.REPORT }
                         )
@@ -134,10 +201,24 @@ fun VerumApp(
                 ) { padding ->
                     Box(modifier = Modifier.padding(padding).fillMaxSize()) {
                         when (screen) {
+                            Screen.SCAN_HOME -> ScanHomeScreen(
+                                state = state,
+                                onSelectFile = { sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                                onStartScan = { caseName -> viewModel.startForensicScan(caseName) },
+                                onNewScan = { viewModel.clearCase(); screen = Screen.SCAN_HOME },
+                                onOpenChat = { screen = Screen.CHAT },
+                                onOpenVault = { screen = Screen.VAULT },
+                                onOpenReport = { screen = Screen.REPORT }
+                            )
                             Screen.CHAT -> ChatScreen(state, viewModel, onPlus = { showMenu = true })
-                            Screen.REPORT -> ReportScreen(state, viewModel, onExportReport)
+                            Screen.REPORT -> ReportScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onExportReport = onExportReport,
+                                onNewScan = { viewModel.clearCase(); screen = Screen.SCAN_HOME }
+                            )
                             Screen.EMAIL -> EmailScreen(state, viewModel, onExportEmail)
-                            Screen.TAX -> TaxScreen(state, viewModel)
+                            Screen.TAX -> TaxScreen(viewModel)
                             Screen.VAULT -> VaultScreen(state)
                             Screen.STORY -> {}
                         }
@@ -153,15 +234,35 @@ fun VerumApp(
                 ) {
                     ActionsSheet(
                         onSealDocument = { showMenu = false; sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                        onSealDocumentWebsite = { showMenu = false; websiteSealPicker.launch(arrayOf("application/pdf")) },
+                        onShareWebsiteSeal = { showMenu = false; viewModel.shareWebsiteSealedFile(context) },
+                        shareWebsiteSealEnabled = state.websiteSealedFile != null,
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
                         onDraftEmail = { showMenu = false; screen = Screen.EMAIL },
                         onTax = { showMenu = false; screen = Screen.TAX },
-                        onReport = { showMenu = false; screen = Screen.REPORT },
-                        onVault = { showMenu = false; screen = Screen.VAULT }
+                        onReport = {
+                            showMenu = false
+                            if (state.report != null) screen = Screen.REPORT
+                            else viewModel.postEngine("No sealed report yet. Start a forensic scan first.")
+                        },
+                        onVault = { showMenu = false; screen = Screen.VAULT },
+                        onReadConstitution = { showMenu = false; onReadConstitution() }
                     )
                 }
+            }
+
+            state.guardianBlock?.let { assessment ->
+                GuardianBlockScreen(
+                    assessment = assessment,
+                    onClearCase = {
+                        viewModel.clearCase()
+                        viewModel.clearGuardianBlock()
+                        screen = Screen.SCAN_HOME
+                    },
+                    onReadConstitution = onReadConstitution
+                )
             }
         }
     }
@@ -192,7 +293,10 @@ private fun VerumTopBar(
                     color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp
                 )
                 Spacer(Modifier.width(6.dp))
-                IconButton(onClick = onReport) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = VoGold) }
+                IconButton(
+                    onClick = onReport,
+                    enabled = state.report != null
+                ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
                 IconButton(onClick = onVault) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
             }
         } else {
@@ -201,6 +305,7 @@ private fun VerumTopBar(
                 Spacer(Modifier.width(4.dp))
                 Text(
                     when (screen) {
+                        Screen.SCAN_HOME -> "New Forensic Scan"
                         Screen.REPORT -> "Forensic Report"
                         Screen.EMAIL -> "Sealed Email"
                         Screen.TAX -> "Tax Return"
@@ -218,13 +323,17 @@ private fun VerumTopBar(
 @Composable
 private fun ActionsSheet(
     onSealDocument: () -> Unit,
+    onSealDocumentWebsite: () -> Unit,
+    onShareWebsiteSeal: () -> Unit,
+    shareWebsiteSealEnabled: Boolean,
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
     onDeepResearch: () -> Unit,
     onDraftEmail: () -> Unit,
     onTax: () -> Unit,
     onReport: () -> Unit,
-    onVault: () -> Unit
+    onVault: () -> Unit,
+    onReadConstitution: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("SEALED ACTIONS", color = VoGold, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
@@ -233,6 +342,10 @@ private fun ActionsSheet(
             color = VoTextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
         ActionRow(Icons.Filled.UploadFile, "Seal a document", "PDF / text → engine → vault", onSealDocument)
+        ActionRow(Icons.Filled.Verified, "Seal Document (website format)", "VO-DSS-1.2 website-compatible seal", onSealDocumentWebsite)
+        if (shareWebsiteSealEnabled) {
+            ActionRow(Icons.Filled.Share, "Share website-format seal", "Send the last website-sealed PDF", onShareWebsiteSeal)
+        }
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
@@ -240,6 +353,7 @@ private fun ActionsSheet(
         ActionRow(Icons.Filled.Calculate, "Tax return", "Company or individual · 50% of accountant fee", onTax)
         ActionRow(Icons.Filled.Description, "View sealed report", "Anchored contradictions, exhibits, seal", onReport)
         ActionRow(Icons.Filled.Lock, "Open vault", "Sealed evidence, findings & seals", onVault)
+        ActionRow(Icons.Filled.AccountBalance, "Read Constitution", "Verum Omnis governing principles", onReadConstitution)
         Spacer(Modifier.height(12.dp))
     }
 }

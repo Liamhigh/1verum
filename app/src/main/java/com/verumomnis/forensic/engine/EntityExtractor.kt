@@ -1,6 +1,8 @@
 package com.verumomnis.forensic.engine
 
 import com.verumomnis.forensic.model.ContradictionCategory
+import com.verumomnis.forensic.model.ExtractedPerson
+import com.verumomnis.forensic.model.PersonRole
 import com.verumomnis.forensic.model.StatementType
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -42,6 +44,19 @@ object EntityExtractor {
         Regex("""\b\d{1,2}/\d{1,2}/\d{2,4}\b""")
     )
 
+    // Age, ID, address, victim-profile patterns.
+    private val AGE_PATTERN = Regex("""\b([A-Z][a-z]+\s+[A-Z][a-z]+).*?\((\d{1,3})\s*(?:Years|Yrs|Year|Y)\b""", RegexOption.IGNORE_CASE)
+    private val AGE_INLINE = Regex("""\b(\d{1,3})\s*(?:years|yrs|year)\s*old\b""", RegexOption.IGNORE_CASE)
+    private val SA_ID_PATTERN = Regex("""\b(\d{13})\b""")
+    private val ADDRESS_PATTERN = Regex(
+        """\b((?:\d+\s+)?[A-Za-z0-9\s,.'-]+(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Lane|Ln|Way|Close|Crescent|Loop|Boulevard|Blvd|Highway|Hwy|PO\s*Box|Post\s*Net\s*Suite)\s*(?:\d+)?)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val VICTIM_PROFILE = Regex(
+        """\b([A-Z][a-z]+\s+[A-Z][a-z]+)\s*[-–]\s*([^,(\n]{3,60})\s*\((\d{1,3})\s*(?:Years|Yrs|Year|Y)\)""",
+        RegexOption.IGNORE_CASE
+    )
+
     fun extractEntities(documents: List<EvidenceDocument>): ExtractedEntities {
         val text = documents.joinToString("\n") { it.text }
         val people = LinkedHashSet<String>()
@@ -59,6 +74,101 @@ object EntityExtractor {
             base * multiplier
         }.filter { it > 0 }.toList()
         return ExtractedEntities(people.toList(), companies.toList(), dates.toList(), amounts)
+    }
+
+    /** Extract structured person records including age, ID number, role and address hints. */
+    fun extractPersons(documents: List<EvidenceDocument>): List<ExtractedPerson> {
+        val persons = LinkedHashMap<String, ExtractedPerson>()
+        documents.forEach { doc ->
+            // Victim profiles: "Name -- Site (X Years)"
+            VICTIM_PROFILE.findAll(doc.text).forEach { m ->
+                val name = m.groupValues[1].trim()
+                val context = m.groupValues[2].trim()
+                val age = m.groupValues[3].toIntOrNull()
+                persons[name] = (persons[name] ?: ExtractedPerson(name = name)).copy(
+                    age = age,
+                    role = PersonRole.VICTIM,
+                    context = context
+                )
+            }
+
+            // Age inline: "Name ... (X Years)" not caught above
+            AGE_PATTERN.findAll(doc.text).forEach { m ->
+                val name = m.groupValues[1].trim()
+                val age = m.groupValues[2].toIntOrNull()
+                if (!persons.containsKey(name)) {
+                    persons[name] = ExtractedPerson(name = name, age = age)
+                } else {
+                    persons[name] = persons[name]!!.copy(age = persons[name]!!.age ?: age)
+                }
+            }
+
+            // Inline "X years old"
+            AGE_INLINE.findAll(doc.text).forEach { m ->
+                val age = m.groupValues[1].toIntOrNull()
+                // Try to attach to the nearest preceding person name in the same doc.
+                val preceding = nearestPrecedingPerson(doc.text, m.range.first)
+                if (preceding != null) {
+                    persons[preceding] = (persons[preceding] ?: ExtractedPerson(name = preceding)).copy(age = age)
+                }
+            }
+
+            // South African ID numbers — attach to the nearest preceding person.
+            SA_ID_PATTERN.findAll(doc.text).filter { isValidSaId(it.groupValues[1]) }.forEach { m ->
+                val id = m.groupValues[1]
+                val preceding = nearestPrecedingPerson(doc.text, m.range.first)
+                if (preceding != null) {
+                    persons[preceding] = (persons[preceding] ?: ExtractedPerson(name = preceding)).copy(idNumber = id)
+                }
+            }
+
+            // Addresses — attach to the nearest preceding person.
+            ADDRESS_PATTERN.findAll(doc.text).forEach { m ->
+                val address = m.groupValues[1].trim()
+                val preceding = nearestPrecedingPerson(doc.text, m.range.first)
+                if (preceding != null) {
+                    persons[preceding] = (persons[preceding] ?: ExtractedPerson(name = preceding)).copy(address = address)
+                }
+            }
+
+            // Named respondents / deponents from headers
+            PERSON_FROM.findAll(doc.text).forEach { m ->
+                val name = m.groupValues[1].trim()
+                if (!persons.containsKey(name)) {
+                    persons[name] = ExtractedPerson(name = name, role = inferRoleFromHeader(m.value))
+                }
+            }
+        }
+        return persons.values.toList()
+    }
+
+    private fun nearestPrecedingPerson(text: String, position: Int): String? {
+        val before = text.substring(0, position)
+        PERSON_INLINE.findAll(before).lastOrNull()?.let { return it.groupValues[1].trim() }
+        PERSON_FROM.findAll(before).lastOrNull()?.let { return it.groupValues[1].trim() }
+        return null
+    }
+
+    private fun inferRoleFromHeader(header: String): PersonRole = when {
+        header.contains("witness", ignoreCase = true) -> PersonRole.WITNESS
+        header.contains("respondent", ignoreCase = true) -> PersonRole.RESPONDENT
+        header.contains("deponent", ignoreCase = true) -> PersonRole.WITNESS
+        else -> PersonRole.UNKNOWN
+    }
+
+    /** Luhn check for a 13-digit South African ID. */
+    private fun isValidSaId(id: String): Boolean {
+        if (id.length != 13 || !id.all { it.isDigit() }) return false
+        val digits = id.map { it.digitToInt() }
+        val check = digits.last()
+        val payload = digits.dropLast(1)
+        var sum = 0
+        payload.reversed().forEachIndexed { index, d ->
+            val v = d * (if (index % 2 == 0) 2 else 1)
+            sum += if (v > 9) v - 9 else v
+        }
+        val expected = (10 - (sum % 10)) % 10
+        return expected == check
     }
 
     fun authorOf(doc: EvidenceDocument): String? =

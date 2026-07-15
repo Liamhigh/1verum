@@ -2,6 +2,10 @@ package com.verumomnis.forensic.pdf
 
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.SealedEmail
+import com.verumomnis.forensic.seal.SealMetadataCodec
+import java.time.Instant
+import java.util.Locale
+import java.util.TimeZone
 
 /** Paginated content for a sealed PDF. */
 data class SealedPdfContent(
@@ -11,7 +15,15 @@ data class SealedPdfContent(
     val shortcode: String,
     val bodyLines: List<String>,
     val cover: Cover? = null,
-    val exhibits: List<ExhibitPage> = emptyList()
+    val exhibits: List<ExhibitPage> = emptyList(),
+    /** Full SHA-512 seal hash used for per-page footer and QR generation. */
+    val sealHash: String = "",
+    /** Constitution version printed in every footer. */
+    val constitutionVersion: String = "",
+    /** UTC timestamp printed in every footer. */
+    val createdAt: String = "",
+    /** Website-compatible seal metadata encoded into the cover QR code. */
+    val sealMetadata: SealMetadataCodec.SealMetadata? = null
 ) {
     /** A sealed photographic/video exhibit page. */
     data class ExhibitPage(
@@ -45,18 +57,51 @@ data class SealedPdfContent(
         val chunks = if (bodyLines.isEmpty()) listOf(emptyList()) else bodyLines.chunked(linesPerPage)
         val total = chunks.size
         return chunks.mapIndexed { index, lines ->
+            val pageNum = index + 1
+            val pageHash = pageSha512(sealHash, pageNum, total)
+            val truncated = if (pageHash.length >= 16) pageHash.take(8) + "…" + pageHash.takeLast(8) else pageHash
+            val footer = buildString {
+                append("VERUM OMNIS · seal-$shortcode · $truncated · ")
+                append("Constitution v$constitutionVersion · ")
+                append("$createdAt · Page $pageNum of $total")
+            }
             Page(
                 title = title,
                 classification = classification,
                 lines = lines,
-                sealFooter = sealFooter,
-                pageLabel = "Page ${index + 1} of $total | $shortcode"
+                sealFooter = footer,
+                pageLabel = "Page $pageNum of $total | $shortcode"
             )
         }
     }
 
+    /** Deterministic per-page integrity hash: SHA-512 over the seal + page number + total pages. */
+    private fun pageSha512(sealHash: String, page: Int, total: Int): String {
+        if (sealHash.isBlank()) return "0".repeat(128)
+        val payload = "$sealHash|$page|$total"
+        return com.verumomnis.forensic.crypto.Sha512.hash(payload.toByteArray())
+    }
+
     companion object {
         private const val WRAP = 88
+
+        private fun deviceString(): String {
+            val cores = Runtime.getRuntime().availableProcessors()
+            return "Android|$cores|${TimeZone.getDefault().id}"
+        }
+
+        private fun buildSealMetadata(createdAt: String, gps: String? = null, device: String? = null): SealMetadataCodec.SealMetadata {
+            val ts = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(System.currentTimeMillis())
+            return SealMetadataCodec.collect(
+                SealMetadataCodec.SealMetadataInput(
+                    timestampMs = ts,
+                    sealType = "private",
+                    gpsLat = gps?.substringBefore(","),
+                    gpsLng = gps?.substringAfter(",", "")?.takeIf { it.isNotEmpty() },
+                    device = device
+                )
+            )
+        }
 
         private fun wrap(text: String): List<String> {
             if (text.length <= WRAP) return listOf(text)
@@ -98,6 +143,9 @@ data class SealedPdfContent(
                     )
                 )
             }
+            val gps = report.jurisdictionSource?.gps?.let {
+                String.format(Locale.US, "%.6f,%.6f", it.latitude, it.longitude)
+            }
             return SealedPdfContent(
                 title = report.title,
                 classification = report.classification,
@@ -105,7 +153,11 @@ data class SealedPdfContent(
                 shortcode = report.seal.shortcode,
                 bodyLines = lines,
                 cover = cover,
-                exhibits = exhibits
+                exhibits = exhibits,
+                sealHash = report.seal.sha512,
+                constitutionVersion = report.seal.constitutionVersion,
+                createdAt = report.seal.createdAt,
+                sealMetadata = buildSealMetadata(report.seal.createdAt, gps, deviceString())
             )
         }
 
@@ -123,7 +175,11 @@ data class SealedPdfContent(
                 classification = "CONFIDENTIAL — DISTRIBUTION RECORD",
                 sealFooter = email.seal.sealFooter(),
                 shortcode = email.seal.shortcode,
-                bodyLines = lines
+                bodyLines = lines,
+                sealHash = email.seal.sha512,
+                constitutionVersion = email.seal.constitutionVersion,
+                createdAt = email.seal.createdAt,
+                sealMetadata = buildSealMetadata(email.sentAt, device = deviceString())
             )
         }
     }

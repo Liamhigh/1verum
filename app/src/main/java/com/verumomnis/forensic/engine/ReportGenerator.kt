@@ -2,10 +2,13 @@ package com.verumomnis.forensic.engine
 
 import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.crypto.EvidenceSealer
+import com.verumomnis.forensic.model.BehavioralFinding
 import com.verumomnis.forensic.model.Contradiction
+import com.verumomnis.forensic.model.ExtractedPerson
 import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.OffenceRow
+import com.verumomnis.forensic.model.Severity
 import java.time.Instant
 
 /**
@@ -21,7 +24,11 @@ object ReportGenerator {
     fun generate(
         findings: ForensicFindings,
         caseName: String,
-        now: Instant = Instant.now()
+        now: Instant = Instant.now(),
+        deviceId: String = "",
+        publicKeyFingerprint: String = "",
+        findingsJsonPath: String = "",
+        narrativeWriter: ReportWriter = DeterministicReportWriter
     ): ForensicReport {
         val reference = "VO-${caseName.uppercase().take(6).replace(" ", "")}-${now.toString().take(10).replace("-", "")}-FOR"
         val title = "Forensic Analysis Report — $caseName"
@@ -29,7 +36,8 @@ object ReportGenerator {
 
         val offenceMatrix = findings.contradictions.map { it.toOffenceRow() }
         val executiveSummary = buildExecutiveSummary(findings)
-        val body = renderBody(reference, title, classification, findings, offenceMatrix, now)
+        val body = renderBody(reference, title, classification, findings, offenceMatrix, now, deviceId, publicKeyFingerprint)
+        val gemmaNarrative = narrativeWriter.writeNarrative(findings, caseName, findingsJsonPath)
 
         val seal = EvidenceSealer.seal(
             bytes = body.toByteArray(Charsets.UTF_8),
@@ -51,8 +59,11 @@ object ReportGenerator {
             offenceMatrix = offenceMatrix,
             financial = findings.financial,
             mediaExhibits = findings.mediaExhibits,
+            findingsJsonPath = findingsJsonPath,
+            jurisdictionSource = findings.jurisdictionSource,
             seal = seal,
-            body = body
+            body = body,
+            gemmaNarrative = gemmaNarrative
         )
     }
 
@@ -72,6 +83,9 @@ object ReportGenerator {
         findings.financial?.companyTax?.let {
             append("Estimated company tax exposure: R%,.2f. ".format(it.taxLiability))
         }
+        if (findings.extractedPersons.isNotEmpty()) {
+            append("${findings.extractedPersons.size} person(s) were extracted from the evidence. ")
+        }
         append("All findings survived Triple-AI consensus and are sealed under Constitution v${Constitution.VERSION}.")
     }
 
@@ -81,7 +95,9 @@ object ReportGenerator {
         classification: String,
         findings: ForensicFindings,
         offenceMatrix: List<OffenceRow>,
-        now: Instant
+        now: Instant,
+        deviceId: String,
+        publicKeyFingerprint: String
     ): String = buildString {
         appendLine("VERUM OMNIS — ${Constitution.TAGLINE}")
         appendLine(title)
@@ -95,7 +111,36 @@ object ReportGenerator {
         appendLine("1. EXECUTIVE SUMMARY")
         appendLine(buildExecutiveSummary(findings))
         appendLine()
-        appendLine("2. CONTRADICTION MATRIX (person · page · statute)")
+        appendLine("2. EXTRACTED PERSONS")
+        if (findings.extractedPersons.isEmpty()) {
+            appendLine("   No structured person records extracted.")
+        } else {
+            findings.extractedPersons.forEach { p ->
+                appendLine("   - ${p.name}" + (p.age?.let { " · age $it" } ?: "") + " · ${p.role}" +
+                    (p.idNumber?.let { " · ID $it" } ?: "") + (p.address?.let { " · $it" } ?: ""))
+            }
+        }
+        appendLine()
+        findings.jurisdictionSource?.let { js ->
+            appendLine("2a. JURISDICTION SOURCE")
+            js.gps?.let { g ->
+                appendLine("   Coordinates: %.6f, %.6f".format(g.latitude, g.longitude))
+            }
+            appendLine("   Statutes applied:")
+            js.statutes.forEach { appendLine("      - $it") }
+            appendLine()
+        }
+        appendLine("2b. ACTOR PROFILES")
+        val actorProfiles = buildActorProfiles(findings)
+        if (actorProfiles.isEmpty()) {
+            appendLine("   No actor profiles available.")
+        } else {
+            actorProfiles.forEach { (person, score, flags) ->
+                appendLine("   - $person · Dishonesty score ${"%.1f" .format(score)}/10 · Flags: ${flags.joinToString(", ")}")
+            }
+        }
+        appendLine()
+        appendLine("3. CONTRADICTION MATRIX (person · page · statute)")
         if (findings.contradictions.isEmpty()) {
             appendLine("   No material contradictions detected.")
         } else {
@@ -111,27 +156,37 @@ object ReportGenerator {
                 appendLine()
             }
         }
-        appendLine("3. CHRONOLOGY")
+        appendLine("3a. 7-CATEGORY CONTRADICTION TABLE")
+        val categoryTable = buildCategoryTable(findings.contradictions)
+        if (categoryTable.isEmpty()) {
+            appendLine("   No contradictions to summarise.")
+        } else {
+            categoryTable.forEach { (category, count, maxSeverity, persons) ->
+                appendLine("   ${category.name.replace("_", " ")}: $count · Max severity $maxSeverity · Persons: ${persons.joinToString(", ")}")
+            }
+        }
+        appendLine()
+        appendLine("4. CHRONOLOGY")
         if (findings.timeline.isEmpty()) appendLine("   No dated events extracted.")
         else findings.timeline.forEach { appendLine("   ${it.dateTime} — ${it.description} (${it.evidenceId})") }
         appendLine()
-        appendLine("4. LEGAL FRAMEWORK")
+        appendLine("5. LEGAL FRAMEWORK")
         findings.legalMappings.forEach { appendLine("   - $it") }
         appendLine()
-        appendLine("5. OFFENCE MATRIX")
+        appendLine("6. OFFENCE MATRIX")
         offenceMatrix.forEach {
             appendLine("   - ${it.person}: ${it.offence}")
             appendLine("     Law: ${it.applicableLaw.joinToString("; ")} | Anchor: ${it.evidenceAnchor} | ${it.confidence}")
         }
         appendLine()
         findings.financial?.let { fin ->
-            appendLine("6. FINANCIAL ANALYSIS")
+            appendLine("7. FINANCIAL ANALYSIS")
             fin.companyTax?.let { appendLine("   Company tax (${it.jurisdiction}): taxable R%,.2f @ %.0f%% = R%,.2f".format(it.taxableIncome, it.rate * 100, it.taxLiability)) }
             fin.flaggedAnomalies.forEach { appendLine("   Anomaly: $it") }
             appendLine()
         }
         findings.behavioral?.let { b ->
-            appendLine("7. BEHAVIOURAL ANALYSIS (B4)")
+            appendLine("8. BEHAVIOURAL ANALYSIS (B4)")
             (b.gaslighting + b.manipulation + b.stress).forEach {
                 appendLine("   [${it.severity}] ${it.type}: \"${it.trigger}\" — ${it.evidenceId}")
             }
@@ -139,7 +194,7 @@ object ReportGenerator {
             appendLine()
         }
         findings.audio?.let { a ->
-            appendLine("7b. AUDIO FORENSICS (B8)")
+            appendLine("8b. AUDIO FORENSICS (B8)")
             appendLine("   Files: ${a.filesAnalyzed} · Speakers: ${a.speakerCount} · Utterances: ${a.segments.size} · Transcript: ${if (a.transcriptionAvailable) "available" else "INSUFFICIENT"}")
             a.tamperSignals.forEach { appendLine("   [${it.severity}] ${it.type}: ${it.description}") }
             a.voiceStress.forEach { appendLine("   Voice stress (${it.speaker}) @${it.timestamp}: ${it.description}") }
@@ -150,12 +205,30 @@ object ReportGenerator {
             appendLine()
         }
         if (findings.documentForensics.isNotEmpty() || findings.communications.isNotEmpty()) {
-            appendLine("8. DOCUMENT & COMMUNICATIONS FORENSICS (B2/B3)")
+            appendLine("9. DOCUMENT & COMMUNICATIONS FORENSICS (B2/B3)")
             findings.documentForensics.forEach { appendLine("   $it") }
             findings.communications.forEach { appendLine("   $it") }
             appendLine()
         }
-        appendLine("9. NINE-BRAIN VERDICTS")
+        findings.guardian?.let { g ->
+            appendLine("9a. B9 GUARDIAN ASSESSMENT")
+            if (g.hardStopRequired) {
+                appendLine("   *** ARTICLE X HARD STOP ACTIVE ***")
+            }
+            if (g.violations.isEmpty()) {
+                appendLine("   No constitutional violations detected.")
+            } else {
+                g.violations.forEach { v ->
+                    appendLine("   [${v.severity}] ${v.type}: ${v.description}" + (v.evidenceId.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""))
+                }
+            }
+            if (g.notes.isNotEmpty()) {
+                appendLine("   Cross-brain notes:")
+                g.notes.forEach { appendLine("     - $it") }
+            }
+            appendLine()
+        }
+        appendLine("10. NINE-BRAIN VERDICTS")
         findings.brainVerdicts.forEach { (brain, verdict) -> appendLine("   $brain: $verdict") }
         if (findings.rndValidation.isNotEmpty()) {
             appendLine("   R&D (B9) notes:")
@@ -163,7 +236,7 @@ object ReportGenerator {
         }
         appendLine()
         if (findings.mediaExhibits.isNotEmpty()) {
-            appendLine("10. EVIDENCE EXHIBITS — PHOTOGRAPHIC / VIDEO (ANNEXURE)")
+            appendLine("11. EVIDENCE EXHIBITS — PHOTOGRAPHIC / VIDEO (ANNEXURE)")
             findings.mediaExhibits.forEach { ex ->
                 appendLine("   ${ex.exhibitId} [${ex.kind}] ${ex.fileName} (${ex.mimeType})")
                 appendLine("      SHA-512: ${ex.sha512.take(32)}…")
@@ -174,8 +247,78 @@ object ReportGenerator {
                 appendLine()
             }
         }
-        appendLine("11. DECLARATION")
+        appendLine("12. DECLARATION")
         appendLine("   Triple-verified (Gemma 3 · communicator · Nine-Brain). Evidence before narrative.")
         appendLine("   Ordinal confidence only. Same evidence yields the same result (determinism).")
+        if (deviceId.isNotBlank() || publicKeyFingerprint.isNotBlank()) {
+            appendLine()
+            appendLine("13. OPERATOR / DEVICE IDENTITY")
+            if (deviceId.isNotBlank()) appendLine("   Device ID: ${deviceId.take(16)}…")
+            if (publicKeyFingerprint.isNotBlank()) appendLine("   Public key fingerprint: ${publicKeyFingerprint.take(24)}…")
+            appendLine("   Cryptographic identity proof is bound to the seal record covering this report.")
+        }
+    }
+
+    private data class CategoryRow(
+        val category: com.verumomnis.forensic.model.ContradictionCategory,
+        val count: Int,
+        val maxSeverity: Severity,
+        val persons: Set<String>
+    )
+
+    private fun buildCategoryTable(contradictions: List<Contradiction>): List<CategoryRow> =
+        contradictions
+            .groupBy { it.category }
+            .map { (category, list) ->
+                CategoryRow(
+                    category = category,
+                    count = list.size,
+                    maxSeverity = list.maxByOrNull { severityScore(it.severity) }?.severity ?: Severity.LOW,
+                    persons = list.map { it.respondent }.filter { it.isNotBlank() }.toSortedSet()
+                )
+            }
+            .sortedByDescending { it.count }
+
+    private data class ActorProfile(
+        val person: String,
+        val score: Double,
+        val flags: List<String>
+    )
+
+    private fun buildActorProfiles(findings: ForensicFindings): List<ActorProfile> {
+        val persons = findings.extractedPersons.map { it.name } +
+            findings.contradictions.map { it.respondent }
+        val uniquePersons = persons.filter { it.isNotBlank() }.toSortedSet()
+        val behavioralByPerson = mutableMapOf<String, MutableList<BehavioralFinding>>()
+        findings.behavioral?.let { b ->
+            (b.gaslighting + b.stress + b.manipulation).forEach { f ->
+                behavioralByPerson.getOrPut(f.evidenceId) { mutableListOf() } += f
+            }
+        }
+        return uniquePersons.map { name ->
+            val contradictionScore = findings.contradictions
+                .filter { it.respondent.equals(name, ignoreCase = true) }
+                .sumOf { severityScore(it.severity).toDouble() }
+            val behavioralScore = findings.contradictions
+                .filter { it.respondent.equals(name, ignoreCase = true) }
+                .flatMap { c -> behavioralByPerson[c.claimA.evidenceId].orEmpty() + behavioralByPerson[c.claimB.evidenceId].orEmpty() }
+                .distinct()
+                .size * 0.5
+            val score = minOf(10.0, contradictionScore + behavioralScore)
+            val flags = buildList {
+                if (findings.contradictions.any { it.respondent.equals(name, ignoreCase = true) && it.severity == Severity.CRITICAL }) add("CRITICAL contradiction")
+                if (findings.contradictions.any { it.respondent.equals(name, ignoreCase = true) && it.category.name.contains("COERCION") }) add("Coercion")
+                if (findings.contradictions.any { it.respondent.equals(name, ignoreCase = true) && it.category.name.contains("PERJURY") }) add("Perjury indicator")
+            }
+            ActorProfile(name, score, flags)
+        }.sortedByDescending { it.score }
+    }
+
+    private fun severityScore(severity: Severity): Int = when (severity) {
+        Severity.CRITICAL -> 5
+        Severity.VERY_HIGH -> 4
+        Severity.HIGH -> 3
+        Severity.MODERATE -> 2
+        Severity.LOW -> 1
     }
 }

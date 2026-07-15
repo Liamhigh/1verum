@@ -5,7 +5,7 @@ package com.verumomnis.forensic.engine.contradiction
  *
  * Seal: VO-CE-v531c-DIGSIM-20260713
  * Constitution: v6.0 Final
- * 43 types | 16 detectors | 17 serial patterns | 7 cases | B1-B11
+ * 52 types | 28 detectors | 26 serial patterns | 9 cases | B1-B11
  *
  * Dual interface:
  *  - processFromFiles(): reads files from disk (CLI/background)
@@ -73,7 +73,7 @@ class VerumContradictionEngine(
         // Step 1: Extract claims
         val claims = ClaimExtractor.extractClaims(atoms, caseConfig)
 
-        // Step 2: Detect all contradictions (16 detectors: 10 base + 6 DIGSIM)
+        // Step 2: Detect all contradictions (28 detectors: 10 base + 6 DIGSIM + 12 ported)
         val contradictions = ContradictionDetectors.detectAll(claims)
 
         // Step 3: Triple verification

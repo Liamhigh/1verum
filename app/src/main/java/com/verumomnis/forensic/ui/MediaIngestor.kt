@@ -9,26 +9,51 @@ import androidx.exifinterface.media.ExifInterface
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.MediaEvidence
+import com.verumomnis.forensic.engine.PdfBoxTextExtractor
+import com.verumomnis.forensic.engine.PdfTextExtractor
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
+import com.verumomnis.forensic.security.EicarScanner
 import com.verumomnis.forensic.vault.EvidenceVault
 import java.io.ByteArrayInputStream
 import java.time.Instant
 
 /**
- * Reads a picked photo/video: preserves the original bytes in the vault, computes
- * the SHA-512, and captures GPS (EXIF location if present, else the device GPS at
- * upload) plus the timestamp — so photographic evidence is anchored to place/time.
+ * Reads a picked photo/video/document: validates size, checks for the EICAR test
+ * pattern, preserves the original bytes in the vault, computes the SHA-512, and
+ * captures GPS/timestamp so evidence is anchored to place/time.
  */
-class MediaIngestor(private val context: Context) {
+class MediaIngestor(
+    private val context: Context,
+    private val pdfExtractor: PdfTextExtractor = PdfBoxTextExtractor()
+) {
+
+    companion object {
+        const val MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
+    }
 
     private val vault = EvidenceVault(context)
 
-    fun ingest(uri: Uri, deviceGps: GpsRecord?, index: Int, now: Instant = Instant.now()): MediaEvidence {
+    fun ingest(uri: Uri, deviceGps: GpsRecord?, index: Int, now: Instant = Instant.now()): IngestResult {
         val resolver = context.contentResolver
         val mime = resolver.getType(uri) ?: "application/octet-stream"
-        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
         val fileName = displayName(uri) ?: "evidence_${now.toEpochMilli()}"
+
+        val size = fileSize(uri)
+        if (size != null && size > MAX_FILE_SIZE_BYTES) {
+            return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
+        }
+
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: return IngestResult.Error.ReadFailed("could not open input stream")
+
+        if (bytes.size > MAX_FILE_SIZE_BYTES) {
+            return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
+        }
+        if (EicarScanner.isEicar(bytes)) {
+            return IngestResult.Error.MalwareDetected()
+        }
+
         val kind = if (mime.startsWith("video")) MediaKind.VIDEO else MediaKind.IMAGE
 
         // Preserve the ORIGINAL unaltered in the vault (chain of custody).
@@ -63,7 +88,7 @@ class MediaIngestor(private val context: Context) {
             }
         }
 
-        return ForensicService.ingestMedia(
+        val evidence = ForensicService.ingestMedia(
             id = "MED%03d".format(index),
             fileName = fileName,
             kind = kind,
@@ -77,22 +102,43 @@ class MediaIngestor(private val context: Context) {
             height = height,
             durationMs = durationMs
         )
+        return IngestResult.MediaSuccess(evidence, bytes.size.toLong())
     }
 
-    data class DocInfo(val fileName: String, val mime: String, val text: String)
-
-    /** Seal a non-media document: preserve original in the vault, return extracted text. */
-    fun ingestDocument(uri: Uri, now: Instant = Instant.now()): DocInfo {
-        val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+    /** Seal a non-media document: validate, preserve original in the vault, return preview info. */
+    fun ingestDocument(uri: Uri, now: Instant = Instant.now()): IngestResult {
+        val resolver = context.contentResolver
+        val mime = resolver.getType(uri) ?: "application/octet-stream"
         val fileName = displayName(uri) ?: "document_${now.toEpochMilli()}"
-        vault.storeEvidence(fileName, bytes)
-        val text = if (mime.startsWith("text")) {
-            String(bytes, Charsets.UTF_8)
-        } else {
-            "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
+
+        val size = fileSize(uri)
+        if (size != null && size > MAX_FILE_SIZE_BYTES) {
+            return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
         }
-        return DocInfo(fileName, mime, text)
+
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: return IngestResult.Error.ReadFailed("could not open input stream")
+
+        if (bytes.size > MAX_FILE_SIZE_BYTES) {
+            return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
+        }
+        if (EicarScanner.isEicar(bytes)) {
+            return IngestResult.Error.MalwareDetected()
+        }
+
+        // Preserve the ORIGINAL unaltered in the vault (chain of custody).
+        vault.storeEvidence(fileName, bytes)
+
+        val text = when {
+            mime.startsWith("text") -> String(bytes, Charsets.UTF_8)
+            mime.startsWith("application/pdf") -> {
+                val extracted = pdfExtractor.extractText(bytes).trim()
+                if (extracted.isNotBlank()) extracted else "(PDF sealed and vaulted; no extractable text layer found.)"
+            }
+            else -> "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
+        }
+        val hash = Sha512.hash(bytes)
+        return IngestResult.DocumentSuccess(fileName, mime, text, hash, bytes.size.toLong())
     }
 
     /** Compute SHA-512 of a picked file for seal verification. */
@@ -105,4 +151,14 @@ class MediaIngestor(private val context: Context) {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) c.getString(0) else null
         }
+
+    private fun fileSize(uri: Uri): Long? {
+        return context.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.SIZE),
+            null, null, null
+        )?.use { c ->
+            if (c.moveToFirst()) c.getLong(0) else null
+        }
+    }
 }

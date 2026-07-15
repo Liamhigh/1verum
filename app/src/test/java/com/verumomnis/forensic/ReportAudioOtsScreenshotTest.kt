@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
@@ -35,7 +36,12 @@ class ReportAudioOtsScreenshotTest {
 
     @Test
     fun reportWithAudioAndAnchor() {
-        val vm = VerumViewModel().apply {
+        val app = RuntimeEnvironment.getApplication() as Application
+        val vm = VerumViewModel(
+            application = app,
+            identityService = IdentityService(app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()),
+            seedSampleCase = true
+        ).apply {
             runScan()
             generateReport()
         }

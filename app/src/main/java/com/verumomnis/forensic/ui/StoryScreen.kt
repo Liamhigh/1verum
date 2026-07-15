@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,7 +39,7 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
-fun StoryScreen(onEnter: () -> Unit) {
+fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -108,8 +110,15 @@ fun StoryScreen(onEnter: () -> Unit) {
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
         ) { Text("Enter · Truth for All", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onReadConstitution,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, VoGold)
+        ) { Text("Read Constitution", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VoGold) }
         Spacer(Modifier.height(16.dp))
-        Text("Free for every citizen · Coming soon to Android & Windows", color = VoTextMuted, fontSize = 11.sp)
+        Text("Free for every citizen · Available on Android", color = VoTextMuted, fontSize = 11.sp)
     }
 }
 

@@ -1,8 +1,8 @@
 package com.verumomnis.forensic.engine.contradiction
 
 // Engine: v5.3.1c | Seal: VO-CE-v531c-DIGSIM-20260713
-// 7 cases: AllFuels, Greensky, Southbridge, Louw v Moolla,
-//          Liebenberg v Standard Bank, Louw v Olivier, Mostert v Digsim
+// 9 cases: AllFuels, AllFuels-111, Greensky, Southbridge, Louw v Moolla,
+//          Liebenberg v Standard Bank, Standard Bank, Louw v Olivier, Mostert v Digsim
 
 /** AllFuels Energy (Pty) Ltd — Petroleum franchise fraud. */
 fun allfuelsConfig() = CaseConfig(
@@ -28,6 +28,38 @@ fun allfuelsConfig() = CaseConfig(
         "Section 12B" to listOf("section 12B", "arbitration", "referral", "Business Zone"),
         "Compensation" to listOf("fee", "payment", "rent", "compensation", "deposit"),
         "Perjury" to listOf("perjury", "Constitutional Court", "sworn", "CCT")
+    )
+)
+
+/** AllFuels 111-contradiction bundle — 7 constitutional categories (B1_ENGINE.md). */
+fun allfuels111Config() = CaseConfig(
+    name = "AllFuels 111-Contradiction Bundle",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "my fault", "we collected", "acknowledged"),
+    liabilityDeny = listOf(
+        "deny", "not true", "false", "never happened", "didn't",
+        "i reject", "no goodwill", "never existed", "cancelled", "not binding"
+    ),
+    liabilityConceal = listOf(
+        "hidden", "withheld", "didn't tell", "omitted", "bcc",
+        "blind copy", "never told", "string him along"
+    ),
+    topicKeywords = listOf(
+        "goodwill", "franchise", "petroleum", "section 12B", "CCT237/20",
+        "eviction", "rent", "clause 7", "MOU", "AllFuels", " extension fee",
+        "Business Zone", "license fee", "operator", "site"
+    ),
+    entityKeywords = listOf(
+        "AllFuels", "Palmbili", "Zeyd Timol", "Petroleum Products Act",
+        "Gary Highcock", "BDO", "SARS", "CCT237/20"
+    ),
+    legalSubjects = mapOf(
+        "Goodwill Value" to listOf("goodwill", "compensable", "entrenched value", "brand fee", "quantifiable asset", "R4.2M", "BDO"),
+        "Contract Validity" to listOf("contract", "agreement", "binding", "countersign", "MOU Clause 1", "tenant at will", "lawful occupation"),
+        "Signature Status" to listOf("signature", "signed", "blank", "unsigned", "countersignature", "fully executed"),
+        "Section 12B" to listOf("section 12B", "arbitration", "referral", "Business Zone", "mandatory arbitration"),
+        "Compensation" to listOf("fee", "payment", "rent", "compensation", "deposit", "R3.8M", "extension fee", "buy-out"),
+        "Perjury" to listOf("perjury", "Constitutional Court", "sworn", "CCT", "CCT237/20", "acted in good faith"),
+        "Coercion" to listOf("coerce", "threat", "intimidate", "suppress", "silence", "pressured", "duress", "grateful", "sign today")
     )
 )
 
@@ -124,6 +156,36 @@ fun liebenbergVStandardBankConfig() = CaseConfig(
     )
 )
 
+/** Standard Bank master bundle — Greensky + Southbridge + Liebenberg (standardbank_findings_v531c.json). */
+fun standardbankConfig() = CaseConfig(
+    name = "Standard Bank Master Bundle",
+    liabilityAdmit = listOf("admit", "confess", "yes it was", "i did", "admitted", "completed", "proceeded"),
+    liabilityDeny = listOf("deny", "not true", "false", "never happened", "didn't", "i reject", "fell through", "never invoiced"),
+    liabilityConceal = listOf("hidden", "withheld", "didn't tell", "omitted", "concealed", "destroyed", "backdated"),
+    topicKeywords = listOf(
+        "Standard Bank", "Greensky", "Southbridge", "RAKEZ", "DIFC",
+        "fraud", "account", "transaction", "unauthorized", "defamation",
+        "shareholder", "exclusivity", "protection order", "jurat",
+        "R4M", "R4m", "loan", "credit application", "NCA"
+    ),
+    entityKeywords = listOf(
+        "Standard Bank", "Liam Highcock", "Marius Nortje", "Kevin Lappeman",
+        "Greensky Ornamentals", "Southbridge Legal", "RAKEZ", "DIFC",
+        "Faimy Amar", "Devika G Kurup", "Nanzo", "Rakash Daya"
+    ),
+    legalSubjects = mapOf(
+        "Banking Fraud" to listOf("bank", "account", "unauthorized", "debit", "credit", "transaction", "fraudulent", "R4m", "R4M"),
+        "Shareholder Oppression" to listOf("shareholder", "excluded", "50%", "exclusivity", "RAKEZ", "Greensky"),
+        "Cybercrime" to listOf("gmail", "access", "hack", "unauthorized", "archive", "device", "google account", "data breach"),
+        "Fraudulent Evidence" to listOf("screenshot", "whatsapp", "fake", "doctored", "fabricated", "cropped", "forged", "decoy"),
+        "Defamation Threat" to listOf("defamation", "cease and desist", "reputational harm", "govern yourself accordingly"),
+        "Attorney Misconduct" to listOf("attorney obstruction", "continued to act", "false statements on record", "withheld mandate"),
+        "Process Remedy Denial" to listOf("effective remedy", "ICCPR", "mandatory duty", "institutional silence", "no response", "denied remedy"),
+        "Temporal Precedence" to listOf("served", "dated", "before", "after", "30 April", "23 April"),
+        "Goodwill Forfeiture" to listOf("goodwill", "buy-out", "take over", "R150,000", "lost money")
+    )
+)
+
 /** Louw v Olivier — South Africa (SAPS 147/12/2025). */
 fun louwVOlivierConfig() = CaseConfig(
     name = "Louw v Olivier (SAPS 147/12/2025)",
@@ -163,10 +225,12 @@ fun mostertVDigsimConfig() = CaseConfig(
     )
 )
 
-/** Get configuration by case name — supports all 7 cases. Defaults to AllFuels. */
+/** Get configuration by case name — supports all 9 cases. Defaults to AllFuels. */
 fun getCaseConfig(caseName: String): CaseConfig {
     val normalized = caseName.lowercase().trim()
     return when {
+        "allfuels-111" in normalized || "111-contradiction" in normalized || "111 contradiction" in normalized ->
+            allfuels111Config()
         "greensky" in normalized || "green sky" in normalized || "rakez" in normalized ->
             greenskyConfig()
         "southbridge" in normalized || "vo-hr-2025" in normalized ->
@@ -175,8 +239,11 @@ fun getCaseConfig(caseName: String): CaseConfig {
             louwVMoollaConfig()
         "louw" in normalized && "olivier" in normalized ->
             louwVOlivierConfig()
-        "liebenberg" in normalized || "standard bank" in normalized ->
+        "liebenberg-standardbank" in normalized || "liebenberg standard bank" in normalized ||
+            "liebenberg v standard bank" in normalized ->
             liebenbergVStandardBankConfig()
+        "standardbank" in normalized || "standard bank" in normalized ->
+            standardbankConfig()
         "mostert" in normalized || "digsim" in normalized || "pha 2026" in normalized ->
             mostertVDigsimConfig()
         else ->

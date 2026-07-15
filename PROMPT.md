@@ -10,17 +10,16 @@ This is NOT a "fight fraud" app. It's NOT a justice platform. It's NOT a weapon.
 
 **Free for everyone.** Private citizens and police use Verum Omnis free of charge, permanently. Institutions — banks, insurance companies, corporations — pay a subscription because Verum saves them more money than it costs. This is written into the Constitution (v6.0 Final) as a hard-coded, compile-time constant. Changing it requires recompiling from source, which invalidates every existing seal.
 
-**It works in every jurisdiction on Earth** because the core engine is contradiction-based. It does not require any single country's legal code to function. It extracts contradictions from the evidence itself — false statements, conflicting claims, actions that contradict words — anchors each one to a person, a page/line reference, and the local statutes that apply wherever the evidence was captured. A contract dispute in Dubai, a tax case in London, a labour matter in Sao Paulo — same engine, same process, different statutes.
+**It works in every jurisdiction on Earth** because the core engine is contradiction-based. It does not require any single country's legal code to function. It extracts contradictions from the evidence itself — false statements, conflicting claims, actions that contradict words — anchors each one to a person, a page/line reference, and the local statutes that apply wherever the evidence was captured. A contract dispute in Dubai, a tax case in London, a labour matter in São Paulo — same engine, same process, different statutes.
 
 **See also:**
 - **`WHAT_THIS_APP_IS.md`** — **START HERE.** The master build reference. Complete overview of architecture, 9-brain system, 3-model LLM, fraud categories, evidence flow, tech stack, and file structure. This is the document any code assistant should read first.
 - **`AI_BUILD_INSTRUCTIONS.md`** — **READ SECOND.** Strict rules for coding assistants: no TODOs, no placeholders, fix compile errors first, every button connected, every screen reachable, continue until done.
 - **`BUILD_STATUS.md`** — **READ THIRD.** Feature completion matrix. 118 features tracked across 10 categories. Shows what's done and what's missing. The coding assistant works through this systematically.
 - **`MASTER_TASK_LIST.md`** — **READ FOURTH.** 91 tasks organized by priority (P0-P4). The coding assistant checks these off as they are completed. 41 tasks are mandatory.
-- **`PROMPT.md`** — This file. The main prompt with 15 Prime Directives, 11 contradiction types, real-world proof, data flow, 13 coding rules.
+- **`PROMPT.md`** — This file. The main prompt with 15 Prime Directives, 11 contradiction types, real-world proof, data flow, 12 coding rules.
 
 **Reference documents (read as needed):**
-- `REPORT_FORMAT_SPECIFICATION.md` — **REPORT FORMAT BIBLE.** 14-section court-ready forensic report format with cover page layout, seal footer, evidence anchors, contradiction matrix, Four Pillars analysis, and Court-Ready Declaration. Gemma 3 MUST follow this exactly when generating reports.
 - `FUNCTIONAL_REQUIREMENTS.md` — How every screen and function should behave (40 requirements)
 - `ARCHITECTURE.md` — 6-layer system architecture, data flows, component communication
 - `DEPENDENCIES.md` — Every library, SDK, model, and version required
@@ -153,7 +152,7 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | 2 | **TEMPORAL_CONTRADICTION** | Time-gap proving consciousness of guilt | 2 years 3 months between act and sworn denial |
 | 3 | **CONSCIOUSNESS_OF_GUILT** | 2+ year gap between act and sworn denial | Clause 7 drafted 2018, denied 2021 |
 | 4 | **PERJURY_BY_TIMELINE** | Temporal proof of deliberate false oath | Harpur SC knew Clause 7 existed when telling Court goodwill had no value |
-| 5 | **PATTERN_OF_RACKETEERING** | Evolution across multiple victims | V1.0 (Desmond 2016) -> V2.0 (Gary 2017) -> V3.0 (Former Way 2020) |
+| 5 | **PATTERN_OF_RACKETEERING** | Evolution across multiple victims | V1.0 (Desmond 2016) → V2.0 (Gary 2017) → V3.0 (Former Way 2020) |
 | 6 | **REGULATORY_CAPTURE** | Controller weaponized against operator | Maqubela cancelled Bester's licence on fraudulent eviction |
 | 7 | **SHAM_TRANSACTION** | Dual control disguised as arm's length | Zeyd Timol controls AllFuels AND Palmbili |
 | 8 | **FRAUD_ON_THE_COURT** | Knowingly misleading judicial proceedings | AllFuels concealed Clause 7 from Constitutional Court |
@@ -202,7 +201,7 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 | 7 — Coercion & Fabricated Consent | 8 | Claiming operator was "grateful" when contemporaneous evidence proves he was non-committal |
 | **TOTAL** | **111** | |
 
-## 13 Coding Rules for Code Assistants
+## 12 Coding Rules for Code Assistants
 
 1. **Respect the constitutional boundary**: Never route raw user uploads directly to the AI chat. Always go through `ForensicService.scan()` first.
 2. **Keep it deterministic**: Same evidence = same findings = same seal. Pass a fixed `Instant` to `ForensicService.scan()` and `ReportGenerator.generate()` in tests.
@@ -216,7 +215,6 @@ The contradiction engine started with chat-log contradictions (Greensky). It evo
 10. **B9 cannot issue verdicts**: B9 is trainer/validator only. It does not count toward the 3-brain quorum.
 11. **7 contradiction categories are constitutional**: Do not add or remove the 7 categories (Goodwill Value, Contract Validity, Signature Status, Section 12B, Compensation, Perjury, Coercion).
 12. **Pattern detection mandatory**: The engine must flag when the same contradiction appears across multiple victims. This is the racketeering indicator.
-13. **Report format is BINDING**: Gemma 3 MUST generate reports following `REPORT_FORMAT_SPECIFICATION.md` exactly — all 14 sections, cover page with logo, seal footer on every page, evidence anchors in "Clean Bundle pp.X-Y (Person, Document, p.N)" format, contradiction matrix table, Four Pillars analysis, Court-Ready Declaration with triple verification panel. No deviations. No shortcuts. The report format is as binding as the Constitution.
 
 ## The Data Flow
 
@@ -224,14 +222,11 @@ This is the most important architectural rule in the entire system. It is what s
 
 ```
 User uploads documents
-        |
-        v
+        ↓
 [Evidence Vault] — AES-256-GCM encrypted, hardware-backed keystore
-        |
-        v
+        ↓
 ForensicService.scan() — deterministic, timestamp-injected
-        |
-        v
+        ↓
 Nine-Brain Engine:
   B1: Contradiction extraction
   B2: Document/metadata verification
@@ -241,21 +236,16 @@ Nine-Brain Engine:
   B6: Financial analysis
   B7: Legal statute mapping (+ Online Judicial Retrieval on flagship devices)
   B8: Audio/video forensics
-        |
-        v
+        ↓
 Triple Verification (Thesis/Antithesis/Synthesis)
-        |
-        v
+        ↓
 ReportGenerator.generate() — sealed PDF with SHA-512 footer (via G3 on-device LLM)
-        |
-        v
+        ↓
 [SEALED FORENSIC REPORT] — court-admissible, cryptographically anchored
-        |
-        v
+        ↓
 AI Chat Interface (reads ONLY the sealed ScanResult, never raw uploads)
-  | Entry/Mid: PHR3 (Command R/PHI-3)  | Flagship: G4 (Gemma 4)
-        |
-        v
+  ↓ Entry/Mid: PHR3 (Command R/PHI-3)  ↓ Flagship: G4 (Gemma 4)
+        ↓
 User asks questions about their own sealed evidence
 ```
 

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
@@ -41,10 +42,25 @@ class UiScreenshotTest {
         shadowOf(app).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
-    private fun populatedViewModel(): VerumViewModel = VerumViewModel().apply {
-        runScan()
-        generateReport()
-        draftAndSendEmail("investigator@saps.gov.za", "Sealed forensic report")
+    private fun emptyViewModel(): VerumViewModel {
+        val app = RuntimeEnvironment.getApplication() as Application
+        return VerumViewModel(
+            application = app,
+            identityService = IdentityService(app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore())
+        )
+    }
+
+    private fun populatedViewModel(): VerumViewModel {
+        val app = RuntimeEnvironment.getApplication() as Application
+        return VerumViewModel(
+            application = app,
+            identityService = IdentityService(app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()),
+            seedSampleCase = true
+        ).apply {
+            runScan()
+            generateReport()
+            draftAndSendEmail("investigator@saps.gov.za", "Sealed forensic report")
+        }
     }
 
     private fun renderScreen(screen: String, name: String) {
@@ -56,12 +72,23 @@ class UiScreenshotTest {
     }
 
     @Test fun story() = renderScreen("STORY", "00_story.png")
+
+    @Test
+    fun scanHome() {
+        val vm = emptyViewModel()
+        composeRule.setContent {
+            VerumOmnisTheme { VerumApp(vm, initialScreen = "SCAN_HOME") }
+        }
+        composeRule.onRoot().captureRoboImage("$outDir/01_scan_home.png")
+    }
+
     @Test fun chat() = renderScreen("CHAT", "03_chat.png")
     @Test fun report() = renderScreen("REPORT", "02_report.png")
     @Test fun email() = renderScreen("EMAIL", "04_email.png")
     @Test fun vault() = renderScreen("VAULT", "05_vault.png")
     @Test fun tax() = renderScreen("TAX", "11_tax.png")
 
+    @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
     @Test
     fun plusActionsMenu() {
         val vm = populatedViewModel()

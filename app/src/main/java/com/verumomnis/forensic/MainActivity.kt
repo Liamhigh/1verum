@@ -1,10 +1,12 @@
 package com.verumomnis.forensic
 
+import android.content.Intent
 import android.location.LocationManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import com.verumomnis.forensic.core.DeadManSwitch
 import com.verumomnis.forensic.model.GpsRecord
@@ -12,6 +14,7 @@ import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
+import java.io.File
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +34,8 @@ class MainActivity : ComponentActivity() {
                     viewModel,
                     onCaptureLocation = ::captureLocation,
                     onExportReport = { report -> runCatching { pdfExporter.share(pdfExporter.exportReport(report)) } },
-                    onExportEmail = { email -> runCatching { pdfExporter.share(pdfExporter.exportEmail(email)) } }
+                    onExportEmail = { email -> runCatching { pdfExporter.share(pdfExporter.exportEmail(email)) } },
+                    onReadConstitution = ::openConstitution
                 )
             }
         }
@@ -63,6 +67,27 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: SecurityException) {
             // Permission revoked mid-flight; keep seeded coordinates.
+        }
+    }
+
+    /**
+     * Copies the bundled Constitution PDF from assets to cache and opens it with
+     * the device's PDF reader (FileProvider-granted uri).
+     */
+    private fun openConstitution() {
+        runCatching {
+            val dest = File(cacheDir, "constitution.pdf")
+            if (!dest.exists() || dest.length() == 0L) {
+                assets.open("constitution.pdf").use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", dest)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Read Constitution").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 }

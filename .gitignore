@@ -11,3 +11,12 @@ local.properties
 *.apk
 *.ap_
 *.aab
+
+# Logs and temporary outputs
+*.log
+
+# Root-level documents that should not be tracked
+/*.pdf
+/*.PDF
+/*.png
+/*.txt

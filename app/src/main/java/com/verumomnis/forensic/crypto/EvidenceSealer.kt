@@ -1,6 +1,7 @@
 package com.verumomnis.forensic.crypto
 
 import com.verumomnis.forensic.core.Constitution
+import com.verumomnis.forensic.identity.IdentityProof
 import com.verumomnis.forensic.model.SealRecord
 import java.time.Instant
 
@@ -24,17 +25,19 @@ object EvidenceSealer {
         bytes: ByteArray,
         documentType: String,
         documentReference: String,
-        nowInstant: Instant = Instant.now()
+        nowInstant: Instant = Instant.now(),
+        identityProof: IdentityProof? = null
     ): SealRecord {
         val sha512 = Sha512.hash(bytes)
-        return sealFromHash(sha512, documentType, documentReference, nowInstant)
+        return sealFromHash(sha512, documentType, documentReference, nowInstant, identityProof)
     }
 
     fun sealFromHash(
         sha512: String,
         documentType: String,
         documentReference: String,
-        nowInstant: Instant = Instant.now()
+        nowInstant: Instant = Instant.now(),
+        identityProof: IdentityProof? = null
     ): SealRecord {
         require(sha512.length == 128) { "SHA-512 hash must be 128 hex chars" }
         val shortcode = sha512.take(SHORTCODE_LEN)
@@ -50,7 +53,8 @@ object EvidenceSealer {
             constitutionRuleset = Constitution.rulesetFingerprint(),
             otsProofFile = "seal_$shortcode.ots",
             status = "PENDING",
-            createdAt = nowInstant.toString()
+            createdAt = nowInstant.toString(),
+            identityProof = identityProof
         )
     }
 

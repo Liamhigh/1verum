@@ -3,6 +3,7 @@ package com.verumomnis.forensic.vault
 import android.content.Context
 import com.verumomnis.forensic.crypto.Sha512
 import java.io.File
+import java.time.Instant
 import javax.crypto.SecretKey
 
 /**
@@ -56,6 +57,31 @@ class EvidenceVault(private val root: File) {
         File(seals, name).writeText(json)
     }
 
+    fun storeOtsProof(shortcode: String, proofBase64: String) {
+        initialize()
+        File(seals, "seal_$shortcode.ots").writeText(proofBase64)
+    }
+
+    fun loadOtsProof(shortcode: String): String? {
+        val file = File(seals, "seal_$shortcode.ots")
+        return if (file.exists()) file.readText() else null
+    }
+
+    fun storeConfig(name: String, json: String) {
+        initialize()
+        File(config, name).writeText(json)
+    }
+
+    fun loadConfig(name: String): String? {
+        val file = File(config, name)
+        return if (file.exists()) file.readText() else null
+    }
+
+    data class IntegrityEntry(val fileName: String, val sha512: String, val timestamp: String)
+
+    /** Default hardware-backed (or test fallback) master key for vault encryption. */
+    fun defaultMasterKey(): SecretKey = VaultKeyStore.getOrCreateMasterKey()
+
     /** Encrypted chat session at rest (AES-256-GCM), stored under chat_sessions as .json.enc. */
     fun storeChatSession(name: String, json: String, key: SecretKey) {
         initialize()
@@ -71,8 +97,33 @@ class EvidenceVault(private val root: File) {
     fun documentCount(): Int =
         (evidenceRaw.listFiles()?.size ?: 0) + (reportsSealed.listFiles()?.size ?: 0)
 
+    fun integrityManifest(): List<IntegrityEntry> {
+        if (!manifest.exists()) return emptyList()
+        return manifest.readLines().filter { it.isNotBlank() }.map { line ->
+            val file = line.substringAfter("\"file\":\"").substringBefore("\"")
+            val hash = line.substringAfter("\"sha512\":\"").substringBefore("\"")
+            val ts = line.substringAfter("\"timestamp\":\"", "").substringBefore("\"", "")
+            IntegrityEntry(file, hash, ts)
+        }
+    }
+
+    /** Re-compute SHA-512 for every entry in the manifest and report mismatches. */
+    fun verifyIntegrity(): List<String> {
+        val mismatches = mutableListOf<String>()
+        integrityManifest().forEach { entry ->
+            val file = File(evidenceRaw, entry.fileName)
+            if (!file.exists()) {
+                mismatches += "MISSING: ${entry.fileName}"
+            } else {
+                val current = Sha512.hash(file.readBytes())
+                if (current != entry.sha512) mismatches += "TAMPERED: ${entry.fileName}"
+            }
+        }
+        return mismatches
+    }
+
     private fun appendManifest(fileName: String, hash: String) {
-        val line = "{\"file\":\"$fileName\",\"sha512\":\"$hash\"}"
+        val line = "{\"file\":\"$fileName\",\"sha512\":\"$hash\",\"timestamp\":\"${Instant.now()}\"}"
         if (manifest.exists()) manifest.appendText("\n$line") else manifest.writeText(line)
     }
 }

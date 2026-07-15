@@ -7,6 +7,7 @@ import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
 import com.verumomnis.forensic.model.SealRecord
+import com.verumomnis.forensic.vault.EvidenceVault
 import java.time.Instant
 
 /** Result of a complete forensic scan: findings plus the seal over the evidence set. */
@@ -84,13 +85,21 @@ object ForensicService {
     fun scan(documents: List<EvidenceDocument>, audio: List<AudioEvidence>, now: Instant): ScanResult =
         scan(documents, audio, emptyList(), now)
 
+    /**
+     * Run the full forensic pipeline. When [vault] and [caseName] are supplied,
+     * the engine also emits a findings.json artefact into the vault under the
+     * findings directory, following the G3 Hybrid Report Pipeline contract.
+     */
     fun scan(
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
-        now: Instant = Instant.now()
+        now: Instant = Instant.now(),
+        vault: EvidenceVault? = null,
+        caseName: String = ""
     ): ScanResult {
         val findings = NineBrainEngine.analyze(documents, audio, media, now)
+        val councilFindings = BrainCouncil.evaluate(findings)
         // Seal the deterministic fingerprint of the entire evidence set (docs + audio + media).
         val corpusFingerprint = (documents.map { it.sha512 } + audio.map { it.sha512 } + media.map { it.sha512 })
             .joinToString("|")
@@ -102,7 +111,12 @@ object ForensicService {
             documentReference = reference,
             nowInstant = now
         )
-        return ScanResult(findings, seal)
+        vault?.takeIf { caseName.isNotBlank() }?.let {
+            val fileName = FindingsJsonEmitter.findingsFileName(caseName, now)
+            val findingsJson = FindingsJsonEmitter.emit(councilFindings, caseName, now)
+            it.storeFinding(fileName, findingsJson)
+        }
+        return ScanResult(councilFindings, seal)
     }
 
     fun verify(bytes: ByteArray, seal: SealRecord): VerificationResult =

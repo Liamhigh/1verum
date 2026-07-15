@@ -10,11 +10,19 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
 ## Module layout
 - `app/src/main/java/com/verumomnis/forensic/core` — Constitution constants, device-tier LLM loading.
 - `.../crypto` — `Sha512`, `EvidenceSealer` (seal + verify).
-- `.../engine` — `NineBrainEngine`, `TaxModule`, `ReportGenerator`, `EmailModule`, `AntiHarassmentMonitor`, `ForensicService`.
+- `.../engine` — `NineBrainEngine`, `TaxModule`, `ReportGenerator`, `EmailModule`, `AntiHarassmentMonitor`, `ForensicService`, `FindingsJsonEmitter`.
+- `.../engine/contradiction` — Hybrid contradiction engine v5.3.1c (rule + deterministic semantic embeddings + confidence calibration).
+- `.../seal` — VO-DSS-1.2 website-compatible sealer (`verumglobal.foundation/verify.html` QR format).
 - `.../model` — serializable data models (evidence atoms, contradictions, seals, reports, emails).
 - `.../vault` — `EvidenceVault` local storage layout.
 - `.../ui` — Compose screens (Dashboard, Report, Chat, Email, Vault) + theme.
 - Business logic is pure Kotlin/JVM so it is unit-testable without a device.
+
+## DSS-12 integration notes (2026-07-14)
+- The hybrid contradiction engine from `1verum-dss-12-android.zip` is wired as B1's primary detection path inside `NineBrainEngine`. Legacy `engine/v531c/` is kept as a reference but deprecated.
+- Report QR codes and the new "Seal Document (website format)" action emit `https://verumglobal.foundation/verify.html?h=...&m=...` URLs, matching the web sealer.
+- Every `ForensicService.scan()` now writes a `findings.json` artefact into the vault following the G3 Hybrid Report Pipeline contract (`FINDINGS_JSON_SCHEMA.json`).
+- G3-raised candidates are explicitly labelled in `ReportWriter.kt` and never presented as engine-verified.
 
 ## Common commands (standard Gradle; run from repo root)
 - Unit tests: `./gradlew testDebugUnitTest`

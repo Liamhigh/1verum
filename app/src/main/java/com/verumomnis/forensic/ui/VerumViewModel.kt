@@ -1,35 +1,57 @@
 package com.verumomnis.forensic.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.verumomnis.forensic.blockchain.BlockchainService
 import com.verumomnis.forensic.blockchain.OpenTimestampsService
 import com.verumomnis.forensic.core.Constitution
+import com.verumomnis.forensic.core.ConstitutionalPrompt
 import com.verumomnis.forensic.core.DeviceTier
 import com.verumomnis.forensic.core.Llm
 import com.verumomnis.forensic.core.ModelLoader
 import com.verumomnis.forensic.crypto.VerificationResult
+import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.engine.AntiHarassmentMonitor
 import com.verumomnis.forensic.engine.AudioEvidence
 import com.verumomnis.forensic.engine.EmailModule
 import com.verumomnis.forensic.engine.EvidenceDocument
+import com.verumomnis.forensic.engine.FindingsJsonEmitter
 import com.verumomnis.forensic.engine.ForensicService
+import com.verumomnis.forensic.engine.GuardianBrain
 import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.engine.ReportGenerator
 import com.verumomnis.forensic.engine.ScanResult
 import com.verumomnis.forensic.engine.TaxModule
 import com.verumomnis.forensic.model.ForensicReport
+import com.verumomnis.forensic.model.GuardianAssessment
 import com.verumomnis.forensic.model.GpsRecord
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import com.verumomnis.forensic.model.HarassmentVerdict
 import com.verumomnis.forensic.model.OtsAnchorResult
 import com.verumomnis.forensic.model.OtsStatus
 import com.verumomnis.forensic.model.SealedEmail
+import com.verumomnis.forensic.trust.TrustEngine
+import com.verumomnis.forensic.trust.TrustScore
+import com.verumomnis.forensic.pdf.SealedPdfExporter
+import com.verumomnis.forensic.security.SilenceLedger
+import com.verumomnis.forensic.seal.DocumentSealer
+import com.verumomnis.forensic.seal.SealMetadataCodec
+import com.verumomnis.forensic.vault.EvidenceVault
+import com.verumomnis.forensic.work.ScanWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
+import java.util.TimeZone
 
 data class FileEntry(
     val name: String,
@@ -40,6 +62,21 @@ data class FileEntry(
 )
 
 data class ChatMessage(val author: String, val text: String, val fromUser: Boolean)
+
+/**
+ * A file that has been picked and validated but not yet added to the sealed case.
+ * The user sees a preview and must confirm before sealing.
+ */
+data class PendingFilePreview(
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val sha512: String,
+    val displayText: String,
+    val isMedia: Boolean,
+    val mediaEvidence: MediaEvidence? = null,
+    val documentText: String = ""
+)
 
 data class UiState(
     val deviceRamGb: Int = 6,
@@ -52,17 +89,43 @@ data class UiState(
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
     val scanResult: ScanResult? = null,
-    val scanLog: String = "Awaiting evidence. Upload documents to begin a forensic scan.",
+    val scanLog: String = "Awaiting evidence. Select a case file to begin a forensic scan.",
     val chat: List<ChatMessage> = emptyList(),
     val report: ForensicReport? = null,
     val emails: List<SealedEmail> = emptyList(),
     val emailStatus: String = "Draft a sealed forensic email. Every draft is delivered as a sealed PDF and logged.",
     val otsResult: OtsAnchorResult? = null,
     val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
-    val anchoring: Boolean = false
+    val anchoring: Boolean = false,
+    val findingsJsonPath: String = "",
+    val trustScore: TrustScore? = null,
+    val identityStatus: String = "Identity not initialized.",
+    val identityFingerprint: String = "",
+    val systemPrompt: String = ConstitutionalPrompt.coreDirective(),
+    val pendingFiles: List<PendingFilePreview> = emptyList(),
+    val sealStage: SealStage = SealStage.IDLE,
+    val guardianBlock: GuardianAssessment? = null,
+    /** Last PDF sealed with the website-compatible VO-DSS-1.2 layer. */
+    val websiteSealedFile: java.io.File? = null,
+    val websiteSealStatus: String = ""
 )
 
-class VerumViewModel : ViewModel() {
+class VerumViewModel(
+    application: Application,
+    private val identityService: IdentityService = IdentityService(application),
+    private val blockchainService: BlockchainService = OpenTimestampsService,
+    private val vault: EvidenceVault = EvidenceVault(application),
+    seedSampleCase: Boolean = false
+) : AndroidViewModel(application) {
+
+    /** Constructor used by Android's default ViewModelProvider factory. */
+    constructor(application: Application) : this(
+        application,
+        IdentityService(application),
+        OpenTimestampsService,
+        EvidenceVault(application),
+        false
+    )
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -71,22 +134,48 @@ class VerumViewModel : ViewModel() {
     private val audios = mutableListOf<AudioEvidence>()
     private val medias = mutableListOf<MediaEvidence>()
     private val harassmentMonitor = AntiHarassmentMonitor()
+    private val silenceLedger = SilenceLedger(context = getApplication())
 
     fun mediaCount(): Int = medias.size
 
-    init {
-        configureDevice(6)
-        seedSampleCase()
+    private fun initializeIdentity() {
+        val device = identityService.initializeDevice()
         _state.update {
             it.copy(
+                identityStatus = "Device identity ${device.deviceId.take(8)}… initialized",
+                identityFingerprint = device.publicKeyFingerprint.take(16)
+            )
+        }
+    }
+
+    /** Sign a seal with the device identity and compute the resulting trust score. */
+    private fun signAndUpdateSeal(seal: com.verumomnis.forensic.model.SealRecord): com.verumomnis.forensic.model.SealRecord {
+        val proof = identityService.signSeal(seal) ?: return seal
+        return seal.copy(identityProof = proof)
+    }
+
+    private fun computeTrustScore() {
+        val findings = _state.value.scanResult?.findings ?: return
+        val identityProof = _state.value.report?.seal?.identityProof
+            ?: _state.value.scanResult?.seal?.identityProof
+        val score = TrustEngine.compute(findings, identityProof, _state.value.otsResult)
+        _state.update { it.copy(trustScore = score) }
+    }
+
+    init {
+        initializeIdentity()
+        configureDevice(6)
+        if (seedSampleCase) seedSampleCase()
+        _state.update { s ->
+            s.copy(
                 chat = listOf(
                     ChatMessage(
                         author = "Verum Omnis",
-                        text = "Truth for All. I am the Verum Omnis communicator (Constitution v${Constitution.VERSION}).\n\n" +
-                            "How this works: anything you add with + goes straight to the forensic engine — it is " +
-                            "SHA-512 sealed, GPS-anchored and stored in the vault with its findings JSON before I ever see it. " +
-                            "I only read the SEALED case file, then help with the narrative, the timeline and the legal strategy. " +
-                            "Nothing leaves here unsealed.",
+                        text = "Truth for All. I am ${s.communicator}, the Verum Omnis communicator (Constitution v${Constitution.VERSION}).\n\n" +
+                            "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
+                            "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
+                            "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
+                            "timeline and legal strategy. Nothing leaves here unsealed.",
                         fromUser = false
                     )
                 )
@@ -94,7 +183,7 @@ class VerumViewModel : ViewModel() {
         }
     }
 
-    private fun postEngine(text: String) {
+    fun postEngine(text: String) {
         _state.update { it.copy(chat = it.chat + ChatMessage("Forensic Engine", text, fromUser = false)) }
     }
 
@@ -116,13 +205,19 @@ class VerumViewModel : ViewModel() {
      * Seal everything added so far through the forensic engine and store it in the
      * vault (findings JSON + forensic report). Only now may the AI read the case.
      */
-    fun sealCase(now: Instant = Instant.now()) {
+    fun sealCase(now: Instant = Instant.now(), caseName: String = "Matter") {
         if (documents.isEmpty() && audios.isEmpty() && medias.isEmpty()) {
             postEngine("Nothing to seal yet — add evidence with the + button first.")
+            _state.update { it.copy(sealStage = SealStage.IDLE) }
             return
         }
+        _state.update { it.copy(sealStage = SealStage.SCANNING) }
         runScan(now)
-        generateReport(now = now)
+        _state.update { it.copy(sealStage = SealStage.SEALING) }
+        storeFindingsJson()
+        generateReport(caseName = caseName, now = now)
+        signSealsAndAnchor()
+        _state.update { it.copy(sealStage = SealStage.ANCHORING) }
         val r = _state.value.scanResult
         postEngine(
             "Sealed ${_state.value.files.size} item(s) into the vault. " +
@@ -130,6 +225,30 @@ class VerumViewModel : ViewModel() {
                 (r?.let { " (seal ${it.seal.shortcode})" } ?: "") +
                 ". The AI may now read the sealed case file."
         )
+    }
+
+    /** Sign the current scan and report seals with the device identity, then anchor. */
+    private fun signSealsAndAnchor() {
+        _state.value.scanResult?.let { result ->
+            val signed = signAndUpdateSeal(result.seal)
+            _state.update { it.copy(scanResult = result.copy(seal = signed)) }
+        }
+        _state.value.report?.let { report ->
+            val signed = signAndUpdateSeal(report.seal)
+            _state.update { it.copy(report = report.copy(seal = signed)) }
+        }
+        computeTrustScore()
+        anchorSealToBitcoin(auto = true)
+    }
+
+    /** Serialize and vault the current findings as a machine-readable JSON bundle. */
+    private fun storeFindingsJson() {
+        val findings = _state.value.scanResult?.findings ?: return
+        val reference = _state.value.scanResult?.seal?.documentReference ?: "findings"
+        val fileName = "${reference}_findings.json"
+        val json = Json { prettyPrint = true }.encodeToString(findings)
+        vault.storeFinding(fileName, json)
+        _state.update { it.copy(findingsJsonPath = File(vault.findings, fileName).absolutePath) }
     }
 
     /** Verify an uploaded file's hash against the sealed vault. */
@@ -174,19 +293,181 @@ class VerumViewModel : ViewModel() {
 
     fun configureDevice(ramGb: Int) {
         val models = ModelLoader.loadModels(ramGb)
+        val communicator = ModelLoader.communicator(models)
+        val prompt = when {
+            communicator.name == "Gemma 4" && communicator.flagship ->
+                ConstitutionalPrompt.communicatorFlagship()
+            communicator.name == "Phi-3" ->
+                ConstitutionalPrompt.communicatorStandard()
+            else ->
+                ConstitutionalPrompt.coreDirective()
+        }
         _state.update {
             it.copy(
                 deviceRamGb = ramGb,
                 deviceTier = DeviceTier.forRam(ramGb),
                 models = models,
-                communicator = ModelLoader.communicator(models).name,
-                reportWriter = ModelLoader.reportWriter(models).name
+                communicator = communicator.name,
+                reportWriter = ModelLoader.reportWriter(models).name,
+                systemPrompt = prompt
             )
         }
     }
 
     fun setGps(gps: GpsRecord) {
         _state.update { it.copy(gps = gps) }
+    }
+
+    fun setSealStage(stage: SealStage) {
+        _state.update { it.copy(sealStage = stage) }
+    }
+
+    fun clearGuardianBlock() {
+        _state.update { it.copy(guardianBlock = null) }
+    }
+
+    /** Log a B9 hard-stop to the Silence Ledger and block the UI until the user acts. */
+    private fun blockForGuardian(assessment: GuardianAssessment, now: Instant = Instant.now()) {
+        if (assessment.violations.isNotEmpty()) {
+            silenceLedger.appendAll(assessment, now)
+        }
+        _state.update { it.copy(guardianBlock = assessment) }
+    }
+
+    /** Show picked files to the user for preview before sealing. */
+    fun setPendingFiles(files: List<PendingFilePreview>) {
+        _state.update { it.copy(pendingFiles = files, sealStage = SealStage.IDLE) }
+    }
+
+    /** Discard the pending preview without sealing. */
+    fun clearPendingFiles() {
+        _state.update { it.copy(pendingFiles = emptyList(), sealStage = SealStage.IDLE) }
+    }
+
+    private fun websiteSealDir(): File =
+        File(getApplication<Application>().filesDir, "vault/reports/sealed").apply { mkdirs() }
+
+    private fun deviceString(): String {
+        val cores = Runtime.getRuntime().availableProcessors()
+        return "Android|$cores|${TimeZone.getDefault().id}"
+    }
+
+    private fun uriFileName(uri: Uri, context: Context): String {
+        var name: String? = null
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0) name = cursor.getString(idx)
+            }
+        }
+        return name?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "sealed_document.pdf"
+    }
+
+    /**
+     * Seal an arbitrary PDF with the website-compatible VO-DSS-1.2 layer.
+     * The sealed PDF is written to vault/reports/sealed and exposed for sharing.
+     */
+    fun sealDocumentWebsiteFormat(uri: Uri, context: Context, now: Instant = Instant.now()) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _state.update { it.copy(websiteSealStatus = "Reading PDF…", websiteSealedFile = null) }
+            runCatching {
+                val originalName = uriFileName(uri, context)
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Could not read $originalName")
+                val gps = _state.value.gps
+                val result = DocumentSealer.seal(
+                    originalPdfBytes = bytes,
+                    options = DocumentSealer.SealOptions(
+                        timestampMs = now.toEpochMilli(),
+                        sealType = "private",
+                        gpsLat = gps?.latitude?.toString(),
+                        gpsLng = gps?.longitude?.toString(),
+                        gpsAccuracyM = gps?.accuracy?.toInt(),
+                        device = deviceString(),
+                        originalName = originalName,
+                        anchorToBlockchain = false
+                    )
+                )
+                val outFile = File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.pdf")
+                outFile.writeBytes(result.sealedPdf)
+                _state.update {
+                    it.copy(
+                        websiteSealedFile = outFile,
+                        websiteSealStatus = "Sealed ${originalName} → ${result.sealId} (${result.pageCount} page(s)). Saved to vault/reports/sealed."
+                    )
+                }
+                postEngine("Website-format seal complete: ${result.sealId} · ${result.verifyUrl}")
+            }.onFailure { e ->
+                _state.update { it.copy(websiteSealStatus = "Seal failed: ${e.message}", websiteSealedFile = null) }
+                postEngine("Website-format seal failed: ${e.message}")
+            }
+        }
+    }
+
+    /** Share the last website-format sealed PDF via the system's PDF chooser. */
+    fun shareWebsiteSealedFile(context: Context) {
+        _state.value.websiteSealedFile?.let { SealedPdfExporter(context).share(it) }
+    }
+
+    /**
+     * Start the forensic scan from files already picked and previewed on the scan home.
+     * Runs the seal pipeline on a background coroutine.
+     */
+    fun startForensicScan(caseName: String = "Matter", now: Instant = Instant.now()) {
+        confirmAndSeal(caseName, now)
+    }
+
+    /** Add pending files to the case, clear the preview, and run the seal pipeline. */
+    fun confirmAndSeal(caseName: String = "Matter", now: Instant = Instant.now()) {
+        val pending = _state.value.pendingFiles
+        if (pending.isEmpty()) return
+        // Schedule a WorkManager background scan so the process survives backgrounding.
+        ScanWorkScheduler.schedule(getApplication(), caseName, pending)
+        _state.update { it.copy(sealStage = SealStage.SCANNING, pendingFiles = emptyList()) }
+        viewModelScope.launch(Dispatchers.IO) {
+            pending.forEach { preview ->
+                if (preview.isMedia && preview.mediaEvidence != null) {
+                    addMedia(preview.mediaEvidence)
+                } else {
+                    val doc = EvidenceDocument(
+                        evidenceId = "DOC%03d".format(documents.size + 1),
+                        fileName = preview.fileName,
+                        type = when {
+                            preview.mimeType.contains("pdf") -> "pdf"
+                            preview.mimeType.startsWith("text") -> "document"
+                            else -> "document"
+                        },
+                        text = preview.documentText,
+                        sha512 = preview.sha512,
+                        gps = _state.value.gps
+                    )
+                    addDocument(doc)
+                }
+            }
+            sealCase(now, caseName)
+        }
+    }
+
+    /** Clear the current case so the user can start a new scan from an empty vault. */
+    fun clearCase() {
+        documents.clear()
+        audios.clear()
+        medias.clear()
+        _state.update {
+            it.copy(
+                files = emptyList(),
+                scanResult = null,
+                report = null,
+                pendingFiles = emptyList(),
+                sealStage = SealStage.IDLE,
+                scanLog = "Awaiting evidence. Select a case file to begin a forensic scan.",
+                trustScore = null,
+                otsResult = null,
+                otsStatus = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
+                findingsJsonPath = "",
+                guardianBlock = null
+            )
+        }
     }
 
     fun addDocument(doc: EvidenceDocument) {
@@ -229,17 +510,24 @@ class VerumViewModel : ViewModel() {
         addDocument(doc)
     }
 
-    fun runScan(now: Instant = Instant.now()) {
+    fun runScan(now: Instant = Instant.now(), caseName: String = "Matter") {
         if (documents.isEmpty() && audios.isEmpty() && medias.isEmpty()) {
             _state.update { it.copy(scanLog = "No evidence to scan. Upload documents first.") }
             return
         }
         _state.update { it.copy(scanning = true, scanLog = "Nine-Brain forensic analysis in progress…") }
-        val result = ForensicService.scan(documents, audios, medias, now)
+        val result = ForensicService.scan(documents, audios, medias, now, vault = vault, caseName = caseName)
+        val findingsJsonName = FindingsJsonEmitter.findingsFileName(caseName, now)
+        val findingsJsonPath = java.io.File(vault.findings, findingsJsonName).absolutePath
+        val guardian = result.findings.guardian
+        if (guardian?.hardStopRequired == true) {
+            blockForGuardian(guardian, now)
+        }
         _state.update { s ->
             s.copy(
                 scanning = false,
                 scanResult = result,
+                findingsJsonPath = findingsJsonPath,
                 jurisdiction = result.findings.jurisdiction,
                 files = s.files.map { it.copy(status = "scanned") },
                 scanLog = buildString {
@@ -247,6 +535,7 @@ class VerumViewModel : ViewModel() {
                     append("${result.findings.contradictions.size} contradictions · ")
                     append("${result.findings.timeline.size} timeline events · ")
                     append("seal ${result.seal.shortcode}")
+                    if (guardian?.hardStopRequired == true) append(" · GUARDIAN HARD STOP")
                 },
                 chat = s.chat + ChatMessage(
                     author = "Forensic Scan",
@@ -260,23 +549,34 @@ class VerumViewModel : ViewModel() {
         }
     }
 
-    fun generateReport(caseName: String = "AllFuels Matter", now: Instant = Instant.now()) {
+    fun generateReport(caseName: String = "Matter", now: Instant = Instant.now()) {
         val findings = _state.value.scanResult?.findings ?: run {
             runScan(now)
             _state.value.scanResult?.findings
         } ?: return
-        val report = ReportGenerator.generate(findings, caseName, now)
+        val device = identityService.deviceIdentity()
+        val report = ReportGenerator.generate(
+            findings = findings,
+            caseName = caseName,
+            now = now,
+            deviceId = device?.deviceId ?: "",
+            publicKeyFingerprint = device?.publicKeyFingerprint ?: "",
+            findingsJsonPath = _state.value.findingsJsonPath
+        )
+        val signedReport = report.copy(seal = signAndUpdateSeal(report.seal))
         _state.update {
             it.copy(
-                report = report,
+                report = signedReport,
                 chat = it.chat + ChatMessage(
                     author = "Report Writer (Gemma 3)",
-                    text = "Generated sealed report ${report.reference} with ${report.contradictions.size} " +
-                        "anchored contradiction(s). Seal: ${report.seal.sealFooter()}",
+                    text = "Generated sealed report ${signedReport.reference} with ${signedReport.contradictions.size} " +
+                        "anchored contradiction(s). Seal: ${signedReport.seal.extendedFooter()}",
                     fromUser = false
                 )
             )
         }
+        computeTrustScore()
+        anchorSealToBitcoin(auto = true)
     }
 
     fun draftAndSendEmail(
@@ -307,35 +607,76 @@ class VerumViewModel : ViewModel() {
         return ForensicService.verify(corpus.toByteArray(), result.seal)
     }
 
-    /** Anchor the current report/evidence seal to Bitcoin via OpenTimestamps (network I/O). */
-    fun anchorSealToBitcoin() {
+    /**
+     * Anchor the current report/evidence seal to Bitcoin via OpenTimestamps.
+     * When [auto] is true the call is silent on missing seals (e.g. invoked from
+     * generateReport before any evidence is present).
+     */
+    fun anchorSealToBitcoin(auto: Boolean = false) {
         val seal = _state.value.report?.seal ?: _state.value.scanResult?.seal
         if (seal == null) {
-            _state.update { it.copy(otsStatus = "Run a scan (or generate a report) before anchoring.") }
+            if (!auto) _state.update { it.copy(otsStatus = "Run a scan (or generate a report) before anchoring.") }
             return
         }
         if (_state.value.anchoring) return
         _state.update { it.copy(anchoring = true, otsStatus = "Submitting SHA-256 digest to OpenTimestamps calendars…") }
         viewModelScope.launch(Dispatchers.IO) {
-            val res = runCatching { OpenTimestampsService.anchor(seal.sha512) }.getOrElse {
+            val res = runCatching { blockchainService.anchor(seal.sha512) }.getOrElse {
                 OtsAnchorResult(
                     status = OtsStatus.FAILED, sha512 = seal.sha512, sha256Digest = "",
                     calendarUrls = emptyList(), submittedAt = java.time.Instant.now().toString(),
                     message = it.message ?: "Anchoring failed"
                 )
             }
+            res.otsProofBase64?.let { vault.storeOtsProof(seal.shortcode, it) }
+            updateSealAfterAnchor(res)
             val status = when (res.status) {
                 OtsStatus.PENDING -> "PENDING · digest ${res.sha256Digest.take(12)}… submitted to ${res.calendarUrls.size} calendar(s). Proof: ${res.otsProofFile}"
                 OtsStatus.OFFLINE -> "OFFLINE · ${res.message}"
                 OtsStatus.CONFIRMED -> "CONFIRMED on Bitcoin."
                 OtsStatus.FAILED -> "FAILED · ${res.message}"
             }
-            _state.update { it.copy(anchoring = false, otsResult = res, otsStatus = status) }
+            val stage = when (res.status) {
+                OtsStatus.CONFIRMED, OtsStatus.PENDING -> SealStage.DONE
+                else -> SealStage.ERROR
+            }
+            _state.update { it.copy(anchoring = false, otsResult = res, otsStatus = status, sealStage = stage) }
+            computeTrustScore()
+        }
+    }
+
+    private fun updateSealAfterAnchor(res: OtsAnchorResult) {
+        _state.value.report?.let { report ->
+            if (report.seal.sha512 == res.sha512) {
+                val updated = report.seal.copy(
+                    status = res.status.name,
+                    otsProofFile = res.otsProofFile,
+                    blockchain = com.verumomnis.forensic.model.BlockchainAnchor(
+                        network = "bitcoin",
+                        blockHeight = res.calendarUrls.size.toLong()
+                    )
+                )
+                _state.update { it.copy(report = report.copy(seal = updated)) }
+            }
+        }
+        _state.value.scanResult?.let { scan ->
+            if (scan.seal.sha512 == res.sha512) {
+                val updated = scan.seal.copy(
+                    status = res.status.name,
+                    otsProofFile = res.otsProofFile
+                )
+                _state.update { it.copy(scanResult = scan.copy(seal = updated)) }
+            }
         }
     }
 
     fun sendChat(text: String) {
         if (text.isBlank()) return
+        val promptAssessment = GuardianBrain.validatePrompt(text)
+        if (promptAssessment.hardStopRequired) {
+            blockForGuardian(promptAssessment)
+            return
+        }
         _state.update { it.copy(chat = it.chat + ChatMessage("You", text, fromUser = true)) }
         val reply = respond(text)
         _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, reply, fromUser = false)) }
@@ -377,7 +718,8 @@ class VerumViewModel : ViewModel() {
         }
     }
 
-    private fun seedSampleCase() {
+    /** Seed the AllFuels sample case. Public so tests and demo builds can opt in explicitly. */
+    fun seedSampleCase() {
         setGps(GpsRecord(latitude = -30.7667, longitude = 30.4000, accuracy = 5.2, timestamp = "2026-07-06T14:32:00Z"))
         ingestText(
             fileName = "cct_affidavit.txt",

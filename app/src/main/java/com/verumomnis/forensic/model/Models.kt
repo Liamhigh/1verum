@@ -1,5 +1,6 @@
 package com.verumomnis.forensic.model
 
+import com.verumomnis.forensic.identity.IdentityProof
 import kotlinx.serialization.Serializable
 
 /** Ordinal confidence only — never probability as truth (spec 8.1). */
@@ -18,6 +19,18 @@ enum class ContradictionType {
 }
 
 enum class StatementType { CLAIM, DENIAL, ADMISSION, DEMAND, PROMISE, THREAT, SWORN_STATEMENT, CONTEMPORANEOUS }
+
+enum class PersonRole { VICTIM, RESPONDENT, WITNESS, UNKNOWN }
+
+@Serializable
+data class ExtractedPerson(
+    val name: String,
+    val age: Int? = null,
+    val idNumber: String? = null,
+    val address: String? = null,
+    val role: PersonRole = PersonRole.UNKNOWN,
+    val context: String = ""
+)
 
 @Serializable
 data class GpsRecord(
@@ -75,6 +88,7 @@ data class Contradiction(
     val category: ContradictionCategory = ContradictionCategory.OTHER,
     val type: ContradictionType = ContradictionType.DIRECT_NEGATION,
     val respondent: String = "",
+    val anchoredPerson: ExtractedPerson? = null,
     val claimA: ContradictionClaim,
     val claimB: ContradictionClaim,
     val severity: Severity,
@@ -85,7 +99,17 @@ data class Contradiction(
     val patternIndicator: Boolean = false,
     val resolutionStatus: String = "CONFIRMED",
     val tripleAiConsensus: TripleConsensus = TripleConsensus(),
-    val timestamp: String
+    val timestamp: String,
+    /** Triple-verification narrative (Thesis / Antithesis / Synthesis). */
+    val thesis: String = "",
+    val antithesis: String = "",
+    val synthesis: String = "",
+    /** Brain council vote: which brains confirmed B1's flag. */
+    val confirmingBrains: List<String> = emptyList(),
+    /** ACCEPTED | INDETERMINATE_DUE_TO_CONCEALMENT | INSUFFICIENT */
+    val councilStatus: String = "INSUFFICIENT",
+    /** Original v5.3.1c engine contradiction type, if produced by the B1-v5.3.1c engine. */
+    val engineType: String = ""
 )
 
 @Serializable
@@ -130,11 +154,18 @@ data class SealRecord(
     val status: String = "PENDING",
     val createdAt: String,
     val confirmedAt: String = "",
-    val tripleVerification: TripleConsensus = TripleConsensus()
+    val tripleVerification: TripleConsensus = TripleConsensus(),
+    val identityProof: IdentityProof? = null
 ) {
     /** Per-page seal footer (spec 6.3). */
     fun sealFooter(): String =
         "VERUM OMNIS SEAL | seal-$shortcode | $truncatedHash | $shortcode"
+
+    /** Extended footer including identity attestation (rendered, not part of the seal hash). */
+    fun extendedFooter(): String {
+        val id = identityProof?.shortFingerprint()?.let { " · ID $it" } ?: ""
+        return sealFooter() + id
+    }
 }
 
 /** A behavioural signal (B4): gaslighting, stress or manipulation. */
@@ -160,6 +191,13 @@ data class BehavioralAnalysis(
 
 /** Result of a full forensic scan run by the Nine-Brain engine. */
 @Serializable
+data class JurisdictionSource(
+    val jurisdiction: String,
+    val gps: GpsRecord? = null,
+    val statutes: List<String> = emptyList()
+)
+
+@Serializable
 data class ForensicFindings(
     val documentsAnalyzed: Int,
     val evidenceAtoms: List<EvidenceAtom>,
@@ -167,6 +205,8 @@ data class ForensicFindings(
     val timeline: List<TimelineEvent>,
     val legalMappings: List<String>,
     val jurisdiction: String,
+    val jurisdictionSource: JurisdictionSource? = null,
+    val extractedPersons: List<ExtractedPerson> = emptyList(),
     val financial: FinancialAnalysis? = null,
     val behavioral: BehavioralAnalysis? = null,
     val audio: AudioAnalysis? = null,
@@ -174,5 +214,6 @@ data class ForensicFindings(
     val communications: List<String> = emptyList(),
     val rndValidation: List<String> = emptyList(),
     val mediaExhibits: List<MediaExhibit> = emptyList(),
-    val brainVerdicts: Map<String, String>
+    val brainVerdicts: Map<String, String>,
+    val guardian: GuardianAssessment? = null
 )

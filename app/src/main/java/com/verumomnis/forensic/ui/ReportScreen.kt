@@ -17,9 +17,11 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,10 +39,30 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
+private fun TrustCard(state: UiState) {
+    VoCard(title = "TRUST & IDENTITY", icon = Icons.Filled.Person) {
+        InfoRow("Device fingerprint", state.identityFingerprint.ifEmpty { "—" })
+        InfoRow("Identity", state.identityStatus)
+        state.trustScore?.let { score ->
+            Spacer(Modifier.height(4.dp))
+            Text(score.summary(), color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            score.factors.forEach { factor ->
+                Text(
+                    "${factor.type.name}: ${factor.confidence}",
+                    color = VoTextMuted,
+                    fontSize = 10.sp
+                )
+            }
+        } ?: Text("Trust score computed after sealing.", color = VoTextMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
 fun ReportScreen(
     state: UiState,
     viewModel: VerumViewModel,
-    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {}
+    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
+    onNewScan: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -57,15 +79,24 @@ fun ReportScreen(
             state.report?.let { rpt ->
                 OutlinedButton(onClick = { onExportReport(rpt) }) { Text("Export Sealed PDF") }
             }
+            OutlinedButton(onClick = onNewScan) {
+                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                Text("New Scan")
+            }
         }
 
         val report = state.report
         if (report == null) {
             VoCard(title = "FORENSIC REPORT", icon = Icons.Filled.Description) {
                 Text(
-                    "No report yet. Generate a report to anchor every contradiction to a person, a page, and a statute.",
+                    "No report yet. Start a forensic scan from the home screen, then return here to view the sealed report.",
                     color = VoTextMuted, fontSize = 13.sp
                 )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onNewScan,
+                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                ) { Text("Start New Scan") }
             }
             return@Column
         }
@@ -78,7 +109,7 @@ fun ReportScreen(
             InfoRow("Contradictions", report.contradictions.size.toString())
             InfoRow("Seal status", report.seal.status)
             Spacer(Modifier.height(6.dp))
-            Text(report.seal.sealFooter(), color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            Text(report.seal.extendedFooter(), color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
             Spacer(Modifier.height(8.dp))
             Text(report.executiveSummary, color = VoTextMuted, fontSize = 12.sp)
         }
@@ -153,6 +184,8 @@ fun ReportScreen(
                 }
             }
         }
+
+        TrustCard(state)
 
         VoCard(title = "BITCOIN ANCHOR (OpenTimestamps)", icon = Icons.Filled.Link) {
             Text(state.otsStatus, color = VoTextMuted, fontSize = 12.sp)

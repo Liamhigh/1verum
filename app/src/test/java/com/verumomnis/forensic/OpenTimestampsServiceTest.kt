@@ -4,6 +4,7 @@ import com.verumomnis.forensic.blockchain.OpenTimestampsService
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.model.OtsStatus
 import org.junit.Assert.assertArrayEquals
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,7 +50,7 @@ class OpenTimestampsServiceTest {
     @Test
     fun anchorOfflineFallbackWhenNoNetwork() {
         // Zero timeout forces the calendar POSTs to fail -> OFFLINE, still deterministic digest.
-        val res = OpenTimestampsService.anchor(sha512, timeoutMs = 1)
+        val res = OpenTimestampsService.anchor(sha512, Instant.now(), timeoutMs = 1)
         assertEquals(OtsStatus.OFFLINE, res.status)
         assertEquals(64, res.sha256Digest.length)
         assertTrue(res.otsProofBase64 == null)

@@ -3,8 +3,8 @@ package com.verumomnis.forensic.engine.contradiction
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 16 Contradiction Detectors — v5.3.1c.
- * 10 base detectors (v5.2.9) + 6 DIGSIM detectors (v5.3.1c).
+ * 28 Contradiction Detectors — v5.3.1c.
+ * 10 base detectors (v5.2.9) + 6 DIGSIM detectors (v5.3.1c) + 12 ported high-value detectors.
  * Results are deduplicated and sorted by severity.
  */
 object ContradictionDetectors {
@@ -109,6 +109,102 @@ object ContradictionDetectors {
                 jurisdictionalNote = "ICCPR Art 2(3), UDHR Art 8 — international human rights law",
                 requiredAdditionalEvidence = listOf(
                     "Statutory duty to respond", "Submission records", "Bounce/denial documentation"
+                )
+            )
+            EngineContradictionType.ACKNOWLEDGE_THEN_DENY -> LegalHypothesis(
+                suggestedOffence = "Fraud / Consciousness of Guilt",
+                legalBasis = "Actor admits or acknowledges a fact and later denies it",
+                jurisdictionalNote = "Varies by jurisdiction — requires legal review",
+                requiredAdditionalEvidence = listOf(
+                    "Original admission/acknowledgment", "Subsequent denial in same actor's words", "Timeline of both statements"
+                )
+            )
+            EngineContradictionType.NO_COUNTERSIGNATURE_TRAP -> LegalHypothesis(
+                suggestedOffence = "Fraudulent Contract Enforcement / Unilateral Document Trap",
+                legalBasis = "Enforcing or relying on an agreement that was never countersigned by the enforcing party",
+                jurisdictionalNote = "Contract law — signature requirements vary by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Unsigned/countersignature page", "Correspondence requesting countersignature", "Enforcement demands"
+                )
+            )
+            EngineContradictionType.GOODWILL_FORFEITURE_SWINDLE -> LegalHypothesis(
+                suggestedOffence = "Fraud / Unlawful Expropriation of Goodwill",
+                legalBasis = "Demanding forfeiture of goodwill while simultaneously extracting value from it",
+                jurisdictionalNote = "Franchise and commercial law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Valuation of goodwill", "Forfeiture clause", "Payments collected on basis of goodwill value"
+                )
+            )
+            EngineContradictionType.MANUFACTURED_CONSENT -> LegalHypothesis(
+                suggestedOffence = "Fraud / Fabricated Consent",
+                legalBasis = "Claim of consent contradicted by contemporaneous evidence of reluctance or refusal",
+                jurisdictionalNote = "Contract and consumer protection law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Contemporaneous communications showing true position", "Signed document", "Witness accounts"
+                )
+            )
+            EngineContradictionType.FABRICATED_DECOY_EVIDENCE -> LegalHypothesis(
+                suggestedOffence = "Forgery / Fabrication of Evidence / Fraud on the Court",
+                legalBasis = "Decoy or forged evidence introduced to mislead proceedings or counterparties",
+                jurisdictionalNote = "Criminal and procedural law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Original authentic record", "Forensic comparison of disputed exhibit", "Metadata and chain of custody"
+                )
+            )
+            EngineContradictionType.DATA_BREACH_ENABLED_FRAUD -> LegalHypothesis(
+                suggestedOffence = "Cybercrime / Unauthorized Access / Data-Breach Facilitated Fraud",
+                legalBasis = "Fraudulent transaction or intrusion enabled by prior unauthorized data access",
+                jurisdictionalNote = "Cybercrime statutes — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Access logs", "Device/location attribution", "Unauthorized transaction records"
+                )
+            )
+            EngineContradictionType.SPOLIATION_OF_EVIDENCE -> LegalHypothesis(
+                suggestedOffence = "Spoliation of Evidence / Obstruction",
+                legalBasis = "Intentional destruction, deletion, or concealment of potentially relevant evidence",
+                jurisdictionalNote = "Procedural and criminal law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Original evidence before destruction", "Deletion logs", "Recovery attempts"
+                )
+            )
+            EngineContradictionType.ATTORNEY_OBSTRUCTION -> LegalHypothesis(
+                suggestedOffence = "Attorney Misconduct / Obstruction of Justice",
+                legalBasis = "Attorney continues to act after dismissal or withholds client file/mandate",
+                jurisdictionalNote = "Legal profession conduct rules — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Dismissal instruction", "Continued acting documentation", "Mandate/file transfer requests"
+                )
+            )
+            EngineContradictionType.DEFAMATION_THREAT -> LegalHypothesis(
+                suggestedOffence = "Intimidation / Abuse of Process / SLAPP",
+                legalBasis = "Threat of defamation proceedings used to silence or pressure a party",
+                jurisdictionalNote = "Defamation and civil procedure law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Threat communications", "Legal basis asserted", "Context of dispute"
+                )
+            )
+            EngineContradictionType.TECHNOLOGY_REFUSAL_LIABILITY -> LegalHypothesis(
+                suggestedOffence = "Negligent Failure to Prevent Foreseeable Fraud",
+                legalBasis = "Institution refuses to evaluate or implement offered fraud-prevention technology",
+                jurisdictionalNote = "Tort and regulatory duty — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Technology offer and specifications", "Rejection/non-response documentation", "Resulting fraud loss"
+                )
+            )
+            EngineContradictionType.CONFLICT_OF_INTEREST -> LegalHypothesis(
+                suggestedOffence = "Conflict of Interest / Breach of Fiduciary Duty",
+                legalBasis = "Undisclosed or improper interest that may compromise duty of loyalty",
+                jurisdictionalNote = "Fiduciary and professional conduct rules — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Relationship disclosures", "Financial or familial ties", "Adverse party documentation"
+                )
+            )
+            EngineContradictionType.INSTITUTIONAL_SILENCE -> LegalHypothesis(
+                suggestedOffence = "Denial of Effective Remedy / Administrative Silence",
+                legalBasis = "Institution with duty to respond fails to do so, creating a cascade of non-response",
+                jurisdictionalNote = "Administrative and human rights law — varies by jurisdiction",
+                requiredAdditionalEvidence = listOf(
+                    "Submission records", "Bounce/undelivered evidence", "Follow-up correspondence"
                 )
             )
             else -> null
@@ -401,8 +497,7 @@ object ContradictionDetectors {
         }
         val contemporaneous = claims.filter {
             it.sourceType == EngineStatementType.CONTEMPORANEOUS ||
-            it.sourceType == EngineStatementType.EMAIL ||
-            it.sourceType == EngineStatementType.CHAT_LOG
+            it.sourceType == EngineStatementType.CLAIM
         }
         val results = mutableListOf<EngineContradiction>()
         for (s in swornAllegations) {
@@ -489,7 +584,235 @@ object ContradictionDetectors {
         }
     }
 
-    // ==================== MASTER DETECT ALL (16 detectors) ====================
+    // ==================== v5.3.1c PORTED HIGH-VALUE DETECTORS ====================
+
+    /** Detector 17: ACKNOWLEDGE_THEN_DENY — same actor first admits/acknowledges then denies/rejects. */
+    fun detectAcknowledgeThenDeny(claims: List<EngineClaim>): List<EngineContradiction> {
+        val triggers = listOf(
+            "acknowledge" to "deny",
+            "admit" to "deny",
+            "agree" to "reject",
+            "accept" to "reject",
+            "confirm" to "deny"
+        )
+        val results = mutableListOf<EngineContradiction>()
+        for (a in claims) {
+            for ((first, second) in triggers) {
+                if (a.value.contains(first, ignoreCase = true)) {
+                    claims.filter { it != a && it.actor == a.actor && it.value.contains(second, ignoreCase = true) }
+                        .forEach { b ->
+                            results += createContradiction(a, b,
+                                EngineContradictionType.ACKNOWLEDGE_THEN_DENY,
+                                EngineSeverity.HIGH, EngineConfidence.HIGH,
+                                "ACKNOWLEDGE_THEN_DENY",
+                                "Actor ${a.actor} acknowledged/admitted a fact and later denied/rejected it",
+                                listOf(a.value, b.value), 0.85
+                            )
+                        }
+                }
+            }
+        }
+        return results
+    }
+
+    /** Detector 18: NO_COUNTERSIGNATURE_TRAP — enforcing unsigned or never-countersigned documents. */
+    fun detectNoCountersignatureTrap(claims: List<EngineClaim>): List<EngineContradiction> {
+        val trapMarkers = listOf("no countersignature", "unsigned agreement", "never signed", "signature missing", "not countersigned")
+        return claims.filter { c -> trapMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.NO_COUNTERSIGNATURE_TRAP,
+                    EngineSeverity.HIGH, EngineConfidence.HIGH,
+                    "NO_COUNTERSIGNATURE_TRAP",
+                    "Document enforced or relied upon despite missing countersignature",
+                    listOf(c.value), 0.8
+                )
+            }
+    }
+
+    /** Detector 19: GOODWILL_FORFEITURE_SWINDLE — taking value from goodwill while forcing its forfeiture. */
+    fun detectGoodwillForfeiture(claims: List<EngineClaim>): List<EngineContradiction> {
+        val forfeit = listOf("goodwill forfeiture", "forfeit goodwill", "no goodwill", "goodwill cancelled", "forfeit all goodwill")
+        val valueExtract = listOf("buy-out", "take over", "extension fee", "goodwill value", "compensable")
+        val forfeitClaims = claims.filter { c -> forfeit.any { c.value.contains(it, ignoreCase = true) } }
+        val valueClaims = claims.filter { c -> valueExtract.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (f in forfeitClaims) {
+            for (v in valueClaims) {
+                if (f.actor == v.actor || f.subject == v.subject) {
+                    results += createContradiction(f, v,
+                        EngineContradictionType.GOODWILL_FORFEITURE_SWINDLE,
+                        EngineSeverity.VERY_HIGH, EngineConfidence.HIGH,
+                        "GOODWILL_FORFEITURE_SWINDLE",
+                        "Actor demands forfeiture of goodwill while simultaneously extracting value from it",
+                        listOf(f.value, v.value), 0.9
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    /** Detector 20: MANUFACTURED_CONSENT — consent claimed but contradicted by contemporaneous reluctance. */
+    fun detectManufacturedConsent(claims: List<EngineClaim>): List<EngineContradiction> {
+        val consentClaimed = listOf("grateful", "signed willingly", "happy to accept", "consented", "agreed voluntarily")
+        val reluctance = listOf("pressured", "no alternative", "distressed", "non-committal", "negotiated for more time", "reluctant")
+        val claimed = claims.filter { c -> consentClaimed.any { c.value.contains(it, ignoreCase = true) } }
+        val reluctant = claims.filter { c -> reluctance.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (c in claimed) {
+            for (r in reluctant) {
+                if (c.actor == r.actor || c.subject == r.subject) {
+                    results += createContradiction(c, r,
+                        EngineContradictionType.MANUFACTURED_CONSENT,
+                        EngineSeverity.HIGH, EngineConfidence.HIGH,
+                        "MANUFACTURED_CONSENT",
+                        "Claim of willing consent contradicted by contemporaneous evidence of pressure or reluctance",
+                        listOf(c.value, r.value), 0.85
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    /** Detector 21: FABRICATED_DECOY_EVIDENCE — forged or decoy evidence deployed. */
+    fun detectFabricatedDecoy(claims: List<EngineClaim>): List<EngineContradiction> {
+        val decoyMarkers = listOf("fabricated decoy", "decoy evidence", "fake transaction", "sms decoy", "forged whatsapp", "fabricated screenshot", "doctored")
+        return claims.filter { c -> decoyMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.FABRICATED_DECOY_EVIDENCE,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.HIGH,
+                    "FABRICATED_DECOY_EVIDENCE",
+                    "Forged, doctored, or decoy evidence introduced to mislead",
+                    listOf(c.value), 0.9
+                )
+            }
+    }
+
+    /** Detector 22: DATA_BREACH_ENABLED_FRAUD — fraud facilitated by unauthorized data access. */
+    fun detectDataBreachFraud(claims: List<EngineClaim>): List<EngineContradiction> {
+        val breach = listOf("data breach", "unauthorized access", "compromised", "gmail access", "unauthorised gmail")
+        val fraud = listOf("card number", "fraudulent transaction", "unauthorized transaction", "unauthorised data access", "hack")
+        val breachClaims = claims.filter { c -> breach.any { c.value.contains(it, ignoreCase = true) } }
+        val fraudClaims = claims.filter { c -> fraud.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (b in breachClaims) {
+            for (f in fraudClaims) {
+                if (b.actor == f.actor || b.subject == f.subject) {
+                    results += createContradiction(b, f,
+                        EngineContradictionType.DATA_BREACH_ENABLED_FRAUD,
+                        EngineSeverity.VERY_HIGH, EngineConfidence.HIGH,
+                        "DATA_BREACH_ENABLED_FRAUD",
+                        "Unauthorized data access or breach enabled subsequent fraudulent conduct",
+                        listOf(b.value, f.value), 0.9
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    /** Detector 23: SPOLIATION_OF_EVIDENCE — intentional destruction/deletion of evidence. */
+    fun detectSpoliation(claims: List<EngineClaim>): List<EngineContradiction> {
+        val spoliationMarkers = listOf("destroyed evidence", "deleted message", "spoliation", "wiped", "concealed document", "evidence destruction")
+        return claims.filter { c -> spoliationMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.SPOLIATION_OF_EVIDENCE,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.HIGH,
+                    "SPOLIATION_OF_EVIDENCE",
+                    "Evidence intentionally destroyed, deleted, or concealed",
+                    listOf(c.value), 0.9
+                )
+            }
+    }
+
+    /** Detector 24: ATTORNEY_OBSTRUCTION — attorney continues acting after dismissal or withholds file. */
+    fun detectAttorneyObstruction(claims: List<EngineClaim>): List<EngineContradiction> {
+        val obstructionMarkers = listOf("attorney obstruction", "obstructed", "withheld mandate", "refused to hand over file", "continued to act", "false statements on record")
+        return claims.filter { c -> obstructionMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.ATTORNEY_OBSTRUCTION,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.HIGH,
+                    "ATTORNEY_OBSTRUCTION",
+                    "Attorney obstructed process by continuing to act after dismissal or making false statements",
+                    listOf(c.value), 0.9
+                )
+            }
+    }
+
+    /** Detector 25: INSTITUTIONAL_SILENCE — institution fails to respond despite duty/cascade. */
+    fun detectInstitutionalSilence(claims: List<EngineClaim>): List<EngineContradiction> {
+        val silenceMarkers = listOf("no response", "remained silent", "bounced", "failed to respond", "institutional silence", "resolution feedback provided")
+        return claims.filter { c -> silenceMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.INSTITUTIONAL_SILENCE,
+                    EngineSeverity.HIGH, EngineConfidence.HIGH,
+                    "INSTITUTIONAL_SILENCE_CASCADE",
+                    "Institution with duty to respond remained silent or bounced submissions",
+                    listOf(c.value), 0.8
+                )
+            }
+    }
+
+    /** Detector 26: DEFAMATION_THREAT — threat of defamation suit to silence/pressure. */
+    fun detectDefamationThreat(claims: List<EngineClaim>): List<EngineContradiction> {
+        val threatMarkers = listOf("defamation", "cease and desist", "will sue for defamation", "reputational harm", "govern yourself accordingly")
+        return claims.filter { c -> threatMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.DEFAMATION_THREAT,
+                    EngineSeverity.MODERATE, EngineConfidence.HIGH,
+                    "DEFAMATION_THREAT",
+                    "Defamation or cease-and-desist threat used to pressure or silence a party",
+                    listOf(c.value), 0.7
+                )
+            }
+    }
+
+    /** Detector 27: TECHNOLOGY_REFUSAL_LIABILITY — offered fraud-prevention technology never evaluated. */
+    fun detectTechnologyRefusal(claims: List<EngineClaim>): List<EngineContradiction> {
+        val offer = listOf("offered", "protocol offered", "certified test document", "fraud-verification protocol")
+        val refusal = listOf("no evaluation", "no reply", "failed to evaluate", "refused to implement", "never evaluated")
+        val offerClaims = claims.filter { c -> offer.any { c.value.contains(it, ignoreCase = true) } }
+        val refusalClaims = claims.filter { c -> refusal.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (o in offerClaims) {
+            for (r in refusalClaims) {
+                if (o.actor == r.actor || o.subject == r.subject) {
+                    results += createContradiction(o, r,
+                        EngineContradictionType.TECHNOLOGY_REFUSAL_LIABILITY,
+                        EngineSeverity.MODERATE, EngineConfidence.MODERATE,
+                        "TECHNOLOGY_REFUSAL_LIABILITY",
+                        "Fraud-prevention technology was offered but never evaluated or implemented",
+                        listOf(o.value, r.value), 0.65
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    /** Detector 28: CONFLICT_OF_INTEREST — undisclosed related-party or dual interest. */
+    fun detectConflictOfInterest(claims: List<EngineClaim>): List<EngineContradiction> {
+        val conflictMarkers = listOf("conflict of interest", "same law firm", "related party", "undisclosed interest", "preferred panel attorney", "dual interest")
+        return claims.filter { c -> conflictMarkers.any { c.value.contains(it, ignoreCase = true) } }
+            .map { c ->
+                createContradiction(c, c,
+                    EngineContradictionType.CONFLICT_OF_INTEREST,
+                    EngineSeverity.HIGH, EngineConfidence.HIGH,
+                    "CONFLICT_OF_INTEREST",
+                    "Undisclosed or improper interest that may compromise duty of loyalty",
+                    listOf(c.value), 0.8
+                )
+            }
+    }
+
+    // ==================== MASTER DETECT ALL (28 detectors) ====================
 
     private val ALL_DETECTORS: List<(List<EngineClaim>) -> List<EngineContradiction>> = listOf(
         // v5.2.9 base detectors
@@ -509,10 +832,23 @@ object ContradictionDetectors {
         ::detectFalseAllegationInAffidavit,
         ::detectTemporalPrecedenceConflict,
         ::detectProcessRemedyConflict,
-        ::detectCharacterAssassination
+        ::detectCharacterAssassination,
+        // v5.3.1c ported high-value detectors
+        ::detectAcknowledgeThenDeny,
+        ::detectNoCountersignatureTrap,
+        ::detectGoodwillForfeiture,
+        ::detectManufacturedConsent,
+        ::detectFabricatedDecoy,
+        ::detectDataBreachFraud,
+        ::detectSpoliation,
+        ::detectAttorneyObstruction,
+        ::detectInstitutionalSilence,
+        ::detectDefamationThreat,
+        ::detectTechnologyRefusal,
+        ::detectConflictOfInterest
     )
 
-    /** Run all 16 detectors, deduplicate, and sort by severity (highest first). */
+    /** Run all 28 detectors, deduplicate, and sort by severity (highest first). */
     fun detectAll(claims: List<EngineClaim>): List<EngineContradiction> {
         val all = ALL_DETECTORS.flatMap { it(claims) }
         val seen = mutableSetOf<String>()

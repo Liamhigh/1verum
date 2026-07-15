@@ -23,6 +23,8 @@ data class ForensicReport(
     val classification: String,
     val createdAt: String,
     val jurisdiction: String,
+    val jurisdictionSource: JurisdictionSource? = null,
+    val extractedPersons: List<ExtractedPerson> = emptyList(),
     val executiveSummary: String,
     val contradictions: List<Contradiction>,
     val timeline: List<TimelineEvent>,
@@ -30,6 +32,8 @@ data class ForensicReport(
     val offenceMatrix: List<OffenceRow>,
     val financial: FinancialAnalysis? = null,
     val mediaExhibits: List<MediaExhibit> = emptyList(),
+    val findingsJsonPath: String = "",
     val seal: SealRecord,
-    val body: String
+    val body: String,
+    val gemmaNarrative: String = ""
 )

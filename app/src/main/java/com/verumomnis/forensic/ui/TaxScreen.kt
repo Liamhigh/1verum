@@ -30,7 +30,7 @@ import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 
 @Composable
-fun TaxScreen(state: UiState, viewModel: VerumViewModel) {
+fun TaxScreen(viewModel: VerumViewModel) {
     var individual by remember { mutableStateOf(true) }
     var jurisdiction by remember { mutableStateOf("ZA-KZN") }
     var income by remember { mutableStateOf("450000") }

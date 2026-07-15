@@ -5,20 +5,21 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Palette sampled from www.verumglobal.foundation (gold on dark navy).
-val VoBackground = Color(0xFF050C15)   // hsl(214 63% 5%)
-val VoSurface = Color(0xFF0B1622)      // elevated panel
-val VoSurfaceAlt = Color(0xFF16263C)   // hsl(214 47% 16%) accent card
-val VoGold = Color(0xFFD1A547)         // hsl(41 60% 55%) primary accent
-val VoGoldSoft = Color(0xFFE3C67E)
+// Palette aligned with webdocsol (www.verumglobal.foundation / seal-module v1.2).
+val VoBackground = Color(0xFF040D1B)
+val VoSurface = Color(0xFF0A1422)      // elevated panel
+val VoSurfaceAlt = Color(0xFF0F3460)   // accent card base (#0F3460 at low alpha applied in modifiers)
+val VoGold = Color(0xFFD4A843)         // CTA / primary accent
+val VoGoldSoft = Color(0xFFE8C567)
 val VoPrimary = VoGold
-val VoAccentBlue = Color(0xFF4E82C6)   // hsl(214 51% 54%) ring/secondary
-val VoAmber = Color(0xFFD1A547)
-val VoGreen = Color(0xFF3FB950)
-val VoRed = Color(0xFFE5484D)
-val VoTextPrimary = Color(0xFFF5F7FA)  // hsl(210 17% 98%)
-val VoTextMuted = Color(0xFF9CA3AF)
-val VoBorder = Color(0xFF1C324E)       // hsl(214 47% 21%)
+val VoAccentBlue = Color(0xFF4A7EC7)   // links / secondary / labels
+val VoAmber = VoGold
+val VoGreen = Color(0xFF22c55e)
+val VoRed = Color(0xFFef4444)
+val VoTextPrimary = Color(0xFFF8F9FA)  // headings
+val VoTextMuted = Color(0xFFD5D8DD)    // body text
+val VoTextSecondary = Color(0xFF94a3b8) // supporting text
+val VoBorder = Color(0xFF1A2E52)       // borders / dashed outlines
 
 private val VerumColorScheme = darkColorScheme(
     primary = VoGold,

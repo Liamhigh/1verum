@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,7 +69,7 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT }
+private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -175,6 +176,18 @@ fun VerumApp(
     val websiteSealPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.sealDocumentWebsiteFormat(it, context) }
     }
+    val sealDocumentPdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            scope.launch(Dispatchers.IO) {
+                val name = viewModel.uriFileName(it, context)
+                val bytes = context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
+                bytes?.let { b ->
+                    viewModel.selectPdfForSealing(b, name, b.size.toLong())
+                    launch(Dispatchers.Main) { screen = Screen.SEAL_DOCUMENT }
+                }
+            }
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = VoBackground) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -221,6 +234,20 @@ fun VerumApp(
                             Screen.TAX -> TaxScreen(viewModel)
                             Screen.VAULT -> VaultScreen(state)
                             Screen.STORY -> {}
+                            Screen.SEAL_DOCUMENT -> SealDocumentScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onBack = { screen = Screen.SCAN_HOME },
+                                onNavigateVerify = { screen = Screen.VERIFY_DOCUMENT },
+                                onNavigateDocuments = { /* no-op — documents screen not implemented */ }
+                            )
+                            Screen.VERIFY_DOCUMENT -> VerifyDocumentScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onBack = { screen = Screen.SCAN_HOME },
+                                onNavigateSeal = { screen = Screen.SEAL_DOCUMENT },
+                                onNavigateDocuments = { }
+                            )
                         }
                     }
                 }
@@ -234,11 +261,12 @@ fun VerumApp(
                 ) {
                     ActionsSheet(
                         onSealDocument = { showMenu = false; sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
-                        onSealDocumentWebsite = { showMenu = false; websiteSealPicker.launch(arrayOf("application/pdf")) },
+                        onSealDocumentScreen = { showMenu = false; sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
                         onShareWebsiteSeal = { showMenu = false; viewModel.shareWebsiteSealedFile(context) },
                         shareWebsiteSealEnabled = state.websiteSealedFile != null,
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
+                        onVerifyScreen = { showMenu = false; screen = Screen.VERIFY_DOCUMENT },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
                         onDraftEmail = { showMenu = false; screen = Screen.EMAIL },
                         onTax = { showMenu = false; screen = Screen.TAX },
@@ -310,6 +338,8 @@ private fun VerumTopBar(
                         Screen.EMAIL -> "Sealed Email"
                         Screen.TAX -> "Tax Return"
                         Screen.VAULT -> "Evidence Vault"
+                        Screen.SEAL_DOCUMENT -> "Seal Document"
+                        Screen.VERIFY_DOCUMENT -> "Verify Document"
                         else -> ""
                     },
                     color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp
@@ -323,11 +353,12 @@ private fun VerumTopBar(
 @Composable
 private fun ActionsSheet(
     onSealDocument: () -> Unit,
-    onSealDocumentWebsite: () -> Unit,
+    onSealDocumentScreen: () -> Unit,
     onShareWebsiteSeal: () -> Unit,
     shareWebsiteSealEnabled: Boolean,
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
+    onVerifyScreen: () -> Unit,
     onDeepResearch: () -> Unit,
     onDraftEmail: () -> Unit,
     onTax: () -> Unit,
@@ -342,12 +373,13 @@ private fun ActionsSheet(
             color = VoTextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
         ActionRow(Icons.Filled.UploadFile, "Seal a document", "PDF / text → engine → vault", onSealDocument)
-        ActionRow(Icons.Filled.Verified, "Seal Document (website format)", "VO-DSS-1.2 website-compatible seal", onSealDocumentWebsite)
+        ActionRow(Icons.Filled.Verified, "Seal Document (website format)", "VO-DSS-1.2 website-compatible seal", onSealDocumentScreen)
         if (shareWebsiteSealEnabled) {
             ActionRow(Icons.Filled.Share, "Share website-format seal", "Send the last website-sealed PDF", onShareWebsiteSeal)
         }
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
+        ActionRow(Icons.Filled.TaskAlt, "Verify Document (screen)", "Open the verify page", onVerifyScreen)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)
         ActionRow(Icons.Filled.Calculate, "Tax return", "Company or individual · 50% of accountant fee", onTax)

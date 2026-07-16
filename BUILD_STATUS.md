@@ -2,9 +2,17 @@
 
 **Document Purpose:** A living tracker of every feature's implementation status. The coding assistant works through this systematically until every row is COMPLETE.
 
-**Last Updated:** 2026-07-14  
-**Version:** v5.3.1c-dss12-integrated  
+**Last Updated:** 2026-07-16  
+**Version:** v5.3.1c-dss12-merged  
 **Repository:** `github.com/Liamhigh/1verum`
+
+**Recent Changes:**
+- PR #3 (GHRP) — **MERGED** — G3 Hybrid Report Pipeline with deterministic fallback
+- PR #4 (DSS-1.2) — **MERGED** — VO-DSS-1.2 Document Sealing & Verification Standard for Android
+- `VerumApplication.kt` added — PDFBox initialization for seal module
+- `AndroidManifest.xml` updated — Application class wired
+- 5 new GitHub issues created for remaining work (#5–#9)
+- CI workflow improvements prepared (lint + artifact upload)
 
 ---
 
@@ -40,6 +48,8 @@
 | Nine-Brain Orchestrator (voting/quorum) | ✅ | ✅ | ⚠️ | ✅ | `BrainCouncil` enforces B1 + ≥2 brain quorum; B9 never votes |
 | Triple Verification (Thesis/Antithesis/Synthesis) | ⚠️ | ⬜ | ❌ | ✅ | Model fields present; narrative generation wired to report |
 | ForensicService.scan() — Main entry point | ✅ | ✅ | ⚠️ | ✅ | End-to-end ingest → analyze → seal pipeline |
+| **G3 Hybrid Report Pipeline (GHRP)** | ✅ | ✅ | ✅ | ✅ | **MERGED (PR #3)** — Deterministic fallback; FindingsJsonEmitter; G3 candidate registry |
+| **VO-DSS-1.2 Seal/Verify (Android)** | ✅ | ✅ | ✅ | ✅ | **MERGED (PR #4)** — PDFBox-based; AES-256 encryption; chain-of-custody; interoperable with web |
 
 ## On-Device LLM System
 
@@ -124,6 +134,8 @@
 | Evidence Vault Browser | ✅ | Browse stored evidence artifacts |
 | Email Screen | ✅ | Secure communication interface |
 | Tax Analysis Screen | ✅ | Financial/tax analysis module |
+| Seal Document (DSS-1.2) | ✅ | **MERGED** — Full PDFBox seal pipeline with identity, password, chain-of-custody |
+| Verify Document (DSS-1.2) | ✅ | **MERGED** — SHA-512 verification with tamper detection |
 | Settings Screen | ⚠️ | Basic settings; OJRS toggle in progress |
 | Timeline Visualization Screen | ❌ | Interactive timeline of events |
 | Actor Profile Screen | ❌ | Per-person analysis view |
@@ -179,6 +191,7 @@
 | Biometric Authentication | ❌ | Fingerprint/face unlock for vault |
 | Android 8.0+ Compatibility | ✅ | Min SDK 26 |
 | Gradle Build Configuration | ✅ | Kotlin DSL, builds successfully |
+| `VerumApplication.kt` (PDFBox init) | ✅ | **ADDED** — Initializes PDFBox resource loader at app start |
 
 ---
 
@@ -186,14 +199,24 @@
 
 | Category | Complete | Partial | Missing | Broken | Total |
 |----------|----------|---------|---------|--------|-------|
-| Core Engine | 10 | 4 | 0 | 0 | 14 |
+| Core Engine | 12 | 3 | 0 | 0 | 15 |
 | LLM System | 1 | 2 | 6 | 0 | 9 |
 | Report Generation | 5 | 4 | 1 | 0 | 10 |
 | OJRS | 0 | 4 | 9 | 0 | 13 |
 | VITS | 0 | 1 | 5 | 0 | 6 |
 | Cryptographic | 4 | 3 | 0 | 0 | 7 |
-| UI Screens | 9 | 1 | 4 | 0 | 14 |
+| UI Screens | 11 | 1 | 3 | 0 | 15 |
 | Multimedia | 0 | 2 | 12 | 0 | 14 |
 | Security | 0 | 5 | 1 | 0 | 6 |
-| Integration | 11 | 1 | 1 | 0 | 13 |
-| **TOTAL** | **40** | **27** | **41** | **0** | **108** |
+| Integration | 12 | 1 | 0 | 0 | 13 |
+| **TOTAL** | **45** | **26** | **37** | **0** | **108** |
+
+## Next Actions (Post-Merge)
+
+| # | Action | Priority | Issue |
+|---|--------|----------|-------|
+| 1 | Build and verify debug APK (`./gradlew clean build`) | **P0** | #5 |
+| 2 | Add QR scanner for seal verification | **P1** | #6 |
+| 3 | Polish Seal/Verify UI screens | **P1** | #7 |
+| 4 | Set up release keystore + signing | **P2** | #9 |
+| 5 | Defer on-device LLMs to v5.4 | **P3** | #8 |

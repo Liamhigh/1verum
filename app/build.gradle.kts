@@ -13,7 +13,7 @@ android {
         minSdk = 29
         targetSdk = 34
         versionCode = 1
-        versionName = "5.2.7"
+        versionName = "5.2.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -80,6 +80,8 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.work)
+    implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
     implementation(libs.zxing.core)
 

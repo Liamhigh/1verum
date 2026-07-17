@@ -1,32 +1,28 @@
 package com.verumomnis.forensic
 
 import com.verumomnis.forensic.crypto.EvidenceSealer
+import com.verumomnis.forensic.crypto.EvidenceSealer.VerificationResult
 import com.verumomnis.forensic.crypto.Sha512
-import com.verumomnis.forensic.crypto.VerificationResult
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 
 class EvidenceSealerTest {
 
-    private val fixedTime = Instant.parse("2026-07-06T14:35:00Z")
+    private val fixedTime = Instant.parse("2026-01-15T10:30:00Z")
 
     @Test
-    fun sealFooterMatchesSpecFormat() {
-        val bytes = "forensic report body".toByteArray()
-        val seal = EvidenceSealer.seal(bytes, "forensic_report", "VO-AF-2026-0608-FOR", fixedTime)
-        val hash = Sha512.hash(bytes)
-
-        assertEquals(hash.take(8), seal.shortcode)
-        assertEquals(hash.take(16) + "..." + hash.takeLast(8), seal.truncatedHash)
-        val footer = seal.sealFooter()
-        assertTrue(footer.startsWith("VERUM OMNIS SEAL | seal-${seal.shortcode} | "))
-        assertTrue(footer.endsWith("| ${seal.shortcode}"))
+    fun sealProducesDeterministicRecord() {
+        val bytes = "sealed evidence".toByteArray()
+        val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
+        assertEquals("seal_${fixedTime.toEpochMilli()}", seal.sealId)
+        assertEquals(Sha512.hash(bytes), seal.sha512)
+        assertTrue(seal.truncatedHash.contains("..."))
     }
 
     @Test
-    fun verifyReturnsVerifiedWhenChainConfirmed() {
+    fun verifyDetectsUntamperedSeal() {
         val bytes = "sealed evidence".toByteArray()
         val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
         val result = EvidenceSealer.verify(bytes, seal, blockchainConfirmed = true)
@@ -37,8 +33,7 @@ class EvidenceSealerTest {
     fun verifyDetectsTampering() {
         val bytes = "sealed evidence".toByteArray()
         val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
-        val tampered = "sealed evidence (edited)".toByteArray()
-        val result = EvidenceSealer.verify(tampered, seal, blockchainConfirmed = true)
+        val result = EvidenceSealer.verify("edited evidence".toByteArray(), seal, blockchainConfirmed = true)
         assertEquals(VerificationResult.TAMPERED, result)
     }
 
@@ -48,5 +43,44 @@ class EvidenceSealerTest {
         val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
         val result = EvidenceSealer.verify(bytes, seal, blockchainConfirmed = false)
         assertEquals(VerificationResult.SEAL_FOUND_NO_CHAIN, result)
+    }
+
+    @Test
+    fun verifyComparesFullHashNotJustTruncatedPrefix() {
+        val bytes = "sealed evidence".toByteArray()
+        val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
+        // Forged record: identical truncated display hash (16 prefix + 8 suffix)
+        // but a different middle. The old prefix/suffix-only comparison would
+        // have accepted this; the full SHA-512 comparison must reject it.
+        val realHash = Sha512.hash(bytes)
+        val forgedMiddle = realHash.substring(16, 120)
+            .map { if (it == '0') '1' else '0' }
+            .joinToString("")
+        val forgedHash = realHash.take(16) + forgedMiddle + realHash.takeLast(8)
+        assertEquals(128, forgedHash.length)
+        val forged = seal.copy(
+            sha512 = forgedHash,
+            truncatedHash = forgedHash.take(16) + "..." + forgedHash.takeLast(8)
+        )
+        assertEquals(seal.truncatedHash, forged.truncatedHash) // display form unchanged
+        assertEquals(
+            VerificationResult.TAMPERED,
+            EvidenceSealer.verify(bytes, forged, blockchainConfirmed = true)
+        )
+    }
+
+    @Test
+    fun verifyFallsBackToTruncatedHashWhenRecordLacksFullHash() {
+        val bytes = "sealed evidence".toByteArray()
+        val seal = EvidenceSealer.seal(bytes, "evidence", "VO-EV-1", fixedTime)
+        val legacy = seal.copy(sha512 = "")
+        assertEquals(
+            VerificationResult.SEAL_FOUND_NO_CHAIN,
+            EvidenceSealer.verify(bytes, legacy, blockchainConfirmed = false)
+        )
+        assertEquals(
+            VerificationResult.TAMPERED,
+            EvidenceSealer.verify("edited evidence".toByteArray(), legacy, blockchainConfirmed = false)
+        )
     }
 }

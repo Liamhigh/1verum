@@ -1,67 +1,48 @@
 package com.verumomnis.forensic.crypto
 
-import com.verumomnis.forensic.core.Constitution
-import com.verumomnis.forensic.identity.IdentityProof
 import com.verumomnis.forensic.model.SealRecord
 import java.time.Instant
 
-enum class VerificationResult { VERIFIED, SEAL_FOUND_NO_CHAIN, TAMPERED, NOT_FOUND }
-
 /**
- * Cryptographic sealing (Part VI). Computes the SHA-512 fingerprint, derives the
- * seal identifiers, embeds the Constitution ruleset and produces a [SealRecord].
- *
- * Blockchain anchoring (OpenTimestamps → Bitcoin) is represented here; the actual
- * network submission is handled asynchronously by the sealing service. This class
- * performs the deterministic, offline-verifiable portion.
+ * Evidence sealing primitive (spec 6.1–6.4).
  */
 object EvidenceSealer {
 
-    private const val PREFIX_LEN = 16
-    private const val SUFFIX_LEN = 8
-    private const val SHORTCODE_LEN = 8
+    enum class VerificationResult { VERIFIED, TAMPERED, SEAL_FOUND_NO_CHAIN, NOT_FOUND }
 
+    /** Creates a seal record over the provided evidence bytes. */
     fun seal(
         bytes: ByteArray,
-        documentType: String,
+        kind: String,
         documentReference: String,
-        nowInstant: Instant = Instant.now(),
-        identityProof: IdentityProof? = null
-    ): SealRecord {
-        val sha512 = Sha512.hash(bytes)
-        return sealFromHash(sha512, documentType, documentReference, nowInstant, identityProof)
-    }
+        timestamp: Instant = Instant.now()
+    ): SealRecord = sealFromHash(Sha512.hash(bytes), kind, documentReference, timestamp)
 
+    /** Creates a seal record from a precomputed hash (used by identity flows). */
     fun sealFromHash(
         sha512: String,
-        documentType: String,
+        kind: String,
         documentReference: String,
-        nowInstant: Instant = Instant.now(),
-        identityProof: IdentityProof? = null
+        timestamp: Instant = Instant.now()
     ): SealRecord {
-        require(sha512.length == 128) { "SHA-512 hash must be 128 hex chars" }
-        val shortcode = sha512.take(SHORTCODE_LEN)
-        val truncated = sha512.take(PREFIX_LEN) + "..." + sha512.takeLast(SUFFIX_LEN)
+        require(sha512.length == 128) { "SHA-512 hex must be 128 chars" }
+        val sealId = "seal_${timestamp.toEpochMilli()}"
         return SealRecord(
-            sealId = "seal-${sha512.take(24)}",
-            documentType = documentType,
-            documentReference = documentReference,
+            sealId = sealId,
+            kind = kind,
             sha512 = sha512,
-            truncatedHash = truncated,
-            shortcode = shortcode,
-            constitutionVersion = Constitution.VERSION,
-            constitutionRuleset = Constitution.rulesetFingerprint(),
-            otsProofFile = "seal_$shortcode.ots",
-            status = "PENDING",
-            createdAt = nowInstant.toString(),
-            identityProof = identityProof
+            truncatedHash = SealHasher.truncatedHash(sha512),
+            documentReference = documentReference,
+            timestamp = timestamp.toString()
         )
     }
 
     /**
-     * Seal verification (spec 6.4). Recomputes the fresh SHA-512, compares against
-     * the embedded prefix/suffix, and factors in whether the blockchain proof is
-     * confirmed.
+     * Seal verification (spec 6.4). Recomputes the fresh SHA-512 and compares it
+     * against the seal record. When the record carries the full 128-char SHA-512
+     * the ENTIRE fingerprint is compared — the truncatedHash prefix/suffix is a
+     * display form and is only used as a fallback for legacy records that lack
+     * the full hash. Blockchain confirmation factors into the final verdict.
      */
     fun verify(
         bytes: ByteArray,
@@ -69,14 +50,18 @@ object EvidenceSealer {
         blockchainConfirmed: Boolean = seal.status == "CONFIRMED"
     ): VerificationResult {
         val fresh = Sha512.hash(bytes)
-        val prefix = seal.truncatedHash.substringBefore("...")
-        val suffix = seal.truncatedHash.substringAfter("...")
-        val prefixMatch = fresh.startsWith(prefix)
-        val suffixMatch = fresh.endsWith(suffix)
+        val hashMatches = if (seal.sha512.length == 128) {
+            fresh.equals(seal.sha512, ignoreCase = true)
+        } else {
+            // Fallback only: legacy records without a full SHA-512.
+            val prefix = seal.truncatedHash.substringBefore("...")
+            val suffix = seal.truncatedHash.substringAfter("...")
+            fresh.startsWith(prefix) && fresh.endsWith(suffix)
+        }
         return when {
-            prefixMatch && suffixMatch && blockchainConfirmed -> VerificationResult.VERIFIED
-            prefixMatch && suffixMatch && !blockchainConfirmed -> VerificationResult.SEAL_FOUND_NO_CHAIN
-            !prefixMatch || !suffixMatch -> VerificationResult.TAMPERED
+            hashMatches && blockchainConfirmed -> VerificationResult.VERIFIED
+            hashMatches && !blockchainConfirmed -> VerificationResult.SEAL_FOUND_NO_CHAIN
+            !hashMatches -> VerificationResult.TAMPERED
             else -> VerificationResult.NOT_FOUND
         }
     }

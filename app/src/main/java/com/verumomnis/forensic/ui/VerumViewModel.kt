@@ -1050,13 +1050,17 @@ class VerumViewModel(
     private fun updateSealAfterAnchor(res: OtsAnchorResult) {
         _state.value.report?.let { report ->
             if (report.seal.sha512 == res.sha512) {
+                // Honest pending representation: an OTS submission yields no block
+                // height/tx/confirmations — those exist only after the Bitcoin
+                // attestation confirms. Until then the anchor stays at defaults
+                // (blockHeight 0, 0 confirmations); the status field carries
+                // PENDING/OFFLINE/CONFIRMED and calendarUrls records which
+                // calendars actually accepted the digest.
                 val updated = report.seal.copy(
                     status = res.status.name,
                     otsProofFile = res.otsProofFile,
-                    blockchain = com.verumomnis.forensic.model.BlockchainAnchor(
-                        network = "bitcoin",
-                        blockHeight = res.calendarUrls.size.toLong()
-                    )
+                    calendarUrls = res.calendarUrls,
+                    blockchain = com.verumomnis.forensic.model.BlockchainAnchor(network = "bitcoin")
                 )
                 _state.update { it.copy(report = report.copy(seal = updated)) }
             }

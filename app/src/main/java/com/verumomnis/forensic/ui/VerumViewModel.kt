@@ -643,11 +643,20 @@ class VerumViewModel(
                 updatePipelineStep("SHA-256", SealPipelineStepStatus.COMPLETE, sha256.take(16) + "…")
 
                 updatePipelineStep("OpenTimestamps", SealPipelineStepStatus.PROCESSING)
-                val ots = runCatching { OpenTimestampsClient.submit(sha256) }.getOrNull()
+                // Anchor the document's SHA-512 fingerprint via the canonical service.
+                // Success = calendars really accepted the digest (PENDING Bitcoin
+                // attestation); Failure = explicit offline/error — never fabricated.
+                val sha512ForAnchor = com.verumomnis.forensic.seal.SealHasher.sha512Hex(bytes)
+                val ots = runCatching { OpenTimestampsClient.submit(sha512ForAnchor) }.getOrNull()
                 updatePipelineStep(
                     "OpenTimestamps",
                     if (ots is OpenTimestampsClient.OtsResult.Success) SealPipelineStepStatus.COMPLETE else SealPipelineStepStatus.ERROR,
-                    if (ots is OpenTimestampsClient.OtsResult.Success) "calendar submitted" else "offline / stub"
+                    when (ots) {
+                        is OpenTimestampsClient.OtsResult.Success ->
+                            "pending Bitcoin attestation (${ots.calendar.substringAfter("://").substringBefore("/")})"
+                        is OpenTimestampsClient.OtsResult.Failure -> ots.error
+                        else -> "offline — not anchored"
+                    }
                 )
 
                 updatePipelineStep("A4 Watermark", SealPipelineStepStatus.PROCESSING)
@@ -688,7 +697,10 @@ class VerumViewModel(
 
                 val outFile = File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.pdf")
                 outFile.writeBytes(result.sealedPdf)
-                val otsProofBytes = (result.ots as? OpenTimestampsClient.OtsResult.Success)?.proof
+                // The pipeline's own OTS result carries the pending proof
+                // (DocumentSealer ran with anchorToBlockchain = false, so
+                // result.ots is null by design — do not read it here).
+                val otsProofBytes = (ots as? OpenTimestampsClient.OtsResult.Success)?.proof
                 otsProofBytes?.let { proof ->
                     File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.ots").apply { writeBytes(proof) }
                 }

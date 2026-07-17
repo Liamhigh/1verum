@@ -2,6 +2,8 @@ package com.verumomnis.forensic.seal
 
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
+import com.verumomnis.forensic.model.SealRecord
+import com.verumomnis.forensic.vault.EvidenceVault
 import java.nio.charset.Charset
 
 /**
@@ -115,6 +117,38 @@ object SealVerifier {
             } else {
                 "No Verum Omnis seal metadata was detected. The document was not sealed by the Verum Omnis system, or the seal metadata was stripped in transit."
             }
+        )
+    }
+
+    /** Outcome of checking a SHA-512 fingerprint against real records held on this device. */
+    data class HashRecordCheck(val verdict: Verdict, val message: String)
+
+    /**
+     * Check a 128-hex SHA-512 fingerprint against actual records on this
+     * device — session seals first, then the vault integrity manifest.
+     * A format-valid hash is never "authentic" on its own: an authenticity
+     * claim is made only when it matches a real seal record.
+     */
+    fun checkHashAgainstRecords(
+        sha512: String,
+        sessionSeals: List<SealRecord?>,
+        vaultManifest: List<EvidenceVault.IntegrityEntry>
+    ): HashRecordCheck {
+        sessionSeals.filterNotNull().firstOrNull { it.sha512.equals(sha512, ignoreCase = true) }?.let {
+            return HashRecordCheck(
+                Verdict.SEAL_FOUND,
+                "Authentic: matches a Verum Omnis seal record on this device (seal ${it.sealId} · ${it.documentReference})."
+            )
+        }
+        vaultManifest.firstOrNull { it.sha512.equals(sha512, ignoreCase = true) }?.let {
+            return HashRecordCheck(
+                Verdict.SEAL_FOUND,
+                "Authentic: matches a Verum Omnis seal record on this device (vault evidence file ${it.fileName})."
+            )
+        }
+        return HashRecordCheck(
+            Verdict.NO_SEAL,
+            "Valid SHA-512 format (128 hex chars). Format check only — no matching seal record was found in this device's vault, so authenticity cannot be confirmed from the hash alone."
         )
     }
 }

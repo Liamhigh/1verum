@@ -189,7 +189,7 @@ object OjrsService {
         return parseCourtListenerResults(body, max)
     }
 
-    private fun parseCourtListenerResults(json: String, max: Int): List<JudicialCase> {
+    internal fun parseCourtListenerResults(json: String, max: Int): List<JudicialCase> {
         val cases = mutableListOf<JudicialCase>()
         // Simple JSON parsing of CourtListener response
         // Format: {"count": N, "results": [{"caseName": "...", "court": "...", "dateFiled": "...", "absolute_url": "..."}]}
@@ -460,7 +460,7 @@ object OjrsService {
     // Helpers
     // ------------------------------------------------------------------
 
-    private fun selectDatabases(jurisdiction: String?): List<JudicialDatabase> {
+    internal fun selectDatabases(jurisdiction: String?): List<JudicialDatabase> {
         if (jurisdiction == null) {
             // Search all databases when no jurisdiction specified
             return listOf(
@@ -484,13 +484,13 @@ object OjrsService {
         }
     }
 
-    private fun extractCitation(title: String): String {
+    internal fun extractCitation(title: String): String {
         // Try to extract a citation pattern like [2024] ZACC 12
         val citationRegex = Regex("""\[\d{4}\]\s*\w+\s*\d+""")
         return citationRegex.find(title)?.value ?: title.take(60)
     }
 
-    private fun extractCourtFromTitle(title: String): String {
+    internal fun extractCourtFromTitle(title: String): String {
         return when {
             title.contains("Supreme Court", ignoreCase = true) -> "Supreme Court"
             title.contains("High Court", ignoreCase = true) -> "High Court"

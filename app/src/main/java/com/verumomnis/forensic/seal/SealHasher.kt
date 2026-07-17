@@ -8,12 +8,13 @@ import java.security.MessageDigest
  * the website and the Firewall: identical hashes, Seal IDs, metadata, and
  * Subject formats on every platform.
  *
- * Dual-hash rule: SHA-256 anchors to Bitcoin via OpenTimestamps;
- * SHA-512 is the Verum forensic fingerprint (footer + QR + Seal ID).
+ * Dual-hash rule: SHA-512 is the Verum forensic fingerprint (footer + QR +
+ * Seal ID); the OpenTimestamps anchor stores SHA-256 of that SHA-512 via the
+ * canonical blockchain/OpenTimestampsService (one anchoring implementation).
  */
 object SealHasher {
 
-    /** SHA-256 of document bytes — used for the OpenTimestamps submission. */
+    /** SHA-256 of document bytes — computed alongside the SHA-512 fingerprint. */
     fun sha256Hex(bytes: ByteArray): String = digestHex("SHA-256", bytes)
 
     /** SHA-512 of document bytes — the Verum forensic fingerprint. */

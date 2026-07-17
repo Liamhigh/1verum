@@ -3,6 +3,7 @@ package com.verumomnis.forensic.ojrs
 import com.verumomnis.forensic.core.ConstitutionalPrompt
 import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.JudicialCase
+import com.verumomnis.forensic.model.JudicialDatabase
 import com.verumomnis.forensic.model.ResearchConfidence
 import com.verumomnis.forensic.model.ResearchFindings
 import com.verumomnis.forensic.model.ResearchStatute
@@ -58,10 +59,21 @@ object DeepResearchEngine {
             jurisdiction = jurisdiction
         )
 
-        // 3. Search judicial databases and web in parallel
+        // 3. Search judicial databases, the open web, and news sources in parallel
         val (judicialCases, webResults, statutes) = coroutineScope {
             val casesDeferred = async { searchJudicialDatabases(judicialQueries, jurisdiction) }
-            val webDeferred = async { WebSearchService.searchMulti(webQueries, maxResultsPerQuery = 4) }
+            val webDeferred = async {
+                // Real news articles (NewsAPI) merge into the web results with
+                // category NEWS_REPORT. On any failure the news leg returns empty
+                // — "news unavailable" — and no invented articles are substituted.
+                val web = WebSearchService.searchMulti(webQueries, maxResultsPerQuery = 4)
+                val news = runCatching {
+                    WebSearchService.searchNews(buildNewsQuery(entities, jurisdiction))
+                }.onFailure {
+                    android.util.Log.w("DeepResearch", "News search failed: ${it.message} — news unavailable.")
+                }.getOrDefault(emptyList())
+                (web + news).distinctBy { it.url }
+            }
             val statutesDeferred = async { searchStatutes(entities, jurisdiction) }
 
             Triple(
@@ -311,6 +323,20 @@ object DeepResearchEngine {
         }
 
         return queries.distinct()
+    }
+
+    /**
+     * Build the NewsAPI query from extracted case entities.
+     * Prefers company names, falls back to a generic fraud/corruption query
+     * when the sealed evidence yielded no usable entities.
+     */
+    private fun buildNewsQuery(entities: SearchEntities, jurisdiction: String): String {
+        val terms = (entities.companyNames.take(2) + entities.legalIssues.take(1))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        if (terms.isNotEmpty()) return terms.joinToString(" OR ")
+        val region = if (jurisdiction.contains("ZA")) "South Africa" else jurisdiction
+        return "fraud OR corruption $region"
     }
 
     // ------------------------------------------------------------------

@@ -4,6 +4,18 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// NewsAPI key for the Deep Research news feature (WebSearchService.searchNews).
+// Resolution order: -PNEWS_API_KEY / gradle.properties -> local.properties ->
+// baked-in default, so the app works out-of-the-box when cloned.
+// SECURITY NOTE: 1verum is a PUBLIC repository — this default key is visible to
+// anyone. Rotate/restrict it at https://newsapi.org/account if it is abused.
+val newsApiKey: String = (project.findProperty("NEWS_API_KEY") as? String)
+    ?: java.util.Properties().apply {
+        val localProps = rootProject.file("local.properties")
+        if (localProps.exists()) localProps.inputStream().use { load(it) }
+    }.getProperty("NEWS_API_KEY")
+    ?: "35292a24002f4d8789d4327b0bf37ea3"
+
 android {
     namespace = "com.verumomnis.forensic"
     compileSdk = 34
@@ -19,6 +31,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Injected into BuildConfig.NEWS_API_KEY for the research news search.
+        buildConfigField("String", "NEWS_API_KEY", "\"$newsApiKey\"")
     }
 
     buildTypes {
@@ -42,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

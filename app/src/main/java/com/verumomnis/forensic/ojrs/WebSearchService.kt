@@ -1,9 +1,15 @@
 package com.verumomnis.forensic.ojrs
 
+import com.verumomnis.forensic.BuildConfig
 import com.verumomnis.forensic.model.WebResultCategory
 import com.verumomnis.forensic.model.WebSearchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
@@ -223,6 +229,99 @@ object WebSearchService {
         // Implementation would call: https://serpapi.com/search
         android.util.Log.w("WebSearch", "SerpAPI not configured — returning empty. Set API key to use.")
         return emptyList()
+    }
+
+    // ------------------------------------------------------------------
+    // NewsAPI (real news articles; key via BuildConfig.NEWS_API_KEY)
+    // ------------------------------------------------------------------
+
+    /** NewsAPI.org "everything" endpoint used for case-relevant news search. */
+    private const val NEWS_API_URL = "https://newsapi.org/v2/everything"
+
+    /** True when a NewsAPI key is configured (BuildConfig default or override). */
+    val newsApiAvailable: Boolean
+        get() = BuildConfig.NEWS_API_KEY.isNotBlank()
+
+    /**
+     * Search NewsAPI for real, published news articles relevant to the case.
+     *
+     * Honesty contract: this function NEVER fabricates articles. If the key is
+     * missing, the network is down, or the API returns an error, it logs
+     * "news unavailable" and returns an empty list — callers report the gap
+     * honestly instead of embedding invented sources.
+     *
+     * @param query Keyword query (NewsAPI supports AND/OR/NOT operators)
+     * @param maxResults Maximum articles to return
+     * @return Real articles mapped to [WebSearchResult] with NEWS_REPORT category
+     */
+    suspend fun searchNews(
+        query: String,
+        maxResults: Int = 5
+    ): List<WebSearchResult> = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.NEWS_API_KEY.trim()
+        if (apiKey.isEmpty()) {
+            android.util.Log.w("WebSearch", "NewsAPI key not configured — news unavailable.")
+            return@withContext emptyList()
+        }
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val pageSize = maxResults.coerceIn(1, 100)
+            val url = "$NEWS_API_URL?q=$encoded&pageSize=$pageSize&sortBy=relevancy&language=en&apiKey=$apiKey"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "VerumOmnis/5.3.1c (research@verumglobal.foundation)")
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string()
+                if (!response.isSuccessful || body == null) {
+                    android.util.Log.w("WebSearch", "NewsAPI HTTP ${response.code} — news unavailable.")
+                    return@withContext emptyList()
+                }
+                parseNewsApiArticles(body, maxResults)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("WebSearch", "NewsAPI search failed (${e.message}) — news unavailable.")
+            emptyList()
+        }
+    }
+
+    /**
+     * Parse a NewsAPI JSON response into categorised results.
+     * Internal (not private) so unit tests can exercise it directly.
+     * Returns an empty list on API error status or malformed JSON.
+     */
+    internal fun parseNewsApiArticles(json: String, max: Int): List<WebSearchResult> {
+        return try {
+            val root = Json.parseToJsonElement(json).jsonObject
+            val status = root["status"]?.jsonPrimitive?.contentOrNull
+            if (status != "ok") {
+                val message = root["message"]?.jsonPrimitive?.contentOrNull ?: "unknown error"
+                android.util.Log.w("WebSearch", "NewsAPI status=$status ($message) — news unavailable.")
+                return emptyList()
+            }
+            val articles = root["articles"]?.jsonArray ?: return emptyList()
+            articles.take(max).mapNotNull { element ->
+                val article = element.jsonObject
+                val title = article["title"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                val url = article["url"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                // NewsAPI marks deleted articles as "[Removed]"; never surface them.
+                if (title.isEmpty() || url.isEmpty() || title == "[Removed]") return@mapNotNull null
+                val description = article["description"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+                val domain = runCatching { java.net.URI(url).host?.removePrefix("www.") }
+                    .getOrNull().orEmpty()
+                WebSearchResult(
+                    title = title,
+                    snippet = description,
+                    url = url,
+                    domain = domain,
+                    relevanceScore = estimateRelevance(title, description),
+                    category = WebResultCategory.NEWS_REPORT
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("WebSearch", "NewsAPI response parse failed (${e.message}) — news unavailable.")
+            emptyList()
+        }
     }
 
     // ------------------------------------------------------------------

@@ -643,17 +643,14 @@ class VerumViewModel(
                 updatePipelineStep("SHA-256", SealPipelineStepStatus.COMPLETE, sha256.take(16) + "…")
 
                 updatePipelineStep("OpenTimestamps", SealPipelineStepStatus.PROCESSING)
-                // Anchor the document's SHA-512 fingerprint via the canonical service.
-                // Success = calendars really accepted the digest (PENDING Bitcoin
-                // attestation); Failure = explicit offline/error — never fabricated.
+                // Anchor the document's SHA-512 fingerprint via the canonical OTS service.
                 val sha512ForAnchor = com.verumomnis.forensic.seal.SealHasher.sha512Hex(bytes)
                 val ots = runCatching { OpenTimestampsClient.submit(sha512ForAnchor) }.getOrNull()
                 updatePipelineStep(
                     "OpenTimestamps",
                     if (ots is OpenTimestampsClient.OtsResult.Success) SealPipelineStepStatus.COMPLETE else SealPipelineStepStatus.ERROR,
                     when (ots) {
-                        is OpenTimestampsClient.OtsResult.Success ->
-                            "pending Bitcoin attestation (${ots.calendar.substringAfter("://").substringBefore("/")})"
+                        is OpenTimestampsClient.OtsResult.Success -> "pending Bitcoin attestation"
                         is OpenTimestampsClient.OtsResult.Failure -> ots.error
                         else -> "offline — not anchored"
                     }
@@ -746,11 +743,16 @@ class VerumViewModel(
                 },
                 expectedHash = cleaned
             )
-            else -> VerifyResult(
-                SealVerifier.Verdict.SEAL_FOUND, null,
-                "Valid SHA-512 format. This appears to be a genuine Verum Omnis forensic fingerprint. Seal ID: VO-${cleaned.take(12).uppercase()}.",
-                expectedHash = cleaned
-            )
+            else -> {
+                // 128 hex chars proves format only; an authenticity claim is made
+                // solely when the hash matches a real seal record on this device.
+                val check = SealVerifier.checkHashAgainstRecords(
+                    cleaned,
+                    listOf(_state.value.report?.seal, _state.value.scanResult?.seal),
+                    runCatching { vault.integrityManifest() }.getOrElse { emptyList() }
+                )
+                VerifyResult(check.verdict, null, check.message, expectedHash = cleaned)
+            }
         }
         _state.update { it.copy(verifyResult = result, verifyHashInput = hash) }
     }
@@ -1050,12 +1052,8 @@ class VerumViewModel(
     private fun updateSealAfterAnchor(res: OtsAnchorResult) {
         _state.value.report?.let { report ->
             if (report.seal.sha512 == res.sha512) {
-                // Honest pending representation: an OTS submission yields no block
-                // height/tx/confirmations — those exist only after the Bitcoin
-                // attestation confirms. Until then the anchor stays at defaults
-                // (blockHeight 0, 0 confirmations); the status field carries
-                // PENDING/OFFLINE/CONFIRMED and calendarUrls records which
-                // calendars actually accepted the digest.
+                // Pending: no block height/tx/confirmations until the Bitcoin
+                // attestation confirms; status + calendarUrls carry the truth.
                 val updated = report.seal.copy(
                     status = res.status.name,
                     otsProofFile = res.otsProofFile,

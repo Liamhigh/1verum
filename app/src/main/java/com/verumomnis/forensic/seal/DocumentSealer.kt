@@ -115,8 +115,9 @@ object DocumentSealer {
         )
         val verifyUrl = SealMetadataCodec.buildVerifyUrl(sha512, meta)
 
-        // Step 3: OpenTimestamps (skippable for offline sealing).
-        val ots = if (options.anchorToBlockchain) OpenTimestampsClient.submit(sha256) else null
+        // Step 3: OpenTimestamps (skippable for offline sealing). Anchors the
+        // SHA-512 fingerprint via the canonical OpenTimestampsService.
+        val ots = if (options.anchorToBlockchain) OpenTimestampsClient.submit(sha512) else null
 
         // Steps 4, 6, 7: build the sealed PDF.
         var pageErrors = 0

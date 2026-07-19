@@ -16,7 +16,7 @@ val newsApiKey: String = (project.findProperty("NEWS_API_KEY") as? String)
         val localProps = rootProject.file("local.properties")
         if (localProps.exists()) localProps.inputStream().use { load(it) }
     }.getProperty("NEWS_API_KEY")
-    ?: "35292a24002f4d8789d4327b0bf37ea3"
+    ?: "81dd6f5b08584517a17fc7f64f09ddf0"
 
 android {
     namespace = "com.verumomnis.forensic"

@@ -9,11 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import com.verumomnis.forensic.core.DeadManSwitch
+import com.verumomnis.forensic.engine.contradiction.ContradictionDetectors
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
+import com.verumomnis.forensic.update.RuleRegistry
+import com.verumomnis.forensic.update.RuleUpdateWorker
 import java.io.File
 import java.time.Instant
 
@@ -27,6 +30,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         viewModel = ViewModelProvider(this)[VerumViewModel::class.java]
+
+        // Signed rule updates: expose the last signature-VERIFIED rules to the
+        // contradiction engine (returns null -> engine unchanged when no package
+        // has been downloaded) and schedule the daily update check. The worker
+        // uses unique KEEP work, so calling this on every start is a no-op once
+        // scheduled.
+        val ruleRegistry = RuleRegistry.getInstance(applicationContext)
+        ContradictionDetectors.downloadedRulesProvider = { ruleRegistry.currentRules() }
+        RuleUpdateWorker.schedule(applicationContext)
 
         setContent {
             VerumOmnisTheme {

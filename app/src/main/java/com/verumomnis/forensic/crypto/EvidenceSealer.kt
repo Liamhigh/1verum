@@ -1,5 +1,6 @@
 package com.verumomnis.forensic.crypto
 
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.model.SealRecord
 import java.time.Instant
 
@@ -13,27 +14,29 @@ object EvidenceSealer {
     /** Creates a seal record over the provided evidence bytes. */
     fun seal(
         bytes: ByteArray,
-        kind: String,
+        documentType: String,
         documentReference: String,
-        timestamp: Instant = Instant.now()
-    ): SealRecord = sealFromHash(Sha512.hash(bytes), kind, documentReference, timestamp)
+        nowInstant: Instant = Instant.now()
+    ): SealRecord = sealFromHash(Sha512.hash(bytes), documentType, documentReference, nowInstant)
 
     /** Creates a seal record from a precomputed hash (used by identity flows). */
     fun sealFromHash(
         sha512: String,
-        kind: String,
+        documentType: String,
         documentReference: String,
-        timestamp: Instant = Instant.now()
+        nowInstant: Instant = Instant.now()
     ): SealRecord {
         require(sha512.length == 128) { "SHA-512 hex must be 128 chars" }
-        val sealId = "seal_${timestamp.toEpochMilli()}"
         return SealRecord(
-            sealId = sealId,
-            kind = kind,
-            sha512 = sha512,
-            truncatedHash = SealHasher.truncatedHash(sha512),
+            sealId = "seal_${nowInstant.toEpochMilli()}",
+            documentType = documentType,
             documentReference = documentReference,
-            timestamp = timestamp.toString()
+            sha512 = sha512,
+            truncatedHash = "${sha512.take(16)}...${sha512.takeLast(8)}",
+            shortcode = sha512.substring(0, 12),
+            constitutionVersion = Constitution.VERSION,
+            constitutionRuleset = Constitution.rulesetFingerprint(),
+            createdAt = nowInstant.toString()
         )
     }
 

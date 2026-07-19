@@ -1,7 +1,7 @@
 package com.verumomnis.forensic
 
 import android.app.Application
-import com.tom_roush.pdfbox.util.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 
 /**
  * Application entry point. Initialises the PDFBox-Android resource loader once,

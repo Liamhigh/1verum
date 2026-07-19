@@ -1,8 +1,8 @@
 package com.verumomnis.forensic.engine
 
 import com.verumomnis.forensic.crypto.EvidenceSealer
+import com.verumomnis.forensic.crypto.EvidenceSealer.VerificationResult
 import com.verumomnis.forensic.crypto.Sha512
-import com.verumomnis.forensic.crypto.VerificationResult
 import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind

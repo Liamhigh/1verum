@@ -13,7 +13,8 @@ import com.verumomnis.forensic.core.ConstitutionalPrompt
 import com.verumomnis.forensic.core.DeviceTier
 import com.verumomnis.forensic.core.Llm
 import com.verumomnis.forensic.core.ModelLoader
-import com.verumomnis.forensic.crypto.VerificationResult
+import com.verumomnis.forensic.crypto.EvidenceSealer
+import com.verumomnis.forensic.crypto.EvidenceSealer.VerificationResult
 import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.engine.AntiHarassmentMonitor
 import com.verumomnis.forensic.engine.AudioEvidence

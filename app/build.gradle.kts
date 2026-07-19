@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -10,7 +12,7 @@ plugins {
 // SECURITY NOTE: 1verum is a PUBLIC repository — this default key is visible to
 // anyone. Rotate/restrict it at https://newsapi.org/account if it is abused.
 val newsApiKey: String = (project.findProperty("NEWS_API_KEY") as? String)
-    ?: java.util.Properties().apply {
+    ?: Properties().apply {
         val localProps = rootProject.file("local.properties")
         if (localProps.exists()) localProps.inputStream().use { load(it) }
     }.getProperty("NEWS_API_KEY")

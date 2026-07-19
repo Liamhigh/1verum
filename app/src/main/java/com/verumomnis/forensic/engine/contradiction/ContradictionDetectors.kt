@@ -1,11 +1,16 @@
 package com.verumomnis.forensic.engine.contradiction
 
+import com.verumomnis.forensic.update.DownloadedRules
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 28 Contradiction Detectors — v5.3.1c.
  * 10 base detectors (v5.2.9) + 6 DIGSIM detectors (v5.3.1c) + 12 ported high-value detectors.
  * Results are deduplicated and sorted by severity.
+ *
+ * Additive hook: [downloadedRulesProvider] feeds an optional extra detector
+ * ([detectDownloadedFraudPairs]) driven by signature-verified downloaded rules.
+ * It can only ADD findings; the built-in detectors are never modified by it.
  */
 object ContradictionDetectors {
 
@@ -16,6 +21,28 @@ object ContradictionDetectors {
         incrementAndGet()
         return get()
     }
+
+    // ==================== SIGNED RULE UPDATES (additive only) ====================
+
+    /**
+     * Signature-verified rules downloaded from the Verum rules service, wired
+     * once at app start (see update/RuleRegistry + update/RuleUpdateClient).
+     *
+     * What downloaded rules DO affect: [detectDownloadedFraudPairs] appends
+     * BEHAVIORAL contradictions when two claims (same actor or same subject)
+     * contain opposite sides of a downloaded fraud-keyword phrase pair
+     * (patternType "DOWNLOADED_RULE_<id>"). These can only ADD findings.
+     *
+     * What they DO NOT affect: all built-in keyword lists below stay hardcoded
+     * and unchanged — downloaded rules never remove, replace, or reweight
+     * built-in detection. Downloaded single keywords, behavioral markers,
+     * serial patterns and case configs are NOT executed by this engine.
+     *
+     * When this returns null (fresh install / no verified package yet),
+     * [detectAll] behaves exactly as before this hook existed.
+     */
+    @Volatile
+    var downloadedRulesProvider: () -> DownloadedRules? = { null }
 
     // ==================== HELPERS ====================
 
@@ -812,7 +839,47 @@ object ContradictionDetectors {
             }
     }
 
-    // ==================== MASTER DETECT ALL (28 detectors) ====================
+    // ==================== SIGNED RULE-UPDATE DETECTOR ====================
+
+    /**
+     * Additive detector driven by downloaded, signature-verified rules.
+     * Flags claim pairs that contain opposite sides of a downloaded
+     * fraud-keyword phrase pair (e.g. "paid" vs "not paid"). A single claim
+     * containing both sides is flagged as a self-contradiction, mirroring
+     * [detectBehavioral]. Conservative severity/confidence (MODERATE) —
+     * substring co-occurrence is a candidate signal, not proof.
+     */
+    fun detectDownloadedFraudPairs(claims: List<EngineClaim>): List<EngineContradiction> {
+        val rules = runCatching { downloadedRulesProvider() }.getOrNull() ?: return emptyList()
+        if (rules.fraudPairs.isEmpty()) return emptyList()
+        val results = mutableListOf<EngineContradiction>()
+        for (pair in rules.fraudPairs) {
+            val first = pair.first.lowercase()
+            val second = pair.second.lowercase()
+            if (first.isEmpty() || second.isEmpty()) continue
+            val firstClaims = claims.filter { c -> c.value.lowercase().contains(first) }
+            val secondClaims = claims.filter { c -> c.value.lowercase().contains(second) }
+            for (a in firstClaims) {
+                for (b in secondClaims) {
+                    if (a.actor == b.actor || a.subject == b.subject) {
+                        results += createContradiction(
+                            a, b,
+                            EngineContradictionType.BEHAVIORAL,
+                            EngineSeverity.MODERATE,
+                            EngineConfidence.MODERATE,
+                            "DOWNLOADED_RULE_${pair.ruleId}",
+                            "Downloaded rule ${pair.ruleId} (rules v${rules.version}): " +
+                                "co-occurring opposing phrases \"${pair.first}\" / \"${pair.second}\"",
+                            listOf(a.value, b.value), 0.5
+                        )
+                    }
+                }
+            }
+        }
+        return results
+    }
+
+    // ==================== MASTER DETECT ALL (28 built-in + 1 additive) ====================
 
     private val ALL_DETECTORS: List<(List<EngineClaim>) -> List<EngineContradiction>> = listOf(
         // v5.2.9 base detectors
@@ -845,10 +912,16 @@ object ContradictionDetectors {
         ::detectInstitutionalSilence,
         ::detectDefamationThreat,
         ::detectTechnologyRefusal,
-        ::detectConflictOfInterest
+        ::detectConflictOfInterest,
+        // Additive signed rule-update detector (no-op until a verified package is downloaded)
+        ::detectDownloadedFraudPairs
     )
 
-    /** Run all 28 detectors, deduplicate, and sort by severity (highest first). */
+    /**
+     * Run all 28 built-in detectors plus the additive downloaded-rule detector,
+     * deduplicate, and sort by severity (highest first). With no downloaded
+     * rules the output is identical to running the built-in detectors alone.
+     */
     fun detectAll(claims: List<EngineClaim>): List<EngineContradiction> {
         val all = ALL_DETECTORS.flatMap { it(claims) }
         val seen = mutableSetOf<String>()

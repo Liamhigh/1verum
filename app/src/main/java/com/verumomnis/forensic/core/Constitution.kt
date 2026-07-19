@@ -37,6 +37,12 @@ object Constitution {
     const val ENCRYPTION = "AES-256-GCM"
     const val BLOCKCHAIN_NETWORK = "bitcoin"
 
+    // Signed rule updates (verum-rules worker, rule-format.md v1).
+    // The public key is public BY DESIGN (SubjectPublicKeyInfo DER, base64) —
+    // it can only verify signatures, never create them. publicKeyId: vo-master-1.
+    const val RULE_MANIFEST_URL = "https://verumglobal.foundation/api/v1/rules/manifest"
+    const val RULES_PUBLIC_KEY_DER_B64 = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA9FQPTWCsFh1qMs/mrOOgZvdjCh8APmlsJlallCm3CmWgMoFAyRHRAauvXWFoBoiaUQGGx7OGtZ6eBCpBlOGLxSnVk0T2hBgd6kxZwj1vHEITw9KmXMjy5qmUY1hd3BO3y4aAfrPKu+6ENSJo7Ax77fvBnHPG1oL8m3724oqU913HYI7Miob+CdL0Oi36oCBKhlw5sCYH+evMPU1PmOqTrmz8zUkDk4osqX8INTIchmk2j3BguMw8sjmKRnrB//t6LPYme4motggMPVMNR3hLJHX+ehCYDUtJLshZq1MPLjTT7aK36gCIPg2ja6BxWfYdx7ZzSFVcL+gapy4pA7VnDrhQ7jb10ojGnofssEbQEi7k9FpswMFegmGNmKEH5TQcKlI4VJvQcZddbhZXYwpfgsL/raEFMChEuzR3A49oIXgBBmi9AdQtdEHpfb2i9/PimxsilhDxa8Pi+8cEQUMbHcPeodfX/IWf+wotnc3VKGoffVL/8+hSU/voPhxfXyOcnbRYkFGeOZhcrE/u4Nh6Vkq6y1+cpVUtrIzOnaeNbNF248ZS7f65IZci8MTeo4nAqkWGmXcZHrZLT7YIvHSyAryYzBNoofm2uTuiTxp8Oiwa2yfU2UMQfg0eGZa0LBHCLbG72pxiVd2TGvdHh3QguO1/zM5NNRtoUnqHfuLBOJECAwEAAQ=="
+
     const val NINE_BRAIN_VERSION = "v1.0"
     const val SEALING_PROTOCOL = "verum-omnis-seal v1.0"
     const val TAGLINE = "AI Forensics for Truth"

@@ -198,21 +198,21 @@ class RuleUpdateClient(
          * EVERYTHING else — including all non-ASCII — as raw characters.
          * (This intentionally differs from org.json's `quote()`, which escapes
          * U+007F–U+009F and U+2000–U+20FF and would corrupt the signed bytes.)
+         * Note: form feed has no Kotlin char escape, so it is matched by code.
          */
         fun quoteJsonString(value: String): String = buildString(value.length + 2) {
             append('"')
             for (c in value) {
-                when (c) {
-                    '"' -> append("\\\"")
-                    '\\' -> append("\\\\")
-                    '\b' -> append("\\b")
-                    '\t' -> append("\\t")
-                    '\n' -> append("\\n")
-                    '' -> append("\\f")
-                    '\r' -> append("\\r")
-                    else ->
-                        if (c < ' ') append("\\u").append(c.code.toString(16).padStart(4, '0'))
-                        else append(c)
+                when {
+                    c == '"' -> append("\\\"")
+                    c == '\\' -> append("\\\\")
+                    c == '\b' -> append("\\b")
+                    c == '\t' -> append("\\t")
+                    c == '\n' -> append("\\n")
+                    c.code == 0x0C -> append("\\f")
+                    c == '\r' -> append("\\r")
+                    c < ' ' -> append("\\u").append(c.code.toString(16).padStart(4, '0'))
+                    else -> append(c)
                 }
             }
             append('"')

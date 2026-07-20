@@ -197,7 +197,13 @@ data class UiState(
     val verifyBusy: Boolean = false,
     /** Deep research findings from OJRS + web search. */
     val researchFindings: ResearchFindings? = null,
-    val researching: Boolean = false
+    val researching: Boolean = false,
+    /** QR seal scanner state. */
+    val scanSealQrPayload: com.verumomnis.forensic.seal.QrScanPayload? = null,
+    val scanSealPdfBytes: ByteArray? = null,
+    val scanSealPdfName: String = "",
+    val scanSealResult: com.verumomnis.forensic.model.SealScanResult? = null,
+    val scanSealBusy: Boolean = false
 ) {
     companion object {
         fun defaultSealPipeline(): List<SealPipelineStep> = listOf(
@@ -786,6 +792,45 @@ class VerumViewModel(
 
     fun clearVerifyResult() {
         _state.update { it.copy(verifyResult = null, verifyHashInput = "", verifyFileBytes = null, verifyFileName = "") }
+    }
+
+    /** Store a Verum seal QR payload scanned by the camera. */
+    fun setScanSealQr(payload: com.verumomnis.forensic.seal.QrScanPayload) {
+        _state.update { it.copy(scanSealQrPayload = payload, scanSealResult = null, scanSealPdfBytes = null, scanSealPdfName = "") }
+    }
+
+    /** Clear the scanned QR payload without resetting the PDF selection. */
+    fun clearScanSealQr() {
+        _state.update { it.copy(scanSealQrPayload = null, scanSealResult = null) }
+    }
+
+    /** Select the sealed PDF that the scanned QR code belongs to. */
+    fun selectScanSealPdf(bytes: ByteArray, name: String) {
+        _state.update { it.copy(scanSealPdfBytes = bytes, scanSealPdfName = name, scanSealResult = null) }
+    }
+
+    /** Run the QR-aware verification against the selected PDF. */
+    fun verifyScanSeal() {
+        val bytes = _state.value.scanSealPdfBytes ?: return
+        val payload = _state.value.scanSealQrPayload
+        _state.update { it.copy(scanSealBusy = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = SealVerifier.verifyWithQr(bytes, payload)
+            _state.update { it.copy(scanSealBusy = false, scanSealResult = result) }
+        }
+    }
+
+    /** Reset the entire QR seal scanner flow. */
+    fun clearScanSeal() {
+        _state.update {
+            it.copy(
+                scanSealQrPayload = null,
+                scanSealPdfBytes = null,
+                scanSealPdfName = "",
+                scanSealResult = null,
+                scanSealBusy = false
+            )
+        }
     }
 
     private fun formatFileSize(size: Long): String {

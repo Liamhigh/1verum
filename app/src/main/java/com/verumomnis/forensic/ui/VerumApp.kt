@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.UploadFile
@@ -69,7 +70,7 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT }
+private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,7 +197,7 @@ fun VerumApp(
             if (screen == Screen.STORY) {
                 StoryScreen(
                     onEnter = { screen = Screen.SCAN_HOME },
-                    onReadConstitution = onReadConstitution
+                    onReadConstitution = { screen = Screen.CONSTITUTION }
                 )
             } else {
                 Scaffold(
@@ -248,6 +249,23 @@ fun VerumApp(
                                 onNavigateSeal = { screen = Screen.SEAL_DOCUMENT },
                                 onNavigateDocuments = { }
                             )
+                            Screen.SCAN_SEAL -> ScanSealScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onBack = { screen = Screen.SCAN_HOME },
+                                onResult = { screen = Screen.SCAN_SEAL_RESULT }
+                            )
+                            Screen.SCAN_SEAL_RESULT -> ScanSealResultScreen(
+                                state = state,
+                                onBack = { screen = Screen.SCAN_HOME },
+                                onScanAgain = {
+                                    viewModel.clearScanSeal()
+                                    screen = Screen.SCAN_SEAL
+                                }
+                            )
+                            Screen.CONSTITUTION -> ConstitutionScreen(
+                                onBack = { screen = Screen.SCAN_HOME }
+                            )
                         }
                     }
                 }
@@ -267,6 +285,7 @@ fun VerumApp(
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
                         onVerifyScreen = { showMenu = false; screen = Screen.VERIFY_DOCUMENT },
+                        onScanSeal = { showMenu = false; screen = Screen.SCAN_SEAL },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
                         onDraftEmail = { showMenu = false; screen = Screen.EMAIL },
                         onTax = { showMenu = false; screen = Screen.TAX },
@@ -276,7 +295,7 @@ fun VerumApp(
                             else viewModel.postEngine("No sealed report yet. Start a forensic scan first.")
                         },
                         onVault = { showMenu = false; screen = Screen.VAULT },
-                        onReadConstitution = { showMenu = false; onReadConstitution() }
+                        onReadConstitution = { showMenu = false; screen = Screen.CONSTITUTION }
                     )
                 }
             }
@@ -289,7 +308,7 @@ fun VerumApp(
                         viewModel.clearGuardianBlock()
                         screen = Screen.SCAN_HOME
                     },
-                    onReadConstitution = onReadConstitution
+                    onReadConstitution = { screen = Screen.CONSTITUTION }
                 )
             }
         }
@@ -331,7 +350,7 @@ private fun VerumTopBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onHome) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold) }
                 Spacer(Modifier.width(4.dp))
-                Text(
+                    Text(
                     when (screen) {
                         Screen.SCAN_HOME -> "New Forensic Scan"
                         Screen.REPORT -> "Forensic Report"
@@ -340,6 +359,9 @@ private fun VerumTopBar(
                         Screen.VAULT -> "Evidence Vault"
                         Screen.SEAL_DOCUMENT -> "Seal Document"
                         Screen.VERIFY_DOCUMENT -> "Verify Document"
+                        Screen.SCAN_SEAL -> "Scan Seal QR"
+                        Screen.SCAN_SEAL_RESULT -> "Seal Verification"
+                        Screen.CONSTITUTION -> "Constitution"
                         else -> ""
                     },
                     color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp
@@ -359,6 +381,7 @@ private fun ActionsSheet(
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
     onVerifyScreen: () -> Unit,
+    onScanSeal: () -> Unit,
     onDeepResearch: () -> Unit,
     onDraftEmail: () -> Unit,
     onTax: () -> Unit,
@@ -380,6 +403,7 @@ private fun ActionsSheet(
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
         ActionRow(Icons.Filled.TaskAlt, "Verify Document (screen)", "Open the verify page", onVerifyScreen)
+        ActionRow(Icons.Filled.QrCodeScanner, "Scan Seal QR", "Point camera at a sealed document QR", onScanSeal)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)
         ActionRow(Icons.Filled.Calculate, "Tax return", "Company or individual · 50% of accountant fee", onTax)

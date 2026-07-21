@@ -6,6 +6,8 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import com.tom_roush.pdfbox.cos.COSName
+import com.tom_roush.pdfbox.cos.COSString
 import com.tom_roush.pdfbox.multipdf.LayerUtility
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
@@ -32,7 +34,12 @@ import java.util.TimeZone
  *   - original pages embedded at 88% scale, per-page error recovery (v1.2)
  *   - clean QR (no border/box) top-right, 10% of page dimension, 2.5% margin
  *   - seal footer bar on every page: type + chain, Seal ID + SHA-512 prefix + timestamp + page x/y
- *   - Subject metadata: VO-SEAL|SHA512|SEAL_ID[|CHAIN:...]
+ *   - Subject metadata (default, matching the website):
+ *       VO-SEAL2|<sealed-file-hash>|<sealId>|ORIG:<original-hash>[|CHAIN:...]
+ *     written as a UTF-16BE hex string with the 128-zero placeholder patched
+ *     after save, so self-sealed documents pass the VO-SEAL2 self-integrity
+ *     check as Genuine (never LEGACY). Legacy VO-SEAL subjects remain
+ *     verifiable via SealVerifier.
  *   - optional true AES-256 password encryption via StandardProtectionPolicy
  *     (PDFBox enforces it — unlike pdf-lib on the web, which silently ignores it)
  *
@@ -61,7 +68,9 @@ object DocumentSealer {
         val device: String? = null, // pre-formatted "Platform|Cores|Timezone"
         val password: String? = null, // min 8 chars — enables cover page + AES-256
         val originalName: String = "Sealed Document",
-        val anchorToBlockchain: Boolean = true
+        val anchorToBlockchain: Boolean = true,
+        /** "v2" (default, website-compatible VO-SEAL2) or "legacy" (VO-SEAL). */
+        val sealScheme: String = "v2"
     )
 
     data class SealedDocument(
@@ -69,6 +78,9 @@ object DocumentSealer {
         val sealId: String,
         val sha256: String,
         val sha512: String,
+        /** VO-SEAL2: hash of the final sealed bytes (placeholder-patched). Empty for legacy. */
+        val sealedSha512: String = "",
+        val sealScheme: String = "v2",
         val verifyUrl: String,
         val metadata: SealMetadataCodec.SealMetadata,
         val priorChain: List<String>,
@@ -215,10 +227,30 @@ object DocumentSealer {
                 }
 
                 // Metadata (step 7) — the interoperable seal carrier.
+                val useV2 = options.sealScheme == "v2"
                 val info = sealed.documentInformation
                 info.title = options.originalName
                 info.author = "Verum Omnis"
-                info.subject = SealChain.buildSubject(sha512, sealId, priorChain)
+                if (useV2) {
+                    // VO-SEAL2: subject carries the fixed placeholder; the real
+                    // sealed-file hash is patched in after save (see below).
+                    // Forced hex form so the subject is stored as UTF-16BE-hex
+                    // ASCII, exactly like the web sealer (pdf-lib).
+                    val subject = SealChain.buildSubject(
+                        sha512 = SealV2IntegrityChecker.HASH_PLACEHOLDER,
+                        sealId = sealId,
+                        previousChain = priorChain,
+                        scheme = "v2",
+                        origHash = sha512
+                    )
+                    val cosSubject = COSString(
+                        byteArrayOf(0xFE.toByte(), 0xFF.toByte()) + subject.toByteArray(Charsets.UTF_16BE)
+                    )
+                    cosSubject.setForceHexForm(true)
+                    info.cosObject.setItem(COSName.getPDFName("Subject"), cosSubject)
+                } else {
+                    info.subject = SealChain.buildSubject(sha512, sealId, priorChain, scheme = "legacy")
+                }
                 info.keywords = SealChain.buildKeywords(sha512, options.sealType)
                 info.producer = SealChain.PRODUCER
                 info.creationDate = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
@@ -240,11 +272,25 @@ object DocumentSealer {
             }
         }
 
+        // VO-SEAL2 self-integrity (matching the website): hash the sealed bytes
+        // with the placeholder in place, then patch the real hash into the
+        // hex-encoded Subject. Byte length is unchanged, so xref stays valid.
+        var sealedFileSha512 = ""
+        val finalBytes = if (options.sealScheme == "v2") {
+            val (hash, patched) = SealV2IntegrityChecker.embedSealedHash(sealedBytes)
+            sealedFileSha512 = hash
+            patched
+        } else {
+            sealedBytes
+        }
+
         return SealedDocument(
-            sealedPdf = sealedBytes,
+            sealedPdf = finalBytes,
             sealId = sealId,
             sha256 = sha256,
             sha512 = sha512,
+            sealedSha512 = sealedFileSha512,
+            sealScheme = options.sealScheme,
             verifyUrl = verifyUrl,
             metadata = meta,
             priorChain = priorChain,

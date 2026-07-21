@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoRed
@@ -74,7 +75,7 @@ fun ReportScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = { viewModel.generateReport() },
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
             ) { Text("Generate Sealed Report") }
             state.report?.let { rpt ->
                 OutlinedButton(onClick = { onExportReport(rpt) }) { Text("Export Sealed PDF") }
@@ -95,7 +96,7 @@ fun ReportScreen(
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = onNewScan,
-                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
                 ) { Text("Start New Scan") }
             }
             return@Column
@@ -199,7 +200,7 @@ fun ReportScreen(
             Button(
                 onClick = { viewModel.anchorSealToBitcoin() },
                 enabled = !state.anchoring,
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
             ) { Text(if (state.anchoring) "Anchoring…" else "Anchor Seal to Bitcoin") }
         }
     }

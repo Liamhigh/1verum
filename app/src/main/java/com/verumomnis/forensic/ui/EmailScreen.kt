@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.model.HarassmentVerdict
+import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoGreen
@@ -88,7 +89,7 @@ fun EmailScreen(
                             )
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
                 ) { Text("Draft & Send Sealed PDF") }
                 OutlinedButton(onClick = {
                     // Trigger the anti-harassment monitor by repeated sends.

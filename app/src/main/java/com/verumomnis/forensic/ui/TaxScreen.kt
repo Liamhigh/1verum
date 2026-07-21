@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 
@@ -79,7 +80,7 @@ fun TaxScreen(viewModel: VerumViewModel) {
                     )
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
             ) { Text("Calculate & Seal") }
             Spacer(Modifier.height(8.dp))
             Text("Result is posted to the chat and sealed. Same 50% deal for companies and private citizens.", color = VoTextMuted, fontSize = 11.sp)

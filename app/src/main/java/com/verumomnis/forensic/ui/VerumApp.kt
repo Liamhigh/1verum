@@ -284,9 +284,7 @@ fun VerumApp(
                                     screen = Screen.SCAN_SEAL
                                 }
                             )
-                            Screen.CONSTITUTION -> ConstitutionScreen(
-                                onBack = { screen = Screen.SCAN_HOME }
-                            )
+                            Screen.CONSTITUTION -> ConstitutionScreen()
                         }
                     }
                 }

@@ -46,10 +46,15 @@ class ReportAndEmailTest {
         assertTrue(c.claimA.page > 0 && c.claimB.page > 0)
         // statute
         assertTrue(c.applicableLaw.isNotEmpty())
-        // Rendered body contains all three anchors and is sealed.
-        assertTrue(report.body.contains("Respondent: Marius Nortje"))
-        assertTrue(report.body.contains("Applicable law:"))
-        assertTrue(report.body.contains("p${c.claimA.page}"))
+        // Rendered body contains all three anchors and is sealed. Council-ACCEPTED
+        // contradictions appear in §3; unconfirmed ones only in the 3b appendix.
+        if (c.councilStatus == "ACCEPTED") {
+            assertTrue(report.body.contains("Respondent: Marius Nortje"))
+            assertTrue(report.body.contains("Applicable law:"))
+            assertTrue(report.body.contains("p${c.claimA.page}"))
+        } else {
+            assertTrue(report.body.contains("NOT CONFIRMED — EXCLUDED FROM FINDINGS"))
+        }
         assertEquals(128, report.seal.sha512.length)
         assertTrue(report.seal.sealFooter().startsWith("VERUM OMNIS SEAL |"))
     }
@@ -57,10 +62,15 @@ class ReportAndEmailTest {
     @Test
     fun offenceMatrixHasPersonAndLaw() {
         val report = ReportGenerator.generate(findings(), "AllFuels", now)
-        val row = report.offenceMatrix.first()
-        assertEquals("Marius Nortje", row.person)
-        assertTrue(row.applicableLaw.isNotEmpty())
-        assertTrue(row.evidenceAnchor.contains("p"))
+        // Doctrine: the offence matrix contains council-ACCEPTED findings only.
+        val accepted = report.contradictions.filter { it.councilStatus == "ACCEPTED" }
+        assertEquals(accepted.size, report.offenceMatrix.size)
+        if (accepted.isNotEmpty()) {
+            val row = report.offenceMatrix.first()
+            assertEquals("Marius Nortje", row.person)
+            assertTrue(row.applicableLaw.isNotEmpty())
+            assertTrue(row.evidenceAnchor.contains("p"))
+        }
     }
 
     @Test

@@ -15,7 +15,7 @@ import java.time.Instant
 
 /**
  * The 9-Brain forensic engine (build spec Sections 5, 8). Deterministic and
- * always-on — it is the third verifier in Triple-AI consensus on every device.
+ * always-on — it validates every finding after the B1–B8 council vote.
  *
  *  - B1 Contradiction   -> [VerumContradictionEngine] + [ContradictionExtractor] booster
  *  - B2 Document         -> creator-tool / metadata tamper signals
@@ -38,7 +38,7 @@ object NineBrainEngine {
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
-        now: Instant = Instant.now()
+        now: Instant
     ): ForensicFindings {
         val timestamp = now.toString()
 

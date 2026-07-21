@@ -5,21 +5,23 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Palette aligned with webdocsol (www.verumglobal.foundation / seal-module v1.2).
-val VoBackground = Color(0xFF040D1B)
-val VoSurface = Color(0xFF0A1422)      // elevated panel
-val VoSurfaceAlt = Color(0xFF0F3460)   // accent card base (#0F3460 at low alpha applied in modifiers)
-val VoGold = Color(0xFFD4A843)         // CTA / primary accent
+// Palette aligned with verumglobal.foundation CSS (design tokens, SPEC-ANDROID-UI).
+val VoBackground = Color(0xFF040D1B)   // deep navy page background
+val VoSurface = Color(0xFF0A1526)      // card surface
+val VoSurfaceAlt = Color(0xFF0F3460)   // accent card base (applied at low alpha in modifiers)
+val VoGold = Color(0xFFD4A843)         // primary gold / CTA
+val VoGoldDark = Color(0xFFB8942A)     // gold-dark (pressed / disabled gold)
 val VoGoldSoft = Color(0xFFE8C567)
 val VoPrimary = VoGold
 val VoAccentBlue = Color(0xFF4A7EC7)   // links / secondary / labels
 val VoAmber = VoGold
 val VoGreen = Color(0xFF22c55e)
 val VoRed = Color(0xFFef4444)
-val VoTextPrimary = Color(0xFFF8F9FA)  // headings
-val VoTextMuted = Color(0xFFD5D8DD)    // body text
+val VoTextPrimary = Color(0xFFE8E6E1)  // primary text
+val VoTextMuted = Color(0xFF8A94A6)    // muted text
 val VoTextSecondary = Color(0xFF94a3b8) // supporting text
-val VoBorder = Color(0xFF1A2E52)       // borders / dashed outlines
+/** Standard border: gold at 25% alpha (verumglobal.foundation). */
+val VoBorder = VoGold.copy(alpha = 0.25f)
 
 private val VerumColorScheme = darkColorScheme(
     primary = VoGold,

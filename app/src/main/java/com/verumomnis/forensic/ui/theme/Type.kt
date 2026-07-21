@@ -50,3 +50,11 @@ val VerumTypography = Typography().let { base ->
         labelSmall = base.labelSmall.copy(fontFamily = SourceSans)
     )
 }
+
+/** Monospace, uppercase-ready, letter-spaced label style for field & hash labels. */
+val MonoLabel = TextStyle(
+    fontFamily = JetBrainsMono,
+    fontWeight = FontWeight.Medium,
+    fontSize = 11.sp,
+    letterSpacing = 1.5.sp
+)

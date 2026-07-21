@@ -126,8 +126,6 @@ fun SealDocumentScreen(
                 NavLink("Seal Document", selected = true, onClick = {})
                 Spacer(Modifier.width(24.dp))
                 NavLink("Verify", selected = false, onClick = onNavigateVerify)
-                Spacer(Modifier.width(24.dp))
-                NavLink("Documents", selected = false, onClick = onNavigateDocuments)
             }
             Spacer(Modifier.height(8.dp))
             HeaderSection()
@@ -698,7 +696,7 @@ private fun InfoSection() {
         ) {
             InfoItem("📄 A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
             InfoItem("📱 Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
-            InfoItem("🔐 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
+            InfoItem("🔒 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
             InfoItem("⛓️ Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
             InfoItem("👤 Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
             InfoItem("📍 GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))

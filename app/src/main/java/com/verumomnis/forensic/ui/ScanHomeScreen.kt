@@ -16,13 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
@@ -113,8 +108,8 @@ fun ScanHomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(VoSurface, RoundedCornerShape(18.dp))
-                .border(1.dp, VoBorder, RoundedCornerShape(18.dp))
+                .background(VoSurface, RoundedCornerShape(12.dp))
+                .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                 .padding(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,25 +130,11 @@ fun ScanHomeScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            OutlinedButton(
+            VerumSecondaryButton(
+                label = if (hasFile) "Change file" else "Select case file",
                 onClick = onSelectFile,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, VoGold)
-            ) {
-                Icon(
-                    if (hasFile) Icons.Filled.Description else Icons.Filled.AddCircle,
-                    contentDescription = null,
-                    tint = VoGold,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    if (hasFile) "Change file" else "Select case file",
-                    color = VoGold,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
 
             pending?.let { file ->
                 Spacer(Modifier.height(12.dp))
@@ -193,20 +174,12 @@ fun ScanHomeScreen(
             )
 
             Spacer(Modifier.height(16.dp))
-            Button(
+            VerumPrimaryButton(
+                label = if (isScanning) "Analysing…" else "Start Forensic Analysis",
                 onClick = { onStartScan(caseName.ifBlank { "Matter" }) },
                 enabled = hasFile && !isScanning,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text(
-                    if (isScanning) "Analysing…" else "🔍 Start Forensic Analysis",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         // Progress / result card
@@ -215,8 +188,8 @@ fun ScanHomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(VoSurface, RoundedCornerShape(18.dp))
-                    .border(1.dp, VoBorder, RoundedCornerShape(18.dp))
+                    .background(VoSurface, RoundedCornerShape(12.dp))
+                    .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                     .padding(20.dp)
             ) {
                 Text(
@@ -244,27 +217,20 @@ fun ScanHomeScreen(
                 }
                 if (scanDone && state.report != null) {
                     Spacer(Modifier.height(14.dp))
-                    Button(
+                    VerumPrimaryButton(
+                        label = "View sealed report",
                         onClick = onOpenReport,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-                    ) {
-                        Icon(Icons.Filled.Description, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                        Text("View sealed report", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(Modifier.height(10.dp))
-                    OutlinedButton(
+                    VerumSecondaryButton(
+                        label = "New scan",
                         onClick = {
                             caseName = ""
                             onNewScan()
                         },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, VoGold)
-                    ) {
-                        Text("New scan", color = VoGold, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

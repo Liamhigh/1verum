@@ -89,7 +89,7 @@ fun VaultScreen(state: UiState, onVerify: () -> Unit = {}) {
     ) {
         VoCard(title = "EVIDENCE VAULT", icon = Icons.Filled.Lock) {
             InfoRow("Evidence files", state.files.size.toString())
-            InfoRow("Media files", state.files.count { it.isMedia }.toString())
+            InfoRow("Media files", state.files.count { it.type == "image" || it.type == "video" }.toString())
             InfoRow("Sealed reports", if (state.report != null) "1" else "0")
             InfoRow("Sealed emails", state.emails.size.toString())
             InfoRow("Findings sealed", if (state.scanResult != null) "yes" else "no")

@@ -5,9 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +40,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
@@ -86,58 +92,95 @@ fun ConstitutionScreen() {
                 ZoomablePage(bitmap = bmp, page = page)
             }
         }
-        PageBar(
-            page = page,
-            pageCount = pageCount,
-            onPrev = { if (page > 0) page -= 1 },
-            onNext = { if (pageCount > 0 && page < pageCount - 1) page += 1 }
-        )
+        if (pageCount > 0) {
+            PageBar(
+                page = page,
+                pageCount = pageCount,
+                onPrev = { if (page > 0) page -= 1 },
+                onNext = { if (page < pageCount - 1) page += 1 }
+            )
+        }
     }
 }
 
-/** Page bitmap with pinch-to-zoom (1x–4x), pan while zoomed, double-tap zoom. */
+/**
+ * Page bitmap: vertical scroll at 1x (so the bottom of an A4 page is always
+ * reachable), pinch-to-zoom 1x-4x with bounded pan while zoomed, and
+ * double-tap zoom towards the tap point. Zoom/pan state resets on page change.
+ */
 @Composable
 private fun ZoomablePage(bitmap: Bitmap, page: Int) {
     var scale by remember(page) { mutableStateOf(1f) }
     var offset by remember(page) { mutableStateOf(Offset.Zero) }
+    val scrollState = remember(page) { ScrollState(0) }
 
-    Image(
-        bitmap = bitmap.asImageBitmap(),
-        contentDescription = "Constitution page ${page + 1}",
-        contentScale = ContentScale.FillWidth,
-        alignment = Alignment.TopCenter,
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(page) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 4f)
-                    offset = if (scale <= 1f) Offset.Zero else offset + pan
-                }
-            }
-            .pointerInput(page) {
-                detectTapGestures(
-                    onDoubleTap = { tap ->
-                        if (scale > 1f) {
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            scale = 2f
-                            // zoom towards the tapped point
-                            offset = Offset(
-                                x = size.width / 2f - tap.x,
-                                y = size.height / 2f - tap.y
-                            )
-                        }
+            .fillMaxSize()
+            .verticalScroll(scrollState, enabled = scale <= 1f)
+    ) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Constitution page ${page + 1}",
+            contentScale = ContentScale.FillWidth,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(page) {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        do {
+                            val event = awaitPointerEvent()
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            // Consume only zoom gestures, or pans while zoomed in; at 1x
+                            // un-consumed drags fall through to the vertical scroller.
+                            if (zoom != 1f || scale > 1f) {
+                                val newScale = (scale * zoom).coerceIn(1f, 4f)
+                                scale = newScale
+                                offset = if (newScale <= 1f) {
+                                    Offset.Zero
+                                } else {
+                                    if (scrollState.value > 0) scrollState.value = 0
+                                    constrainPan(offset + pan, newScale, size)
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
                     }
-                )
-            }
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offset.x
-                translationY = offset.y
-            }
-    )
+                }
+                .pointerInput(page) {
+                    detectTapGestures(
+                        onDoubleTap = { tap ->
+                            if (scale > 1f) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            } else {
+                                scale = 2f
+                                offset = constrainPan(
+                                    Offset(size.width / 2f - tap.x, size.height / 2f - tap.y),
+                                    2f,
+                                    size
+                                )
+                            }
+                        }
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                }
+        )
+    }
+}
+
+/** Bounds pan so the zoomed page can never be dragged fully off-screen. */
+private fun constrainPan(offset: Offset, scale: Float, size: IntSize): Offset {
+    val maxX = size.width * (scale - 1f) / 2f
+    val maxY = size.height * (scale - 1f) / 2f + size.height * 0.1f
+    return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
 }
 
 /** Bottom bar: "‹ PREVIOUS" | "PAGE N / 13" | "NEXT ›" — 48dp, horizontal. */

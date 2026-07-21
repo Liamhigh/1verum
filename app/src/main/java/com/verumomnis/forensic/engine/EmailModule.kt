@@ -8,10 +8,12 @@ import com.verumomnis.forensic.model.SealedEmail
 import java.time.Instant
 
 /**
- * Email & Distribution (Part X). The AI drafts emails; every draft is delivered
- * as a SEALED PDF (SHA-512 + Constitution). Before sending, the draft passes the
- * anti-harassment monitor and a content check. Blocked emails are still sealed
- * for the audit trail but not delivered.
+ * Email & Distribution (Part X). The engine drafts emails deterministically;
+ * every draft is rendered to a SEALED PDF (SHA-512 + Constitution) in the vault
+ * and handed to the user's own mail app via a share intent — this module never
+ * "sends" anything itself. Before the draft leaves, it passes the
+ * anti-harassment monitor and a content check. Blocked drafts are still sealed
+ * for the audit trail but are not offered for sharing.
  */
 object EmailModule {
 
@@ -52,7 +54,7 @@ object EmailModule {
     fun sealAndSend(
         draft: EmailDraft,
         monitor: AntiHarassmentMonitor,
-        now: Instant = Instant.now()
+        now: Instant
     ): SealedEmail {
         val nowMillis = now.toEpochMilli()
         val assessment = monitor.assess(

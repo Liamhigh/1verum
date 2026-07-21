@@ -10,7 +10,6 @@ import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.PersonRole
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.model.StatementType
-import com.verumomnis.forensic.model.TripleConsensus
 import java.time.Instant
 
 /**
@@ -22,7 +21,7 @@ import java.time.Instant
  */
 object ContradictionToForensicAdapter {
 
-    fun toContradictions(report: EngineForensicReport, now: Instant = Instant.now()): List<Contradiction> =
+    fun toContradictions(report: EngineForensicReport, now: Instant): List<Contradiction> =
         report.contradictions.map { toContradiction(it, now) }
 
     fun toExtractedPersons(report: EngineForensicReport): List<ExtractedPerson> =
@@ -35,7 +34,7 @@ object ContradictionToForensicAdapter {
  */
     fun toForensicFindings(
         report: EngineForensicReport,
-        now: Instant = Instant.now(),
+        now: Instant,
         documentsAnalyzed: Int = 0
     ): ForensicFindings = ForensicFindings(
         documentsAnalyzed = documentsAnalyzed,
@@ -82,12 +81,6 @@ object ContradictionToForensicAdapter {
             confidence = mapConfidence(c.confidence),
             timestamp = now.toString(),
             engineType = c.type.name,
-            tripleAiConsensus = TripleConsensus(
-                gemma3 = if (c.verificationStatus["gemma3"] == "CONCURS") "CONCURS" else "ABSTAINS",
-                phi3 = if (c.verificationStatus["phi3"] == "CONCURS") "CONCURS" else "ABSTAINS",
-                nineBrain = if (c.verificationStatus["nineBrain"] == "CONCURS") "CONCURS" else "ABSTAINS",
-                quorum = c.verificationStatus["quorum"] == "true"
-            )
         )
     }
 
@@ -102,8 +95,8 @@ object ContradictionToForensicAdapter {
 
     private fun toExtractedPerson(profile: ActorProfile): ExtractedPerson = ExtractedPerson(
         name = profile.name,
-        role = if (profile.dishonestyScore > 50) PersonRole.RESPONDENT else PersonRole.UNKNOWN,
-        context = "Dishonesty score ${profile.dishonestyScore}/100; flags: ${profile.flags.joinToString(", ")}"
+        role = if (profile.severityIndicator > 50) PersonRole.RESPONDENT else PersonRole.UNKNOWN,
+        context = "Severity indicator (heuristic) ${profile.severityIndicator}/100; flags: ${profile.flags.joinToString(", ")}"
     )
 
     private fun mapCategory(type: EngineContradictionType, context: String): ContradictionCategory {

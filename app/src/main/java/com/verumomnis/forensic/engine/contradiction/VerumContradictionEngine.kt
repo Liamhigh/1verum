@@ -76,7 +76,7 @@ class VerumContradictionEngine(
         // Step 2: Detect all contradictions (28 detectors: 10 base + 6 DIGSIM + 12 ported)
         val contradictions = ContradictionDetectors.detectAll(claims)
 
-        // Step 3: Triple verification
+        // Step 3: Deterministic engine verification summary
         val tv = TripleVerifier.verifyTriple(contradictions)
 
         // Step 4: Actor profiles
@@ -90,7 +90,7 @@ class VerumContradictionEngine(
             caseId = caseId,
             contradictions = contradictions,
             actorProfiles = profiles,
-            tripleVerification = tv,
+            verification = tv,
             corpusHash = corpusHash,
             confidenceCalibration = ConfidenceCalibrator.reportCalibration(),
             generatedAt = injectedTimestamp ?: System.currentTimeMillis()

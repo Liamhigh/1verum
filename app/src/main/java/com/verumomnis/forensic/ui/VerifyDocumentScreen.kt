@@ -102,8 +102,6 @@ fun VerifyDocumentScreen(
                 NavLinkVerify("Seal Document", selected = false, onClick = onNavigateSeal)
                 Spacer(Modifier.width(24.dp))
                 NavLinkVerify("Verify", selected = true, onClick = {})
-                Spacer(Modifier.width(24.dp))
-                NavLinkVerify("Documents", selected = false, onClick = onNavigateDocuments)
             }
             Spacer(Modifier.height(8.dp))
             VerifyHeader()

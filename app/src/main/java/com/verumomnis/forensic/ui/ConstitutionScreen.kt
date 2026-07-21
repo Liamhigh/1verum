@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -113,6 +115,7 @@ private fun ZoomablePage(bitmap: Bitmap, page: Int) {
     var scale by remember(page) { mutableStateOf(1f) }
     var offset by remember(page) { mutableStateOf(Offset.Zero) }
     val scrollState = remember(page) { ScrollState(0) }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -141,10 +144,10 @@ private fun ZoomablePage(bitmap: Bitmap, page: Int) {
                                 offset = if (newScale <= 1f) {
                                     Offset.Zero
                                 } else {
-                                    if (scrollState.value > 0) scrollState.value = 0
+                                    if (scrollState.value > 0) scope.launch { scrollState.scrollTo(0) }
                                     constrainPan(offset + pan, newScale, size)
                                 }
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                event.changes.forEach { if (it.position != it.previousPosition) it.consume() }
                             }
                         } while (event.changes.any { it.pressed })
                     }

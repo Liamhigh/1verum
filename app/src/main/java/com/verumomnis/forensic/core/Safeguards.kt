@@ -38,5 +38,5 @@ object Safeguards {
         Constitution.ANTI_WAR_DOCTRINE && WEAPONIZATION.containsMatchIn(request)
 
     /** Immutable Constitution: any change invalidates seals (see Constitution.rulesetFingerprint). */
-    fun constitutionIsFinal(): Boolean = Constitution.FINAL && Constitution.VERSION == "5.2.8"
+    fun constitutionIsFinal(): Boolean = Constitution.FINAL && Constitution.VERSION == "6.0"
 }

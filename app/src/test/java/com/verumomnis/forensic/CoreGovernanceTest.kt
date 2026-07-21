@@ -12,7 +12,7 @@ class CoreGovernanceTest {
 
     @Test
     fun constitutionConstantsAreImmutableValues() {
-        assertEquals("5.2.8", Constitution.VERSION)
+        assertEquals("6.0", Constitution.VERSION)
         assertTrue(Constitution.FINAL)
         assertEquals(9, Constitution.BRAIN_COUNT)
         assertEquals(20, Constitution.COMMISSION_PERCENT)

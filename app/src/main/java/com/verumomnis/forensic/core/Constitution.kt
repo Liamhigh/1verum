@@ -1,7 +1,7 @@
 package com.verumomnis.forensic.core
 
 /**
- * Verum Omnis Constitution v5.2.8 — hard-coded, immutable governance constants.
+ * Verum Omnis Constitution v6.0 — hard-coded, immutable governance constants.
  *
  * Per the specification these are COMPILE-TIME CONSTANTS: they are not stored in
  * config files or databases. Changing them requires recompiling from source, and
@@ -9,7 +9,7 @@ package com.verumomnis.forensic.core
  * the machine-readable ruleset embedded into every cryptographic seal.
  */
 object Constitution {
-    const val VERSION = "5.2.8"
+    const val VERSION = "6.0"
     const val FINAL = true
 
     const val PROFIT_TO_FOUNDATION = 99      // 99% to Verum Foundation

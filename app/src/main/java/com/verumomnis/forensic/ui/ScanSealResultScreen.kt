@@ -1,10 +1,11 @@
 package com.verumomnis.forensic.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,25 +16,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,75 +44,74 @@ import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 /**
- * Displays the result of a QR-aware seal verification (MATCH, TAMPERED,
- * SEAL_PRESENT, LEGACY, or NO_SEAL). Mirrors the verdict cards shown on the
- * live webdocsol verify.html.
+ * Result of the on-device, format-level seal check. Honestly labelled:
+ * these are indicators, not determinations — the canonical verifier is
+ * verumglobal.foundation/verify.html, reachable via the online button when
+ * a scanned QR payload is present.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanSealResultScreen(
     state: UiState,
     onBack: () -> Unit,
     onScanAgain: () -> Unit
 ) {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val result = state.scanSealResult
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("VERUM", fontFamily = Cormorant, fontWeight = FontWeight.Bold, color = VoGold, fontSize = 20.sp)
-                        Text(" OMNIS", fontFamily = Cormorant, fontWeight = FontWeight.Light, color = VoTextPrimary, fontSize = 20.sp)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = VoBackground.copy(alpha = 0.9f), titleContentColor = VoTextPrimary)
-            )
-        },
-        containerColor = VoBackground
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            result?.let { ScanSealVerdictCard(it) } ?: ScanSealNoResultCard()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            "ON-DEVICE FORMAT CHECK — INDICATORS, NOT DETERMINATIONS",
+            fontFamily = JetBrainsMono,
+            fontSize = 11.sp,
+            letterSpacing = 1.sp,
+            color = VoGold,
+            textAlign = TextAlign.Center
+        )
 
-            Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onScanAgain,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-            ) {
-                Text("Scan another seal", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
+        Spacer(Modifier.height(16.dp))
+        result?.let { ScanSealVerdictCard(it) } ?: ScanSealNoResultCard()
 
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "Verification is performed entirely on your device. No document content or hashes are sent to any server.",
-                color = VoTextMuted,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
+        state.scanSealQrPayload?.let { payload ->
+            Spacer(Modifier.height(16.dp))
+            VerumPrimaryButton(
+                label = "Verify online at verumglobal.foundation",
+                onClick = { openVerifier(context, payload.rawUrl) },
+                modifier = Modifier.fillMaxWidth()
             )
         }
+
+        Spacer(Modifier.height(12.dp))
+        VerumSecondaryButton(
+            label = "Scan another seal",
+            onClick = onScanAgain,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "This on-device check is format-level only. The canonical verifier is " +
+                "verumglobal.foundation/verify.html. No document content leaves your device.",
+            color = VoTextMuted,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 private fun ScanSealVerdictCard(result: com.verumomnis.forensic.model.SealScanResult) {
     val (icon, title, color) = when (result.verdict) {
-        SealScanVerdict.MATCH -> Triple(Icons.Filled.CheckCircle, "Seal Verified — Genuine", VoGreen)
-        SealScanVerdict.TAMPERED -> Triple(Icons.Filled.Error, "Seal Invalid / Tampered", VoRed)
-        SealScanVerdict.SEAL_PRESENT -> Triple(Icons.Filled.HelpOutline, "Seal Present — Check Not Applicable", VoAccentBlue)
-        SealScanVerdict.LEGACY -> Triple(Icons.Filled.Warning, "Seal Present — Legacy Format", VoGold)
+        SealScanVerdict.MATCH -> Triple(Icons.Filled.CheckCircle, "Format Check Passed", VoGreen)
+        SealScanVerdict.TAMPERED -> Triple(Icons.Filled.Error, "Hash Mismatch Detected", VoRed)
+        SealScanVerdict.SEAL_PRESENT -> Triple(Icons.Filled.HelpOutline, "Seal Found — Format Check Only", VoAccentBlue)
+        SealScanVerdict.LEGACY -> Triple(Icons.Filled.Warning, "Seal Found — Legacy Format", VoGold)
         SealScanVerdict.NO_SEAL -> Triple(Icons.Filled.Error, "No Seal Found", VoRed)
     }
 
@@ -202,10 +193,14 @@ private fun ScanSealNoResultCard() {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Scan a QR code and select the sealed PDF to see the verdict.",
+            "Scan a QR code and select the sealed PDF to run the on-device format check.",
             fontSize = 14.sp,
             color = VoTextMuted,
             textAlign = TextAlign.Center
         )
     }
+}
+
+private fun openVerifier(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }

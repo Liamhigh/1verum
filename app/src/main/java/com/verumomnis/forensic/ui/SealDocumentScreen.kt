@@ -29,9 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,14 +51,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -70,8 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.pdf.QrCodeGenerator
-import com.verumomnis.forensic.seal.SealMetadataCodec
 import com.verumomnis.forensic.ui.theme.Cormorant
+import com.verumomnis.forensic.ui.theme.CormorantDisplay
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.SourceSans
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
@@ -209,9 +205,7 @@ private fun HeaderSection() {
         Spacer(Modifier.height(12.dp))
         Text(
             "Document Sealing Service",
-            fontFamily = Cormorant,
-            fontWeight = FontWeight.Light,
-            fontSize = 34.sp,
+            style = CormorantDisplay.copy(fontSize = 34.sp),
             color = VoTextPrimary,
             textAlign = TextAlign.Center
         )
@@ -261,8 +255,6 @@ private fun FileInfoCard(name: String, size: String, onClear: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Text("📎", fontSize = 14.sp)
-            Spacer(Modifier.width(8.dp))
             Text(name, color = VoTextPrimary, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
             Text(size, color = VoAccentBlue, fontSize = 13.sp)
@@ -276,8 +268,8 @@ private fun FileInfoCard(name: String, size: String, onClear: () -> Unit) {
 @Composable
 private fun SealTypeSelector(selected: String, onSelect: (String) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-        SealTypeChip(label = "🏠 Private (Free)", active = selected == "private", onClick = { onSelect("private") })
-        SealTypeChip(label = "🏢 Commercial", active = selected == "commercial", onClick = { onSelect("commercial") })
+        SealTypeChip(label = "Private (Free)", active = selected == "private", onClick = { onSelect("private") })
+        SealTypeChip(label = "Commercial", active = selected == "commercial", onClick = { onSelect("commercial") })
     }
 }
 
@@ -363,7 +355,7 @@ private fun PasswordSection(
                 colors = CheckboxDefaults.colors(checkedColor = VoGold, checkmarkColor = VoBackground, uncheckedColor = VoBorder)
             )
             Spacer(Modifier.width(6.dp))
-            Text("🔒 Password protect this document (delivery receipt mode)", fontSize = 14.sp, color = VoTextMuted)
+            Text("Password protect this document (delivery receipt mode)", fontSize = 14.sp, color = VoTextMuted)
         }
         if (enabled) {
             Spacer(Modifier.height(12.dp))
@@ -531,7 +523,7 @@ private fun ResultsCard(result: SealResult, viewModel: VerumViewModel, context: 
                 .border(1.dp, VoGold.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
                 .padding(14.dp)
         ) {
-            Text("⏳ OpenTimestamps proof pending Bitcoin blockchain confirmation (typically 1-2 hours)", color = VoGold, fontSize = 13.sp)
+            Text("OpenTimestamps proof pending Bitcoin blockchain confirmation (typically 1-2 hours)", color = VoGold, fontSize = 13.sp)
         }
         Spacer(Modifier.height(16.dp))
         PreviewSection()
@@ -694,14 +686,14 @@ private fun InfoSection() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             maxItemsInEachRow = 2
         ) {
-            InfoItem("📄 A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
-            InfoItem("📱 Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
-            InfoItem("🔒 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
-            InfoItem("⛓️ Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
-            InfoItem("👤 Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
-            InfoItem("📍 GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))
-            InfoItem("🔐 Password Protection", "Optional AES-256 password protection with delivery receipt cover page. Recipient must email sender for password — that email IS the read receipt.", Modifier.weight(1f))
-            InfoItem("🛡️ Tamper Detection", "Recipient uploads document to verify page. If SHA-512 doesn't match —> 'TAMPERED — DO NOT ACCEPT'. Cryptographically impossible to forge.", Modifier.weight(1f))
+            InfoItem("A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
+            InfoItem("Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
+            InfoItem("Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
+            InfoItem("Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
+            InfoItem("Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
+            InfoItem("GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))
+            InfoItem("Password Protection", "Optional AES-256 password protection with delivery receipt cover page. Recipient must email sender for password — that email IS the read receipt.", Modifier.weight(1f))
+            InfoItem("Tamper Detection", "Recipient uploads document to verify page. If SHA-512 doesn't match, the verdict reads 'TAMPERED — DO NOT ACCEPT'. Cryptographically impossible to forge.", Modifier.weight(1f))
         }
     }
 }

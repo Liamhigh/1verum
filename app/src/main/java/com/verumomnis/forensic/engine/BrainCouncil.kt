@@ -11,9 +11,10 @@ import com.verumomnis.forensic.model.TripleConsensus
  * A contradiction is accepted only when B1 + at least two other brains agree.
  * B9 never votes; it validates afterwards.
  *
- * The council also materialises the Thesis/Antithesis/Synthesis triple-
- * verification block for every finding so the sealed report can show how the
- * verdict was reached.
+ * The council also records a plain-language Thesis/Antithesis/Synthesis
+ * narrative for every finding so the sealed report can show how the council
+ * reached its status. No external AI model takes part in this vote; the
+ * record must never claim otherwise.
  */
 object BrainCouncil {
 
@@ -38,10 +39,13 @@ object BrainCouncil {
             synthesis = synthesis,
             confirmingBrains = confirming,
             councilStatus = status,
+            // Honest single-council record: no external LLM (gemma3/phi3) ever
+            // runs on device, so those lanes are explicitly NOT_RUN. Only the
+            // Nine-Brain council vote is real.
             tripleAiConsensus = TripleConsensus(
-                gemma3 = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
-                phi3 = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
-                nineBrain = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
+                gemma3 = "NOT_RUN",
+                phi3 = "NOT_RUN",
+                nineBrain = if (status == "ACCEPTED") "COUNCIL_ACCEPTED" else "COUNCIL_NOT_CONFIRMED",
                 quorum = status == "ACCEPTED"
             )
         )

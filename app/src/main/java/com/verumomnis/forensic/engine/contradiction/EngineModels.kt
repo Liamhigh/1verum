@@ -86,23 +86,30 @@ data class EngineContradiction(
     val verificationStatus: Map<String, String> = emptyMap()
 )
 
-/** Per-actor profile with dishonesty scoring. */
+/**
+ * Per-actor profile. [severityIndicator] is a neutral 0-100 heuristic derived
+ * from contradiction counts and flags. It is NOT a measure of honesty and must
+ * never be presented as one (indicators, not determinations).
+ */
 @Serializable
 data class ActorProfile(
     val name: String,
-    val dishonestyScore: Int = 0, // 0-100, capped
+    val severityIndicator: Int = 0, // 0-100 heuristic, capped
     val flags: List<String> = emptyList(),
     val contradictions: List<String> = emptyList(),
     val statementsMade: Int = 0,
     val statementsDenied: Int = 0
 )
 
-/** Triple verification result — Thesis/Antithesis/Synthesis. */
+/**
+ * Engine verification summary. The on-device contradiction engine is fully
+ * deterministic: no external AI model (no Gemma/Phi lanes) participates, so the
+ * summary records an honest engine self-check plus a review recommendation.
+ */
 @Serializable
-data class EngineTripleVerification(
-    val gemma3Status: String = "CONCURS",
-    val phi3Status: String = "CONCURS",
-    val nineBrainStatus: String = "CONCURS",
+data class EngineVerificationSummary(
+    val engineStatus: String = "DETERMINISTIC_SELF_CHECK",
+    val reviewStatus: String = "CONFIRMED",
     val quorumMet: Boolean = true,
     val discrepancies: List<String> = emptyList()
 )
@@ -113,7 +120,7 @@ data class EngineForensicReport(
     val caseId: String,
     val contradictions: List<EngineContradiction>,
     val actorProfiles: List<ActorProfile>,
-    val tripleVerification: EngineTripleVerification,
+    val verification: EngineVerificationSummary,
     val corpusHash: String,
     val confidenceCalibration: Map<String, String> = emptyMap(),
     val generatedAt: Long = 0L

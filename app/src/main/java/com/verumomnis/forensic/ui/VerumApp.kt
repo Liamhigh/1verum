@@ -2,6 +2,7 @@ package com.verumomnis.forensic.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -45,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,6 +87,24 @@ fun VerumApp(
     var showMenu by remember { mutableStateOf(initialMenuOpen) }
     val context = LocalContext.current
 
+    // Simple in-app back stack: every screen switch pushes the previous screen,
+    // the system back button / top-bar arrow pops it (falls back to scan home).
+    val backStack = remember { mutableStateListOf<Screen>() }
+    fun navigate(target: Screen) {
+        if (target != screen) {
+            backStack.add(screen)
+            screen = target
+        }
+    }
+    fun goBack() {
+        screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex) else Screen.SCAN_HOME
+    }
+    fun resetToHome() {
+        backStack.clear()
+        screen = Screen.SCAN_HOME
+    }
+    BackHandler(enabled = backStack.isNotEmpty() && !showMenu) { goBack() }
+
     val scope = rememberCoroutineScope()
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -104,7 +124,7 @@ fun VerumApp(
     // Auto-advance from the scan home to the report once the seal pipeline completes.
     LaunchedEffect(state.sealStage) {
         if (screen == Screen.SCAN_HOME && state.sealStage == SealStage.DONE && state.report != null) {
-            screen = Screen.REPORT
+            navigate(Screen.REPORT)
         }
     }
 
@@ -181,7 +201,7 @@ fun VerumApp(
                 val bytes = context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
                 bytes?.let { b ->
                     viewModel.selectPdfForSealing(b, name, b.size.toLong())
-                    launch(Dispatchers.Main) { screen = Screen.SEAL_DOCUMENT }
+                    launch(Dispatchers.Main) { navigate(Screen.SEAL_DOCUMENT) }
                 }
             }
         }
@@ -193,8 +213,8 @@ fun VerumApp(
 
             if (screen == Screen.STORY) {
                 StoryScreen(
-                    onEnter = { screen = Screen.SCAN_HOME },
-                    onReadConstitution = { screen = Screen.CONSTITUTION }
+                    onEnter = { navigate(Screen.SCAN_HOME) },
+                    onReadConstitution = { navigate(Screen.CONSTITUTION) }
                 )
             } else {
                 Scaffold(
@@ -216,7 +236,7 @@ fun VerumApp(
                                 Screen.CONSTITUTION -> "Constitution"
                                 Screen.STORY -> ""
                             },
-                            onBack = if (screen == Screen.SCAN_HOME) null else ({ screen = Screen.SCAN_HOME }),
+                            onBack = if (screen == Screen.SCAN_HOME) null else ({ goBack() }),
                             trailing = {
                                 if (screen == Screen.CHAT) {
                                     Text(
@@ -225,11 +245,11 @@ fun VerumApp(
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     IconButton(
-                                        onClick = { screen = Screen.REPORT },
+                                        onClick = { navigate(Screen.REPORT) },
                                         enabled = state.report != null
                                     ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
                                 }
-                                IconButton(onClick = { screen = Screen.VAULT }) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
+                                IconButton(onClick = { navigate(Screen.VAULT) }) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
                             }
                         )
                     }
@@ -240,48 +260,51 @@ fun VerumApp(
                                 state = state,
                                 onSelectFile = { sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                                 onStartScan = { caseName -> viewModel.startForensicScan(caseName) },
-                                onNewScan = { viewModel.clearCase(); screen = Screen.SCAN_HOME },
-                                onOpenChat = { screen = Screen.CHAT },
-                                onOpenVault = { screen = Screen.VAULT },
-                                onOpenReport = { screen = Screen.REPORT }
+                                onNewScan = { viewModel.clearCase(); resetToHome() },
+                                onOpenChat = { navigate(Screen.CHAT) },
+                                onOpenVault = { navigate(Screen.VAULT) },
+                                onOpenReport = { navigate(Screen.REPORT) }
                             )
                             Screen.CHAT -> ChatScreen(state, viewModel, onPlus = { showMenu = true })
                             Screen.REPORT -> ReportScreen(
                                 state = state,
                                 viewModel = viewModel,
                                 onExportReport = onExportReport,
-                                onNewScan = { viewModel.clearCase(); screen = Screen.SCAN_HOME }
+                                onNewScan = { viewModel.clearCase(); resetToHome() }
                             )
                             Screen.EMAIL -> EmailScreen(state, viewModel, onExportEmail)
                             Screen.TAX -> TaxScreen(viewModel)
-                            Screen.VAULT -> VaultScreen(state)
+                            Screen.VAULT -> VaultScreen(
+                                state = state,
+                                onVerify = { navigate(Screen.VERIFY_DOCUMENT) }
+                            )
                             Screen.STORY -> {}
                             Screen.SEAL_DOCUMENT -> SealDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
-                                onBack = { screen = Screen.SCAN_HOME },
-                                onNavigateVerify = { screen = Screen.VERIFY_DOCUMENT },
+                                onBack = { goBack() },
+                                onNavigateVerify = { navigate(Screen.VERIFY_DOCUMENT) },
                                 onNavigateDocuments = { /* no-op — documents screen not implemented */ }
                             )
                             Screen.VERIFY_DOCUMENT -> VerifyDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
-                                onBack = { screen = Screen.SCAN_HOME },
-                                onNavigateSeal = { screen = Screen.SEAL_DOCUMENT },
+                                onBack = { goBack() },
+                                onNavigateSeal = { navigate(Screen.SEAL_DOCUMENT) },
                                 onNavigateDocuments = { }
                             )
                             Screen.SCAN_SEAL -> ScanSealScreen(
                                 state = state,
                                 viewModel = viewModel,
-                                onBack = { screen = Screen.SCAN_HOME },
-                                onResult = { screen = Screen.SCAN_SEAL_RESULT }
+                                onBack = { goBack() },
+                                onResult = { navigate(Screen.SCAN_SEAL_RESULT) }
                             )
                             Screen.SCAN_SEAL_RESULT -> ScanSealResultScreen(
                                 state = state,
-                                onBack = { screen = Screen.SCAN_HOME },
+                                onBack = { goBack() },
                                 onScanAgain = {
                                     viewModel.clearScanSeal()
-                                    screen = Screen.SCAN_SEAL
+                                    navigate(Screen.SCAN_SEAL)
                                 }
                             )
                             Screen.CONSTITUTION -> ConstitutionScreen()
@@ -303,18 +326,18 @@ fun VerumApp(
                         shareWebsiteSealEnabled = state.websiteSealedFile != null,
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
-                        onVerifyScreen = { showMenu = false; screen = Screen.VERIFY_DOCUMENT },
-                        onScanSeal = { showMenu = false; screen = Screen.SCAN_SEAL },
+                        onVerifyScreen = { showMenu = false; navigate(Screen.VERIFY_DOCUMENT) },
+                        onScanSeal = { showMenu = false; navigate(Screen.SCAN_SEAL) },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
-                        onDraftEmail = { showMenu = false; screen = Screen.EMAIL },
-                        onTax = { showMenu = false; screen = Screen.TAX },
+                        onDraftEmail = { showMenu = false; navigate(Screen.EMAIL) },
+                        onTax = { showMenu = false; navigate(Screen.TAX) },
                         onReport = {
                             showMenu = false
-                            if (state.report != null) screen = Screen.REPORT
+                            if (state.report != null) navigate(Screen.REPORT)
                             else viewModel.postEngine("No sealed report yet. Start a forensic scan first.")
                         },
-                        onVault = { showMenu = false; screen = Screen.VAULT },
-                        onReadConstitution = { showMenu = false; screen = Screen.CONSTITUTION }
+                        onVault = { showMenu = false; navigate(Screen.VAULT) },
+                        onReadConstitution = { showMenu = false; navigate(Screen.CONSTITUTION) }
                     )
                 }
             }
@@ -325,9 +348,9 @@ fun VerumApp(
                     onClearCase = {
                         viewModel.clearCase()
                         viewModel.clearGuardianBlock()
-                        screen = Screen.SCAN_HOME
+                        resetToHome()
                     },
-                    onReadConstitution = { screen = Screen.CONSTITUTION }
+                    onReadConstitution = { navigate(Screen.CONSTITUTION) }
                 )
             }
         }

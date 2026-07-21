@@ -1,33 +1,35 @@
 package com.verumomnis.forensic.engine.contradiction
 
 /**
- * Triple Verifier & Report Generator — v5.3.1c.
- * Triple-AI consensus + actor profiling + multi-format report output.
+ * Verifier & Report Generator — v5.3.1c.
+ * Deterministic engine self-check + actor profiling + multi-format report output.
+ *
+ * Doctrine: indicators, not determinations. No external AI model runs in this
+ * pipeline, so nothing here may claim a "triple-AI consensus" or name models
+ * that did not run.
  */
 object TripleVerifier {
 
     /**
-     * Triple-AI Verification: Thesis (Gemma 3) + Antithesis (Phi-3) + Synthesis (9-Brain).
-     * All three must concur for a finding to be confirmed.
-     * In deterministic mode, all three always concur (evidence is self-verifying).
+     * Deterministic engine self-check. Every contradiction is produced by the
+     * same deterministic detectors, so the engine is self-consistent by
+     * construction; the summary instead records the review recommendation
+     * derived from the highest severity present.
      */
-    fun verifyTriple(contradictions: List<EngineContradiction>): EngineTripleVerification {
+    fun verifyTriple(contradictions: List<EngineContradiction>): EngineVerificationSummary {
         val hasVeryHigh = contradictions.any { it.severity == EngineSeverity.VERY_HIGH }
         val hasHigh = contradictions.any { it.severity == EngineSeverity.HIGH }
 
         return when {
-            hasVeryHigh -> EngineTripleVerification(
-                gemma3Status = "CONCURS", phi3Status = "CONCURS",
-                nineBrainStatus = "CONCURS", quorumMet = true, discrepancies = emptyList()
+            hasVeryHigh -> EngineVerificationSummary(
+                reviewStatus = "CONFIRMED", quorumMet = true, discrepancies = emptyList()
             )
-            hasHigh -> EngineTripleVerification(
-                gemma3Status = "CONCURS", phi3Status = "CONCURS",
-                nineBrainStatus = "CONCURS", quorumMet = true,
+            hasHigh -> EngineVerificationSummary(
+                reviewStatus = "CONFIRMED", quorumMet = true,
                 discrepancies = listOf("No VERY_HIGH findings — confidence capped at HIGH pending review")
             )
-            else -> EngineTripleVerification(
-                gemma3Status = "CONCURS", phi3Status = "CONCURS",
-                nineBrainStatus = "PENDING", quorumMet = false,
+            else -> EngineVerificationSummary(
+                reviewStatus = "REVIEW_REQUIRED", quorumMet = false,
                 discrepancies = listOf("Only MODERATE/LOW findings — human review required")
             )
         }
@@ -51,13 +53,13 @@ object TripleVerifier {
         return data.map { (name, d) ->
             ActorProfile(
                 name = name,
-                dishonestyScore = (d.contradictions.size * 15 + d.flags.size * 5).coerceAtMost(100),
+                severityIndicator = (d.contradictions.size * 15 + d.flags.size * 5).coerceAtMost(100),
                 flags = d.flags.toList(),
                 contradictions = d.contradictions,
                 statementsMade = d.claims,
                 statementsDenied = d.denials
             )
-        }.sortedByDescending { it.dishonestyScore }
+        }.sortedByDescending { it.severityIndicator }
     }
 
     private class MutableActorData {
@@ -81,7 +83,7 @@ object TripleVerifier {
         appendLine("Case: ${report.caseId}")
         appendLine("Corpus SHA-512: ${report.corpusHash}")
         appendLine("Contradictions Found: ${report.contradictions.size}")
-        appendLine("Triple Verification: ${if (report.tripleVerification.quorumMet) "QUORUM MET" else "PENDING REVIEW"}")
+        appendLine("Engine verification: ${if (report.verification.quorumMet) "CONFIRMED" else "REVIEW REQUIRED"}")
         appendLine("Engine: v5.3.1c | Constitution: v6.0 Final")
         appendLine()
 
@@ -109,7 +111,7 @@ object TripleVerifier {
             appendLine("-".repeat(70))
             for (p in report.actorProfiles) {
                 appendLine()
-                appendLine("${p.name} (Dishonesty Score: ${p.dishonestyScore}/100)")
+                appendLine("${p.name} (severity indicator, heuristic: ${p.severityIndicator}/100)")
                 appendLine("  Statements: ${p.statementsMade} made, ${p.statementsDenied} denied")
                 appendLine("  Contradictions: ${p.contradictions.size}")
                 appendLine("  Flags: ${p.flags.joinToString(", ").ifEmpty { "none" }}")
@@ -117,14 +119,12 @@ object TripleVerifier {
         }
 
         appendLine().appendLine("-".repeat(70))
-        appendLine("TRIPLE VERIFICATION")
+        appendLine("ENGINE VERIFICATION (deterministic self-check)")
         appendLine("-".repeat(70))
-        appendLine("Gemma 3 (Thesis):      ${report.tripleVerification.gemma3Status}")
-        appendLine("Phi-3 (Antithesis):    ${report.tripleVerification.phi3Status}")
-        appendLine("9-Brain (Synthesis):   ${report.tripleVerification.nineBrainStatus}")
-        appendLine("Quorum:                ${if (report.tripleVerification.quorumMet) "MET" else "NOT MET"}")
-        if (report.tripleVerification.discrepancies.isNotEmpty()) {
-            appendLine("Discrepancies: ${report.tripleVerification.discrepancies.joinToString("; ")}")
+        appendLine("Engine status:         ${report.verification.engineStatus}")
+        appendLine("Review recommendation: ${report.verification.reviewStatus}")
+        if (report.verification.discrepancies.isNotEmpty()) {
+            appendLine("Notes: ${report.verification.discrepancies.joinToString("; ")}")
         }
 
         appendLine().appendLine("=".repeat(70))
@@ -144,7 +144,7 @@ object TripleVerifier {
         appendLine()
         appendLine("- **Corpus SHA-512:** `${report.corpusHash}`")
         appendLine("- **Contradictions:** ${report.contradictions.size}")
-        appendLine("- **Verification:** ${if (report.tripleVerification.quorumMet) "✅ Quorum Met" else "⚠️ Pending Review"}")
+        appendLine("- **Engine verification:** ${if (report.verification.quorumMet) "Confirmed" else "Review required"}")
         appendLine("- **Engine:** v5.3.1c | Constitution: v6.0 Final")
         appendLine()
 
@@ -164,7 +164,7 @@ object TripleVerifier {
         appendLine().appendLine("## Actor Profiles")
         for (p in report.actorProfiles) {
             appendLine()
-            appendLine("### ${p.name} — Score: ${p.dishonestyScore}/100")
+            appendLine("### ${p.name} — severity indicator (heuristic): ${p.severityIndicator}/100")
             appendLine("- Statements: ${p.statementsMade} made, ${p.statementsDenied} denied")
             appendLine("- Contradictions: ${p.contradictions.size}")
             appendLine("- Flags: ${p.flags.joinToString(", ").ifEmpty { "none" }}")

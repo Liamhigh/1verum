@@ -88,11 +88,11 @@ fun VaultScreen(state: UiState, onVerify: () -> Unit = {}) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         VoCard(title = "EVIDENCE VAULT", icon = Icons.Filled.Lock) {
-            InfoRow("Documents", state.files.count { !it.isMedia }.toString())
+            InfoRow("Evidence files", state.files.size.toString())
             InfoRow("Media files", state.files.count { it.isMedia }.toString())
-            InfoRow("Sealed report", if (state.report != null) "1" else "0")
-            InfoRow("Encrypted chat", state.chatSessionPath.substringAfterLast('/'))
-            InfoRow("Integrity manifest", "manifest.txt")
+            InfoRow("Sealed reports", if (state.report != null) "1" else "0")
+            InfoRow("Sealed emails", state.emails.size.toString())
+            InfoRow("Findings sealed", if (state.scanResult != null) "yes" else "no")
         }
 
         VoCard(title = "VAULT FILES", icon = Icons.Filled.Folder) {
@@ -120,16 +120,18 @@ fun VaultScreen(state: UiState, onVerify: () -> Unit = {}) {
             }
         }
 
-        state.scanResult?.seal?.let { seal ->
+        if (state.report != null || state.scanResult != null || state.emails.isNotEmpty()) {
             VoCard(title = "SEAL LEDGER", icon = Icons.Filled.Verified) {
-                LedgerEntry("Report", seal.sealFooter()) { openNewestSealedReport(context) }
+                state.report?.seal?.let { seal ->
+                    LedgerEntry("Report", seal.sealFooter()) { openNewestSealedReport(context) }
+                }
+                state.scanResult?.seal?.let { seal ->
+                    LedgerEntry("Evidence", seal.sealFooter(), onVerify)
+                }
                 state.emails.forEach { email ->
-                    LedgerEntry("Email → ${email.draft.recipient}", email.seal.shortcode) {
+                    LedgerEntry("Email → ${email.draft.recipient}", email.seal.sealFooter()) {
                         openSealedEmail(context, email.sealedPdfFile, onVerify)
                     }
-                }
-                state.files.lastOrNull()?.let { f ->
-                    LedgerEntry("Evidence", f.sha512.take(16) + "…", onVerify)
                 }
             }
         }

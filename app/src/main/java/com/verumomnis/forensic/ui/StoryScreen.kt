@@ -95,7 +95,7 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
                 lineHeight = 27.sp
             )
             Spacer(Modifier.height(8.dp))
-            Text("— Verum Omnis · Constitution v5.2.7", color = VoGold, fontSize = 11.sp, letterSpacing = 1.sp)
+            Text("— Verum Omnis · Constitution v6.0 FINAL", color = VoGold, fontSize = 11.sp, letterSpacing = 1.sp)
         }
 
         Spacer(Modifier.height(30.dp))

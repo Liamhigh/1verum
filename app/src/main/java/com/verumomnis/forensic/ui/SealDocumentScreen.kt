@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -45,10 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -116,38 +112,24 @@ fun SealDocumentScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("VERUM", fontFamily = Cormorant, fontWeight = FontWeight.Bold, color = VoGold, fontSize = 20.sp)
-                        Text(" OMNIS", fontFamily = Cormorant, fontWeight = FontWeight.Light, color = VoTextPrimary, fontSize = 20.sp)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold) }
-                },
-                actions = {
-                    Row(modifier = Modifier.padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        NavLink("Seal Document", selected = true, onClick = {})
-                        NavLink("Verify", selected = false, onClick = onNavigateVerify)
-                        NavLink("Documents", selected = false, onClick = onNavigateDocuments)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = VoBackground.copy(alpha = 0.9f), titleContentColor = VoTextPrimary)
-            )
-        },
-        containerColor = VoBackground
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                NavLink("Seal Document", selected = true, onClick = {})
+                Spacer(Modifier.width(24.dp))
+                NavLink("Verify", selected = false, onClick = onNavigateVerify)
+                Spacer(Modifier.width(24.dp))
+                NavLink("Documents", selected = false, onClick = onNavigateDocuments)
+            }
+            Spacer(Modifier.height(8.dp))
             HeaderSection()
             Spacer(Modifier.height(24.dp))
             UploadZone(
@@ -193,7 +175,6 @@ fun SealDocumentScreen(
             InfoSection()
             Spacer(Modifier.height(32.dp))
             Footer()
-        }
     }
 }
 
@@ -717,7 +698,7 @@ private fun InfoSection() {
         ) {
             InfoItem("📄 A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
             InfoItem("📱 Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
-            InfoItem("🔒 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
+            InfoItem("🔐 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
             InfoItem("⛓️ Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
             InfoItem("👤 Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
             InfoItem("📍 GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))

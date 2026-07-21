@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -28,13 +27,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -61,9 +55,9 @@ import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
-import com.verumomnis.forensic.ui.theme.VoGoldSoft
 import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoRed
+import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoSurfaceAlt
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
@@ -94,38 +88,24 @@ fun VerifyDocumentScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("VERUM", fontFamily = Cormorant, fontWeight = FontWeight.Bold, color = VoGold, fontSize = 20.sp)
-                        Text(" OMNIS", fontFamily = Cormorant, fontWeight = FontWeight.Light, color = VoTextPrimary, fontSize = 20.sp)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold) }
-                },
-                actions = {
-                    Row(modifier = Modifier.padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        NavLinkVerify("Seal Document", selected = false, onClick = onNavigateSeal)
-                        NavLinkVerify("Verify", selected = true, onClick = {})
-                        NavLinkVerify("Documents", selected = false, onClick = onNavigateDocuments)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = VoBackground.copy(alpha = 0.9f), titleContentColor = VoTextPrimary)
-            )
-        },
-        containerColor = VoBackground
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                NavLinkVerify("Seal Document", selected = false, onClick = onNavigateSeal)
+                Spacer(Modifier.width(24.dp))
+                NavLinkVerify("Verify", selected = true, onClick = {})
+                Spacer(Modifier.width(24.dp))
+                NavLinkVerify("Documents", selected = false, onClick = onNavigateDocuments)
+            }
+            Spacer(Modifier.height(8.dp))
             VerifyHeader()
             Spacer(Modifier.height(24.dp))
             VerifyCard(title = "Method 1: Paste SHA-512 Hash") {
@@ -187,7 +167,6 @@ fun VerifyDocumentScreen(
             BlockchainNote()
             Spacer(Modifier.height(24.dp))
             VerifyFooter()
-        }
     }
 }
 
@@ -246,9 +225,9 @@ private fun VerifyCard(title: String, content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(VoSurfaceAlt.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-            .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-            .padding(20.dp)
+            .background(VoSurface, RoundedCornerShape(12.dp))
+            .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
+            .padding(16.dp)
     ) {
         Text(title, fontFamily = Cormorant, fontSize = 20.sp, color = VoGold)
         Spacer(Modifier.height(12.dp))
@@ -285,19 +264,13 @@ private fun GoldButton(label: String, enabled: Boolean, busy: Boolean, onClick: 
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp),
-        shape = RoundedCornerShape(10.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, disabledContainerColor = VoGold.copy(alpha = 0.4f)),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground, disabledContainerColor = VoGold.copy(alpha = 0.4f), disabledContentColor = VoBackground.copy(alpha = 0.7f))
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(VoGold, VoGoldSoft.copy(alpha = 0.85f)))),
-            contentAlignment = Alignment.Center
-        ) {
-            if (busy) {
-                CircularProgressIndicator(color = VoBackground, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            } else {
-                Text(label.uppercase(), color = VoBackground, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 1.sp)
-            }
+        if (busy) {
+            CircularProgressIndicator(color = VoBackground, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        } else {
+            Text(label.uppercase(), color = VoBackground, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 1.sp)
         }
     }
 }

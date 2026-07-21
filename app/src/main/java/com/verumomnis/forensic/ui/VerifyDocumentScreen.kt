@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.seal.SealVerifier
 import com.verumomnis.forensic.ui.theme.Cormorant
+import com.verumomnis.forensic.ui.theme.CormorantDisplay
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.SourceSans
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
@@ -200,9 +199,7 @@ private fun VerifyHeader() {
         Spacer(Modifier.height(12.dp))
         Text(
             "Verify Document Seal",
-            fontFamily = Cormorant,
-            fontWeight = FontWeight.Light,
-            fontSize = 30.sp,
+            style = CormorantDisplay.copy(fontSize = 30.sp),
             color = VoTextPrimary
         )
         Spacer(Modifier.height(8.dp))
@@ -273,39 +270,63 @@ private fun GoldButton(label: String, enabled: Boolean, busy: Boolean, onClick: 
     }
 }
 
+/** Plain-language verdict strings, identical to verumglobal.foundation/verify. */
+private fun verdictLabel(verdict: SealVerifier.Verdict): String = when (verdict) {
+    SealVerifier.Verdict.VERIFIED -> "Seal Verified — Genuine"
+    SealVerifier.Verdict.SEAL_FOUND -> "Seal Found — Legacy Format"
+    SealVerifier.Verdict.NO_SEAL -> "No Seal Found"
+    SealVerifier.Verdict.TAMPERED -> "TAMPERED — DO NOT ACCEPT"
+}
+
+private fun verdictColor(verdict: SealVerifier.Verdict): androidx.compose.ui.graphics.Color = when (verdict) {
+    SealVerifier.Verdict.VERIFIED -> VoGreen
+    SealVerifier.Verdict.SEAL_FOUND -> VoGold
+    SealVerifier.Verdict.NO_SEAL -> VoTextMuted
+    SealVerifier.Verdict.TAMPERED -> VoRed
+}
+
 @Composable
 private fun ResultBox(result: VerifyResult) {
-    val (background, border, textColor) = when (result.verdict) {
-        SealVerifier.Verdict.VERIFIED -> Triple(VoGreen.copy(alpha = 0.08f), VoGreen.copy(alpha = 0.25f), VoGreen)
-        SealVerifier.Verdict.TAMPERED -> Triple(VoRed.copy(alpha = 0.08f), VoRed.copy(alpha = 0.25f), VoRed)
-        SealVerifier.Verdict.SEAL_FOUND -> Triple(VoAccentBlue.copy(alpha = 0.08f), VoAccentBlue.copy(alpha = 0.25f), VoAccentBlue)
-        SealVerifier.Verdict.NO_SEAL -> Triple(VoGold.copy(alpha = 0.08f), VoGold.copy(alpha = 0.25f), VoGold)
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(background, RoundedCornerShape(12.dp))
-            .border(1.dp, border, RoundedCornerShape(12.dp))
-            .padding(16.dp)
-    ) {
-        Text(result.verdict.name, fontFamily = JetBrainsMono, fontSize = 12.sp, color = textColor, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        Text(result.reason, fontSize = 14.sp, color = textColor, lineHeight = 22.sp)
+    val bannerColor = verdictColor(result.verdict)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Full-width colored banner with a Cormorant headline — the verdict is
+        // readable at arm's length, exactly like the website.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(bannerColor, RoundedCornerShape(12.dp))
+                .padding(vertical = 18.dp, horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                verdictLabel(result.verdict),
+                fontFamily = Cormorant,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 24.sp,
+                color = VoBackground,
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(result.reason, fontSize = 14.sp, color = VoTextPrimary, lineHeight = 22.sp)
         result.seal?.let { seal ->
-            Spacer(Modifier.height(8.dp))
-            Box(
+            Spacer(Modifier.height(12.dp))
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(VoBackground.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .border(1.dp, VoBorder, RoundedCornerShape(8.dp))
                     .padding(12.dp)
             ) {
-                Column {
-                    Text("Seal ID: ${seal.sealId}", fontFamily = JetBrainsMono, fontSize = 12.sp, color = VoTextPrimary)
-                    Text("SHA-512: ${seal.sha512.take(24)}…", fontFamily = JetBrainsMono, fontSize = 12.sp, color = VoTextPrimary)
-                    if (seal.chain.isNotEmpty()) {
-                        Text("Chain: ${seal.chain.joinToString(", ")}", fontFamily = JetBrainsMono, fontSize = 12.sp, color = VoTextPrimary)
-                    }
+                Text("SEAL ID", fontFamily = JetBrainsMono, fontSize = 10.sp, color = VoTextMuted, letterSpacing = 1.sp)
+                Text(seal.sealId, fontFamily = JetBrainsMono, fontSize = 12.sp, color = VoTextPrimary)
+                if (seal.chain.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("CHAIN", fontFamily = JetBrainsMono, fontSize = 10.sp, color = VoTextMuted, letterSpacing = 1.sp)
+                    Text(seal.chain.joinToString(", "), fontFamily = JetBrainsMono, fontSize = 12.sp, color = VoTextPrimary)
                 }
+                Spacer(Modifier.height(6.dp))
+                HashDetailsExpander(label = "SHA-512", hash = seal.sha512)
             }
         }
     }
@@ -320,7 +341,7 @@ private fun BlockchainNote() {
             .border(1.dp, VoGold.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text("⏱️ Bitcoin Blockchain Timing", fontWeight = FontWeight.Bold, color = VoGold, fontSize = 14.sp)
+        Text("Bitcoin Blockchain Timing", fontWeight = FontWeight.Bold, color = VoGold, fontSize = 14.sp)
         Spacer(Modifier.height(6.dp))
         Text(
             "OpenTimestamps anchors the SHA-256 hash into a Bitcoin transaction. This process is not instant — it typically takes 1 to 2 hours for the timestamp to be confirmed on the blockchain. During this time, the seal is still valid (the SHA-512 fingerprint proves document integrity), but the blockchain timestamp is pending. You can download the .OTS proof file and verify it independently at opentimestamps.org once confirmation is complete.",

@@ -8,6 +8,8 @@ import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
 import com.verumomnis.forensic.model.SealRecord
 import com.verumomnis.forensic.vault.EvidenceVault
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 /** Result of a complete forensic scan: findings plus the seal over the evidence set. */
@@ -22,6 +24,8 @@ data class ScanResult(
  * Pure Kotlin so it is fully unit-testable off-device.
  */
 object ForensicService {
+
+    private val sealJson = Json { encodeDefaults = true }
 
     fun ingest(
         evidenceId: String,
@@ -86,9 +90,11 @@ object ForensicService {
         scan(documents, audio, emptyList(), now)
 
     /**
-     * Run the full forensic pipeline. When [vault] and [caseName] are supplied,
-     * the engine also emits a findings.json artefact into the vault under the
-     * findings directory, following the G3 Hybrid Report Pipeline contract.
+     * Run the full forensic pipeline. When [vault] is supplied, the engine also
+     * persists the raw evidence documents (evidence/raw + integrity manifest
+     * entries) and the seal record (seals/) into the vault; when [caseName] is
+     * supplied it additionally emits a findings.json artefact under findings/,
+     * following the G3 Hybrid Report Pipeline contract.
      */
     fun scan(
         documents: List<EvidenceDocument>,
@@ -111,10 +117,22 @@ object ForensicService {
             documentReference = reference,
             nowInstant = now
         )
-        vault?.takeIf { caseName.isNotBlank() }?.let {
-            val fileName = FindingsJsonEmitter.findingsFileName(caseName, now)
-            val findingsJson = FindingsJsonEmitter.emit(councilFindings, caseName, now)
-            it.storeFinding(fileName, findingsJson)
+        vault?.let { v ->
+            // Persist the raw evidence corpus so evidence/raw and the integrity
+            // manifest hold real artefacts for every scan (previously nothing was
+            // ever written, leaving the vault empty).
+            documents.forEach { doc ->
+                runCatching {
+                    v.storeEvidence("${doc.evidenceId}_${doc.fileName}", doc.text.toByteArray(Charsets.UTF_8))
+                }
+            }
+            // Persist the seal record over the evidence corpus for later verification.
+            runCatching { v.storeSeal("seal_${seal.shortcode}.json", sealJson.encodeToString(seal)) }
+            if (caseName.isNotBlank()) {
+                val fileName = FindingsJsonEmitter.findingsFileName(caseName, now)
+                val findingsJson = FindingsJsonEmitter.emit(councilFindings, caseName, now)
+                v.storeFinding(fileName, findingsJson)
+            }
         }
         return ScanResult(councilFindings, seal)
     }

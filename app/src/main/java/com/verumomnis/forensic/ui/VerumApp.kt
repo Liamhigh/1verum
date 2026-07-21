@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,12 +55,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
@@ -205,11 +202,35 @@ fun VerumApp(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     topBar = {
                         VerumTopBar(
-                            state = state,
-                            screen = screen,
-                            onHome = { screen = Screen.SCAN_HOME },
-                            onVault = { screen = Screen.VAULT },
-                            onReport = { screen = Screen.REPORT }
+                            title = when (screen) {
+                                Screen.SCAN_HOME -> "New Forensic Scan"
+                                Screen.CHAT -> "Case Chat"
+                                Screen.REPORT -> "Forensic Report"
+                                Screen.EMAIL -> "Sealed Email"
+                                Screen.TAX -> "Tax Return"
+                                Screen.VAULT -> "Evidence Vault"
+                                Screen.SEAL_DOCUMENT -> "Seal Document"
+                                Screen.VERIFY_DOCUMENT -> "Verify Document"
+                                Screen.SCAN_SEAL -> "Scan Seal QR"
+                                Screen.SCAN_SEAL_RESULT -> "Seal Verification"
+                                Screen.CONSTITUTION -> "Constitution"
+                                Screen.STORY -> ""
+                            },
+                            onBack = if (screen == Screen.SCAN_HOME) null else ({ screen = Screen.SCAN_HOME }),
+                            trailing = {
+                                if (screen == Screen.CHAT) {
+                                    Text(
+                                        "${state.deviceTier.label}·${state.deviceRamGb}GB",
+                                        color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    IconButton(
+                                        onClick = { screen = Screen.REPORT },
+                                        enabled = state.report != null
+                                    ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
+                                }
+                                IconButton(onClick = { screen = Screen.VAULT }) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
+                            }
                         )
                     }
                 ) { padding ->
@@ -311,63 +332,6 @@ fun VerumApp(
                     onReadConstitution = { screen = Screen.CONSTITUTION }
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun VerumTopBar(
-    state: UiState,
-    screen: Screen,
-    onHome: () -> Unit,
-    onVault: () -> Unit,
-    onReport: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        if (screen == Screen.CHAT) {
-            Image(
-                painter = painterResource(R.drawable.vo_banner),
-                contentDescription = "Verum Omnis",
-                modifier = Modifier.height(38.dp).clip(RoundedCornerShape(8.dp))
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${state.deviceTier.label}·${state.deviceRamGb}GB",
-                    color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp
-                )
-                Spacer(Modifier.width(6.dp))
-                IconButton(
-                    onClick = onReport,
-                    enabled = state.report != null
-                ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
-                IconButton(onClick = onVault) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onHome) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold) }
-                Spacer(Modifier.width(4.dp))
-                    Text(
-                    when (screen) {
-                        Screen.SCAN_HOME -> "New Forensic Scan"
-                        Screen.REPORT -> "Forensic Report"
-                        Screen.EMAIL -> "Sealed Email"
-                        Screen.TAX -> "Tax Return"
-                        Screen.VAULT -> "Evidence Vault"
-                        Screen.SEAL_DOCUMENT -> "Seal Document"
-                        Screen.VERIFY_DOCUMENT -> "Verify Document"
-                        Screen.SCAN_SEAL -> "Scan Seal QR"
-                        Screen.SCAN_SEAL_RESULT -> "Seal Verification"
-                        Screen.CONSTITUTION -> "Constitution"
-                        else -> ""
-                    },
-                    color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp
-                )
-            }
-            IconButton(onClick = onVault) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
         }
     }
 }

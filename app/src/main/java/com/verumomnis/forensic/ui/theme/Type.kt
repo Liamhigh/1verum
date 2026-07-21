@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.R
 
@@ -31,19 +32,30 @@ val JetBrainsMono = FontFamily(
     Font(R.font.jetbrains_mono, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500)))
 )
 
+/**
+ * Cormorant Light display style for big headlines (verdicts, hero titles),
+ * tracking tightened to -0.03em per the verumglobal.foundation design lock.
+ */
+val CormorantDisplay = TextStyle(
+    fontFamily = Cormorant,
+    fontWeight = FontWeight.Light,
+    letterSpacing = (-0.03).em
+)
+
 val VerumTypography = Typography().let { base ->
     base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
-        displayMedium = base.displayMedium.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
-        displaySmall = base.displaySmall.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
+        displayLarge = base.displayLarge.copy(fontFamily = Cormorant, fontWeight = FontWeight.Light, letterSpacing = (-0.03).em),
+        displayMedium = base.displayMedium.copy(fontFamily = Cormorant, fontWeight = FontWeight.Light, letterSpacing = (-0.03).em),
+        displaySmall = base.displaySmall.copy(fontFamily = Cormorant, fontWeight = FontWeight.Light, letterSpacing = (-0.03).em),
         headlineLarge = base.headlineLarge.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
         headlineMedium = base.headlineMedium.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
         headlineSmall = base.headlineSmall.copy(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold),
         titleLarge = TextStyle(fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 22.sp),
         titleMedium = base.titleMedium.copy(fontFamily = SourceSans, fontWeight = FontWeight.SemiBold),
         titleSmall = base.titleSmall.copy(fontFamily = SourceSans, fontWeight = FontWeight.SemiBold),
-        bodyLarge = base.bodyLarge.copy(fontFamily = SourceSans),
-        bodyMedium = base.bodyMedium.copy(fontFamily = SourceSans),
+        // 1.6 line-height on body copy for readability (website rhythm).
+        bodyLarge = base.bodyLarge.copy(fontFamily = SourceSans, lineHeight = 1.6.em),
+        bodyMedium = base.bodyMedium.copy(fontFamily = SourceSans, lineHeight = 1.6.em),
         bodySmall = base.bodySmall.copy(fontFamily = SourceSans),
         labelLarge = base.labelLarge.copy(fontFamily = SourceSans, fontWeight = FontWeight.SemiBold),
         labelMedium = base.labelMedium.copy(fontFamily = SourceSans),

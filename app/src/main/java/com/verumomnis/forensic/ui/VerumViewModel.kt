@@ -2,7 +2,9 @@ package com.verumomnis.forensic.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -160,7 +162,7 @@ data class UiState(
     val chat: List<ChatMessage> = emptyList(),
     val report: ForensicReport? = null,
     val emails: List<SealedEmail> = emptyList(),
-    val emailStatus: String = "Draft a sealed forensic email. Every draft is delivered as a sealed PDF and logged.",
+    val emailStatus: String = "Draft a sealed forensic email. The sealed PDF is generated into the vault and handed to your mail app — you choose the recipient and press send yourself.",
     val otsResult: OtsAnchorResult? = null,
     val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
     val anchoring: Boolean = false,
@@ -271,6 +273,11 @@ class VerumViewModel(
         _state.update { it.copy(trustScore = score) }
     }
 
+    companion object {
+        /** Retired hard-coded recipient — must never be used as a default again. */
+        private const val LEGACY_DEFAULT_RECIPIENT = "admin@verumglobal.foundation"
+    }
+
     init {
         initializeIdentity()
         configureDevice(6)
@@ -280,11 +287,12 @@ class VerumViewModel(
                 chat = listOf(
                     ChatMessage(
                         author = "Verum Omnis",
-                        text = "Truth for All. I am ${s.communicator}, the Verum Omnis communicator (Constitution v${Constitution.VERSION}).\n\n" +
-                            "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
+                        text = "Truth for All. I am the Verum Omnis on-device constitutional assistant " +
+                            "(Constitution v${Constitution.VERSION}). My answers are deterministic: they come from the sealed " +
+                            "case file on this device, not from a cloud AI or a named language model.\n\n" +
                             "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
                             "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
-                            "timeline and legal strategy. Nothing leaves here unsealed.",
+                            "timeline and legal framework. Nothing leaves here unsealed.",
                         fromUser = false
                     )
                 )
@@ -297,7 +305,7 @@ class VerumViewModel(
     }
 
     private fun postAi(text: String) {
-        _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, text, fromUser = false)) }
+        _state.update { it.copy(chat = it.chat + ChatMessage("Verum Assistant", text, fromUser = false)) }
     }
 
     /** A document picked from the + menu goes to the engine (not the chat AI). */
@@ -1017,7 +1025,7 @@ class VerumViewModel(
             it.copy(
                 report = signedReport,
                 chat = it.chat + ChatMessage(
-                    author = "Report Writer (Gemma 3)",
+                    author = "Report Writer",
                     text = "Generated sealed report ${signedReport.reference} with ${signedReport.contradictions.size} " +
                         "anchored contradiction(s)." + (if (research != null) " External research from ${research.sourceUrls.size} sources included." else "") +
                         " Seal: ${signedReport.seal.extendedFooter()}",
@@ -1035,19 +1043,53 @@ class VerumViewModel(
         points: List<String> = emptyList(),
         now: Instant = Instant.now()
     ) {
-        if (recipient.isBlank()) {
-            _state.update { it.copy(emailStatus = "Recipient required.") }
+        // Never default to a hard-coded internal address — the user chooses the recipient.
+        if (recipient.isBlank() || recipient.equals(LEGACY_DEFAULT_RECIPIENT, ignoreCase = true)) {
+            _state.update { it.copy(emailStatus = "Enter a recipient email address first — Verum Omnis never picks one for you.") }
             return
         }
         val draft = EmailModule.draft(recipient, subject, points, _state.value.report?.reference)
         val sealed = EmailModule.sealAndSend(draft, harassmentMonitor, now)
         val verdict = sealed.assessment.verdict
         val status = when (verdict) {
-            HarassmentVerdict.ALLOW -> "Sent sealed PDF ${sealed.sealedPdfFile} to $recipient."
-            HarassmentVerdict.WARN -> "Sent with WARNING: ${sealed.assessment.reasons.joinToString("; ")}"
-            HarassmentVerdict.BLOCK -> "BLOCKED (not delivered): ${sealed.assessment.reasons.joinToString("; ")}. Sealed for audit."
+            HarassmentVerdict.ALLOW -> {
+                openEmailDraft(sealed)
+                "Draft ready — choose your mail app. Sealed PDF ${sealed.sealedPdfFile} attached for $recipient."
+            }
+            HarassmentVerdict.WARN -> {
+                openEmailDraft(sealed)
+                "Draft ready with WARNING (${sealed.assessment.reasons.joinToString("; ")}) — choose your mail app."
+            }
+            HarassmentVerdict.BLOCK -> "BLOCKED (not shared): ${sealed.assessment.reasons.joinToString("; ")}. Sealed for audit."
         }
         _state.update { it.copy(emails = it.emails + sealed, emailStatus = status) }
+    }
+
+    /**
+     * Render the sealed email PDF into the vault and hand it to the user's own
+     * mail app via ACTION_SEND with a FileProvider attachment. The app never
+     * sends mail itself, so no "sent" claim is ever made.
+     */
+    private fun openEmailDraft(sealed: com.verumomnis.forensic.model.SealedEmail) {
+        runCatching {
+            val context = getApplication<Application>()
+            val file = SealedPdfExporter(context).exportEmail(sealed)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(sealed.draft.recipient))
+                putExtra(Intent.EXTRA_SUBJECT, sealed.draft.subject)
+                putExtra(Intent.EXTRA_TEXT, sealed.draft.body)
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(
+                Intent.createChooser(intent, "Draft ready — choose your mail app")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { e ->
+            _state.update { it.copy(emailStatus = "Draft sealed but could not open a mail app: ${e.message}") }
+        }
     }
 
     fun verifyCurrentSeal(): VerificationResult? {
@@ -1129,7 +1171,7 @@ class VerumViewModel(
         }
         _state.update { it.copy(chat = it.chat + ChatMessage("You", text, fromUser = true)) }
         val reply = respond(text)
-        _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, reply, fromUser = false)) }
+        _state.update { it.copy(chat = it.chat + ChatMessage("Verum Assistant", reply, fromUser = false)) }
     }
 
     /**

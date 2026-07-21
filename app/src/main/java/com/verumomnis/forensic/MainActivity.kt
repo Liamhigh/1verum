@@ -40,6 +40,10 @@ class MainActivity : ComponentActivity() {
         ContradictionDetectors.downloadedRulesProvider = { ruleRegistry.currentRules() }
         RuleUpdateWorker.schedule(applicationContext)
 
+        // The story intro is shown on first run only.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val storySeen = prefs.getBoolean(KEY_STORY_SEEN, false)
+
         setContent {
             VerumOmnisTheme {
                 VerumApp(
@@ -47,7 +51,9 @@ class MainActivity : ComponentActivity() {
                     onCaptureLocation = ::captureLocation,
                     onExportReport = { report -> runCatching { pdfExporter.share(pdfExporter.exportReport(report)) } },
                     onExportEmail = { email -> runCatching { pdfExporter.share(pdfExporter.exportEmail(email)) } },
-                    onReadConstitution = ::openConstitution
+                    onReadConstitution = ::openConstitution,
+                    onStorySeen = { prefs.edit().putBoolean(KEY_STORY_SEEN, true).apply() },
+                    initialScreen = if (storySeen) "SCAN_HOME" else "STORY"
                 )
             }
         }
@@ -101,5 +107,10 @@ class MainActivity : ComponentActivity() {
             }
             startActivity(Intent.createChooser(intent, "Read Constitution").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+    }
+
+    companion object {
+        private const val PREFS_NAME = "verum_prefs"
+        private const val KEY_STORY_SEEN = "story_seen"
     }
 }

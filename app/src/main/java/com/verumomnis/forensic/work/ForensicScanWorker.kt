@@ -29,7 +29,7 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
         const val INPUT_EVIDENCE_COUNT = "evidence_count"
         const val PREFIX_FILENAME = "evidence_"
         const val SUFFIX_FILENAME = "_filename"
-        const val SUFFIX_TEXT = "_text"
+        const val SUFFIX_TEXT_FILE = "_text_file"
         const val SUFFIX_SHA512 = "_sha512"
         const val SUFFIX_TYPE = "_type"
 
@@ -53,7 +53,10 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
             repeat(count) { index ->
                 val base = "$PREFIX_FILENAME$index"
                 val fileName = inputData.getString(base + SUFFIX_FILENAME) ?: "evidence_$index.txt"
-                val text = inputData.getString(base + SUFFIX_TEXT) ?: ""
+                val textFilePath = inputData.getString(base + SUFFIX_TEXT_FILE) ?: ""
+                val text = if (textFilePath.isNotBlank()) {
+                    runCatching { java.io.File(textFilePath).readText() }.getOrDefault("")
+                } else ""
                 val sha512 = inputData.getString(base + SUFFIX_SHA512) ?: ""
                 val type = inputData.getString(base + SUFFIX_TYPE) ?: "document"
                 add(

@@ -47,6 +47,33 @@ class EvidenceVault(private val root: File) {
         return hash
     }
 
+    /** Persist a sealed report artefact (PDF) under reports/sealed. Returns its SHA-512. */
+    fun storeSealedReport(fileName: String, bytes: ByteArray): String {
+        initialize()
+        val target = File(reportsSealed, fileName)
+        target.writeBytes(bytes)
+        return Sha512.hash(bytes)
+    }
+
+    /** Persist a draft report artefact under reports/draft. Returns its SHA-512. */
+    fun storeDraftReport(fileName: String, bytes: ByteArray): String {
+        initialize()
+        val target = File(reportsDraft, fileName)
+        target.writeBytes(bytes)
+        return Sha512.hash(bytes)
+    }
+
+    /**
+     * Delete a single file inside the vault. Refuses any path that resolves
+     * outside the vault root; never deletes directories.
+     */
+    fun delete(file: File): Boolean {
+        val canonicalRoot = root.canonicalPath
+        val canonical = file.canonicalPath
+        if (canonical == canonicalRoot || !canonical.startsWith("$canonicalRoot/")) return false
+        return file.isFile && file.delete()
+    }
+
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)

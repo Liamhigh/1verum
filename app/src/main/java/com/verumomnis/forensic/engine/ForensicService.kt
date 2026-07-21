@@ -94,7 +94,7 @@ object ForensicService {
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
-        now: Instant = Instant.now(),
+        now: Instant,
         vault: EvidenceVault? = null,
         caseName: String = ""
     ): ScanResult {

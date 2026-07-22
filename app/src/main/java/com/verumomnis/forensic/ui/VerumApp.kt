@@ -265,7 +265,18 @@ fun VerumApp(
                                 onOpenVault = { navigate(Screen.VAULT) },
                                 onOpenReport = { navigate(Screen.REPORT) }
                             )
-                            Screen.CHAT -> ChatScreen(state, viewModel, onPlus = { showMenu = true })
+                            Screen.CHAT -> ModernChatScreen(
+                                onSendMessage = { message, isDeepResearch ->
+                                    if (isDeepResearch) {
+                                        viewModel.deepResearch()
+                                    } else {
+                                        viewModel.postEngine(message)
+                                    }
+                                },
+                                onRequestDeepResearch = { query ->
+                                    viewModel.deepResearch()
+                                }
+                            )
                             Screen.REPORT -> ReportScreen(
                                 state = state,
                                 viewModel = viewModel,

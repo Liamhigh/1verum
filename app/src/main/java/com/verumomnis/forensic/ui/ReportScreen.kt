@@ -19,18 +19,26 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
@@ -55,6 +63,106 @@ private fun TrustCard(state: UiState) {
                 )
             }
         } ?: Text("Trust score computed after sealing.", color = VoTextMuted, fontSize = 12.sp)
+    }
+}
+
+/**
+ * Human sign-off surface for the GHRP two-tier rule: lists every candidate
+ * Gemma 3 raised during vault review, with promote (candidate becomes a local
+ * engine rule, detected deterministically on the next scan) and reject
+ * (reason sealed with the record — never deleted).
+ */
+@Composable
+private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
+    var rejectTarget by remember { mutableStateOf<String?>(null) }
+    var rejectReason by remember { mutableStateOf("") }
+
+    VoCard(title = "G3 CANDIDATES — PENDING VERIFICATION", icon = Icons.Filled.Description) {
+        Text(
+            "Contradictions raised by Gemma 3 during vault review that the engine did not emit. " +
+                "They are anchored and hashed but are never engine-verified until promoted here " +
+                "(human sign-off) or re-detected by the engine. Promotion adds the proposition pair " +
+                "to the engine as a local rule, applied on the next scan.",
+            color = VoTextMuted,
+            fontSize = 10.sp
+        )
+        Spacer(Modifier.height(6.dp))
+        state.g3Candidates.forEach { c ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .background(VoSurfaceAlt, RoundedCornerShape(12.dp))
+                    .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    "${c.contradictionId} · ${c.severity} · ${c.type}",
+                    color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("A (${c.propositionAActor}): \"${c.propositionAText}\"", color = VoTextPrimary, fontSize = 12.sp)
+                Text("B (${c.propositionBActor}): \"${c.propositionBText}\"", color = VoTextPrimary, fontSize = 12.sp)
+                Text(c.conflictDescription, color = VoTextMuted, fontSize = 11.sp)
+                Text(
+                    "Source: ${c.sourceDocument} p${c.sourcePage} · SHA-512 ${c.sha512Anchor.take(12)}…",
+                    color = VoTextMuted, fontSize = 10.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                if (c.verificationStatus == FindingsJsonEmitter.STATUS_G3_CANDIDATE) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.promoteG3Candidate(c.contradictionId) },
+                            colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
+                        ) { Text("Promote", fontSize = 12.sp) }
+                        OutlinedButton(onClick = {
+                            rejectTarget = c.contradictionId
+                            rejectReason = ""
+                        }) { Text("Reject", fontSize = 12.sp) }
+                    }
+                } else {
+                    val statusColor =
+                        if (c.verificationStatus == FindingsJsonEmitter.STATUS_CANDIDATE_PROMOTED) VoGold else VoRed
+                    Text(c.verificationStatus, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    c.rejectionReason?.let {
+                        Text("Reason: $it", color = VoTextMuted, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    rejectTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { rejectTarget = null },
+            title = { Text("Reject $target") },
+            text = {
+                Column {
+                    Text(
+                        "A rejection reason is required — it is sealed with the record and never deleted.",
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = rejectReason,
+                        onValueChange = { rejectReason = it },
+                        label = { Text("Reason") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.rejectG3Candidate(target, rejectReason.trim())
+                        rejectTarget = null
+                    },
+                    enabled = rejectReason.isNotBlank()
+                ) { Text("Reject candidate") }
+            },
+            dismissButton = {
+                TextButton(onClick = { rejectTarget = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -84,6 +192,12 @@ fun ReportScreen(
                 Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
                 Text("New Scan")
             }
+        }
+
+        // Candidates surface as soon as a scan has run — they must never wait
+        // on (or be buried inside) the sealed report.
+        if (state.g3Candidates.isNotEmpty()) {
+            G3CandidateCard(state, viewModel)
         }
 
         val report = state.report

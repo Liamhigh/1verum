@@ -165,6 +165,8 @@ data class UiState(
     val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
     val anchoring: Boolean = false,
     val findingsJsonPath: String = "",
+    /** G3-raised candidates for the current case (GHRP two-tier rule). */
+    val g3Candidates: List<com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter.FindingsContradictionRecord> = emptyList(),
     val trustScore: TrustScore? = null,
     val identityStatus: String = "Identity not initialized.",
     val identityFingerprint: String = "",
@@ -385,6 +387,7 @@ class VerumViewModel(
                 "g3_promotion_${candidateId}_${now.toString().take(19).replace(":", "-")}.json",
                 "{\"action\":\"PROMOTED\",\"candidate_id\":\"$candidateId\",\"method\":\"human_signoff\",\"utc\":\"$now\"}"
             )
+            _state.update { it.copy(g3Candidates = registry.allRecords()) }
             postEngine(
                 "Candidate $candidateId PROMOTED — its proposition pair is now a local engine rule. " +
                     "The deterministic engine will detect it directly on the next scan."
@@ -404,6 +407,7 @@ class VerumViewModel(
                 "g3_rejection_${candidateId}_${now.toString().take(19).replace(":", "-")}.json",
                 "{\"action\":\"REJECTED\",\"candidate_id\":\"$candidateId\",\"reason\":${Json.encodeToString(reason)},\"utc\":\"$now\"}"
             )
+            _state.update { it.copy(g3Candidates = registry.allRecords()) }
             postEngine("Candidate $candidateId REJECTED — reason sealed with the record.")
         }.onFailure { postEngine("Cannot reject $candidateId: ${it.message}") }
     }
@@ -1010,6 +1014,7 @@ class VerumViewModel(
                 scanning = false,
                 scanResult = result,
                 findingsJsonPath = findingsJsonPath,
+                g3Candidates = result.g3Registry?.allRecords() ?: emptyList(),
                 jurisdiction = result.findings.jurisdiction,
                 files = s.files.map { it.copy(status = "scanned") },
                 scanLog = buildString {

@@ -118,7 +118,16 @@ data class SealedPdfContent(
         }
 
         fun fromReport(report: ForensicReport): SealedPdfContent {
-            val lines = report.body.lines().flatMap { wrap(it) }
+            // The narrative appendix travels with the exported PDF but is
+            // explicitly labelled unsealed: the seal covers report.body only.
+            val appendix = if (report.gemmaNarrative.isBlank()) emptyList() else buildList {
+                add("")
+                add("=".repeat(72))
+                add("APPENDIX — NARRATIVE ANALYSIS (GEMMA 3) — NOT PART OF THE SEALED BODY")
+                add("=".repeat(72))
+                addAll(report.gemmaNarrative.lines())
+            }
+            val lines = (report.body.lines() + appendix).flatMap { wrap(it) }
             val cover = Cover(
                 title = "FORENSIC EVIDENCE REPORT",
                 subtitle = report.title,

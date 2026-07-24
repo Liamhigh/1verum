@@ -10,10 +10,16 @@ import com.verumomnis.forensic.model.SealRecord
 import com.verumomnis.forensic.vault.EvidenceVault
 import java.time.Instant
 
-/** Result of a complete forensic scan: findings plus the seal over the evidence set. */
+/**
+ * Result of a complete forensic scan: findings plus the seal over the evidence
+ * set. [g3Registry] holds any candidates Gemma 3 raised during the post-scan
+ * vault review so they can later be promoted or rejected; it is null-safe to
+ * ignore when no runtime is installed (the registry is then simply empty).
+ */
 data class ScanResult(
     val findings: ForensicFindings,
-    val seal: SealRecord
+    val seal: SealRecord,
+    val g3Registry: com.verumomnis.forensic.engine.contradiction.G3CandidateRegistry? = null
 )
 
 /**
@@ -111,13 +117,36 @@ object ForensicService {
             documentReference = reference,
             nowInstant = now
         )
+        // G3 second pass: Gemma 3 reviews the sealed evidence for contradictions
+        // the deterministic engine missed. No-op when no runtime is installed.
+        val g3Review = G3ReviewPass.review(documents, councilFindings, now)
         vault?.takeIf { caseName.isNotBlank() }?.let {
             val fileName = FindingsJsonEmitter.findingsFileName(caseName, now)
-            val findingsJson = FindingsJsonEmitter.emit(councilFindings, caseName, now)
+            val findingsJson = FindingsJsonEmitter.emit(
+                councilFindings, caseName, now,
+                corpusSha512 = corpusHash,
+                extraRecords = g3Review.candidateRecords
+            )
             it.storeFinding(fileName, findingsJson)
+            val auditTrail = g3Review.registry.auditTrail()
+            if (auditTrail.isNotEmpty()) {
+                val auditJson = buildString {
+                    appendLine("[")
+                    auditTrail.forEachIndexed { i, entry ->
+                        append("  {\"action\":\"${entry.action}\",\"candidate_id\":\"${entry.candidateId}\",")
+                        append("\"detail\":${jsonString(entry.detail)},\"utc\":\"${entry.utc}\"}")
+                        appendLine(if (i < auditTrail.size - 1) "," else "")
+                    }
+                    append("]")
+                }
+                it.storeFinding("g3_audit_${FindingsJsonEmitter.findingsFileName(caseName, now).removeSuffix(".json")}.json", auditJson)
+            }
         }
-        return ScanResult(councilFindings, seal)
+        return ScanResult(councilFindings, seal, g3Review.registry)
     }
+
+    private fun jsonString(s: String): String =
+        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
     fun verify(bytes: ByteArray, seal: SealRecord): VerificationResult =
         EvidenceSealer.verify(bytes, seal)

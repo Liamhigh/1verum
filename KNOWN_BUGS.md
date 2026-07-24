@@ -61,8 +61,8 @@ No confirmed critical bugs at this time.
 - **Reproduction:** Try to load any GGUF model — `LlamaModel.load()` throws `UnsatisfiedLinkError`.
 - **Expected:** Models load successfully and respond to inference requests.
 - **Actual:** Native library not found.
-- **Blocked by:** CMake build configuration, NDK setup, JNI wrapper code.
-- **Notes:** Requires Android NDK 25.2+, CMake 3.22+. See `DEPENDENCIES.md`. The `ReportWriter` interface is in place so the rest of the app builds without the native bridge.
+- **Blocked by:** CMake build configuration, NDK setup, native (C++) side of the JNI wrapper.
+- **Notes:** Requires Android NDK 25.2+, CMake 3.22+. See `DEPENDENCIES.md`. The Kotlin side of the bridge now exists (`llm/LlamaCppGemma3Runtime.kt`: loads `libverum_llama.so`, discovers `files/models/gemma3-*.gguf`, declares `nativeLoadModel`/`nativeGenerate`), and the full hybrid pipeline is wired behind it — G3 vault review (`engine/G3ReviewPass.kt`), Gemma narrative report writing (`engine/ReportWriter.kt`), candidate promotion into local engine rules (`update/LocalRuleStore.kt`). Everything degrades to the deterministic pipeline until the native library and a model file are provisioned; only the C++ build remains.
 
 ### BUG-003: Sealed PDF Generation
 - **Severity:** HIGH

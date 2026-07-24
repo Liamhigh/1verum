@@ -10,11 +10,15 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModelProvider
 import com.verumomnis.forensic.core.DeadManSwitch
 import com.verumomnis.forensic.engine.contradiction.ContradictionDetectors
+import com.verumomnis.forensic.llm.Gemma3RuntimeProvider
+import com.verumomnis.forensic.llm.LlamaCppGemma3Runtime
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.ui.VerumApp
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
+import com.verumomnis.forensic.update.DownloadedRules
+import com.verumomnis.forensic.update.LocalRuleStore
 import com.verumomnis.forensic.update.RuleRegistry
 import com.verumomnis.forensic.update.RuleUpdateWorker
 import java.io.File
@@ -35,10 +39,20 @@ class MainActivity : ComponentActivity() {
         // contradiction engine (returns null -> engine unchanged when no package
         // has been downloaded) and schedule the daily update check. The worker
         // uses unique KEEP work, so calling this on every start is a no-op once
-        // scheduled.
+        // scheduled. Locally promoted G3 candidate rules are merged in through
+        // the same additive path, closing the Gemma-to-engine feedback loop.
         val ruleRegistry = RuleRegistry.getInstance(applicationContext)
-        ContradictionDetectors.downloadedRulesProvider = { ruleRegistry.currentRules() }
+        val localRuleStore = LocalRuleStore.getInstance(applicationContext)
+        ContradictionDetectors.downloadedRulesProvider = {
+            DownloadedRules.merged(ruleRegistry.currentRules(), localRuleStore.promotedRules())
+        }
         RuleUpdateWorker.schedule(applicationContext)
+
+        // Hybrid pipeline: install the llama.cpp-backed Gemma 3 runtime when a
+        // GGUF model is provisioned under files/models/. Without it the
+        // provider stays on the unavailable default and every consumer falls
+        // back to the deterministic pipeline.
+        LlamaCppGemma3Runtime.discover(filesDir)?.let { Gemma3RuntimeProvider.runtime = it }
 
         setContent {
             VerumOmnisTheme {

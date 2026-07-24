@@ -37,7 +37,11 @@ object FindingsJsonEmitter {
         val findings_json_version: String,
         val generated_utc: String,
         val source_bundle: String,
+        val case_id: String = "",
         val case_ids: List<String> = emptyList(),
+        val corpus_sha512: String = "",
+        val engine_verified_count: Int = 0,
+        val g3_candidate_count: Int = 0,
         val supplement_date: String? = null,
         val new_contradictions: Int? = null,
         val re_anchored_known: Int? = null,
@@ -74,20 +78,68 @@ object FindingsJsonEmitter {
         return "findings_${caseName}_${timestamp}.json"
     }
 
-    /** Serialize a full [ForensicFindings] object into the findings JSON contract. */
-    fun emit(findings: ForensicFindings, caseName: String, now: Instant): String {
-        val records = findings.contradictions.map { contradictionToRecord(it) }
+    /**
+     * Serialize a full [ForensicFindings] object into the findings JSON contract.
+     *
+     * [extraRecords] carries G3-raised candidates (already converted to this
+     * schema via [fromContractRecord]); the tier counts are recomputed so the
+     * document always states how many findings are engine-verified versus
+     * pending candidates.
+     */
+    fun emit(
+        findings: ForensicFindings,
+        caseName: String,
+        now: Instant,
+        corpusSha512: String = "",
+        extraRecords: List<FindingsJsonRecord> = emptyList()
+    ): String {
+        val records = findings.contradictions.map { contradictionToRecord(it) } + extraRecords
+        val candidateCount = records.count { it.verification_status == STATUS_G3_CANDIDATE }
         val document = FindingsJsonDocument(
             engine_version = ENGINE_VERSION,
             findings_json_version = FINDINGS_JSON_VERSION,
             generated_utc = now.toString(),
             source_bundle = caseName,
+            case_id = caseName,
             case_ids = listOf(caseName),
+            corpus_sha512 = corpusSha512,
+            engine_verified_count = records.size - candidateCount,
+            g3_candidate_count = candidateCount,
             integrity_findings = emptyList(),
             contradictions = records
         )
         return Json.encodeToString(document)
     }
+
+    /**
+     * Bridge from the GHRP contract record type produced by
+     * [com.verumomnis.forensic.engine.contradiction.G3CandidateRegistry] into
+     * this emitter's record type, so registry candidates merge into the
+     * production findings document. One schema in the vault, two producers.
+     */
+    fun fromContractRecord(
+        record: com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter.FindingsContradictionRecord
+    ): FindingsJsonRecord = FindingsJsonRecord(
+        contradiction_id = record.contradictionId,
+        type = record.type,
+        severity = record.severity,
+        confidence = record.confidence,
+        proposition_a_text = record.propositionAText,
+        proposition_a_actor = record.propositionAActor,
+        proposition_b_text = record.propositionBText,
+        proposition_b_actor = record.propositionBActor,
+        conflict_description = record.conflictDescription,
+        source_document = record.sourceDocument,
+        source_page = record.sourcePage,
+        source_line = record.sourceLine,
+        sha512_anchor = record.sha512Anchor,
+        extraction_method = record.extractionMethod,
+        temporal_analysis = null,
+        detected_fact = null,
+        logical_pattern = null,
+        legal_hypothesis = null,
+        verification_status = record.verificationStatus
+    )
 
     /** Convert one deterministic-engine [Contradiction] into a findings JSON record. */
     fun contradictionToRecord(c: Contradiction): FindingsJsonRecord {

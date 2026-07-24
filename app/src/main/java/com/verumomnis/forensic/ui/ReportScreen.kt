@@ -142,6 +142,19 @@ fun ReportScreen(
             }
         }
 
+        if (report.gemmaNarrative.isNotBlank()) {
+            VoCard(title = "NARRATIVE ANALYSIS (GEMMA 3)", icon = Icons.Filled.Description) {
+                Text(
+                    "Unsealed appendix — narrative written by the on-device report writer from the sealed findings JSON. " +
+                        "The sealed report body above remains the sole evidentiary record.",
+                    color = VoTextMuted,
+                    fontSize = 10.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(report.gemmaNarrative, color = VoTextPrimary, fontSize = 12.sp)
+            }
+        }
+
         state.scanResult?.findings?.audio?.let { a ->
             VoCard(title = "AUDIO FORENSICS (B8)", icon = Icons.Filled.GraphicEq) {
                 InfoRow("Files", a.filesAnalyzed.toString())

@@ -1,6 +1,7 @@
 package com.verumomnis.forensic.update
 
 import android.content.Context
+import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -29,13 +30,19 @@ class LocalRuleStore private constructor(context: Context) {
     private val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** Record a promoted candidate's proposition pair as an engine rule. */
+    /**
+     * Record a promoted candidate's proposition pair as an engine rule.
+     * The rule ID is derived from the pair content (not the per-case
+     * candidate counter, which restarts at G3-CAND-0001 for every scan), so
+     * promotions from different cases never collide and the same pair is
+     * naturally deduplicated.
+     */
     @Synchronized
     fun addPromotedCandidate(record: FindingsJsonEmitter.FindingsContradictionRecord) {
         val first = record.propositionAText.trim()
         val second = record.propositionBText.trim()
         if (first.isEmpty() || second.isEmpty()) return
-        val ruleId = "G3_${record.contradictionId}"
+        val ruleId = "G3_" + Sha512.hash("${first.lowercase()}|${second.lowercase()}").take(16)
         val existing = loadPairs()
         if (existing.any { it.ruleId == ruleId }) return
         val updated = existing + DownloadedRules.FraudPair(

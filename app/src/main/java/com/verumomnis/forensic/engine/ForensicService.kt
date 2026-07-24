@@ -145,8 +145,21 @@ object ForensicService {
         return ScanResult(councilFindings, seal, g3Review.registry)
     }
 
-    private fun jsonString(s: String): String =
-        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    private fun jsonString(s: String): String = buildString {
+        append('"')
+        for (ch in s) {
+            when {
+                ch == '\\' -> append("\\\\")
+                ch == '"' -> append("\\\"")
+                ch == '\n' -> append("\\n")
+                ch == '\r' -> append("\\r")
+                ch == '\t' -> append("\\t")
+                ch < ' ' -> append("\\u%04x".format(ch.code))
+                else -> append(ch)
+            }
+        }
+        append('"')
+    }
 
     fun verify(bytes: ByteArray, seal: SealRecord): VerificationResult =
         EvidenceSealer.verify(bytes, seal)

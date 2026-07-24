@@ -324,7 +324,7 @@ class VerumViewModel(
         runScan(now, caseName)
         _state.update { it.copy(sealStage = SealStage.SEALING) }
         storeFindingsJson()
-        generateReport(caseName = caseName, now = now)
+        generateReportSync(caseName = caseName, now = now)
         signSealsAndAnchor()
         _state.update { it.copy(sealStage = SealStage.ANCHORING) }
         val r = _state.value.scanResult
@@ -352,7 +352,7 @@ class VerumViewModel(
 
     /**
      * Serialize and vault the current findings as a raw machine-readable dump.
-     * This is a convenience artefact only — [VerumState.findingsJsonPath] keeps
+     * This is a convenience artefact only — [UiState.findingsJsonPath] keeps
      * pointing at the GHRP findings-JSON contract file written by [runScan],
      * which is what the report writer and Gemma 3 narrate from. (Overwriting
      * that path here previously made the G3 candidate tier unreadable.)
@@ -426,15 +426,19 @@ class VerumViewModel(
      * incorporated into reports.
      */
     fun deepResearch(now: Instant = Instant.now()) {
-        if (_state.value.scanResult == null) sealCase(now)
-        val findings = _state.value.scanResult?.findings ?: return
-        val caseRef = _state.value.scanResult?.seal?.documentReference ?: "Matter"
-        val jurisdiction = _state.value.jurisdiction
-
         _state.update { it.copy(researching = true) }
         postAi("Initiating deep research across judicial databases and the open web… This may take a moment.")
 
         viewModelScope.launch(Dispatchers.IO) {
+            // Sealing (and the G3 review pass inside it) can run on-device LLM
+            // inference — it must happen here, never on the caller's thread.
+            if (_state.value.scanResult == null) sealCase(now)
+            val findings = _state.value.scanResult?.findings ?: run {
+                _state.update { it.copy(researching = false) }
+                return@launch
+            }
+            val caseRef = _state.value.scanResult?.seal?.documentReference ?: "Matter"
+            val jurisdiction = _state.value.jurisdiction
             try {
                 val research = DeepResearchEngine.research(
                     findings = findings,
@@ -1028,6 +1032,17 @@ class VerumViewModel(
     }
 
     fun generateReport(caseName: String = "Matter", now: Instant = Instant.now()) {
+        // On-device Gemma 3 narration is slow — never run it on the caller
+        // (UI) thread. Without a runtime the pipeline is fast and stays
+        // synchronous, which callers like sealCase and unit tests rely on.
+        if (com.verumomnis.forensic.llm.Gemma3RuntimeProvider.runtime.isAvailable()) {
+            viewModelScope.launch(Dispatchers.IO) { generateReportSync(caseName, now) }
+        } else {
+            generateReportSync(caseName, now)
+        }
+    }
+
+    private fun generateReportSync(caseName: String = "Matter", now: Instant = Instant.now()) {
         val findings = _state.value.scanResult?.findings ?: run {
             runScan(now, caseName)
             _state.value.scanResult?.findings
@@ -1050,11 +1065,13 @@ class VerumViewModel(
             narrativeWriter = narrativeWriter
         )
 
-        // If research exists, build the research prompt and store it alongside
+        // If research exists, append the human-readable research summary to the
+        // narrative appendix (never the raw model prompt — the appendix renders
+        // in the report UI and exported PDF).
         val reportWithResearch = if (research != null) {
-            val researchPrompt = DeepResearchEngine.buildResearchPrompt(research, findings)
+            val researchSummary = DeepResearchEngine.buildChatSummary(research)
             report.copy(
-                gemmaNarrative = report.gemmaNarrative + "\n\n" + researchPrompt
+                gemmaNarrative = (report.gemmaNarrative + "\n\nEXTERNAL RESEARCH SUMMARY (advisory only):\n" + researchSummary).trim()
             )
         } else report
 

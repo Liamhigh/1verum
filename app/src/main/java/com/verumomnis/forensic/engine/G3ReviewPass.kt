@@ -56,7 +56,11 @@ object G3ReviewPass {
         val response = runtime.generate(buildReviewPrompt(documents, findings), maxTokens = 2048)
             ?: return ReviewOutcome(registry, emptyList())
 
-        val docsByName = documents.associateBy { it.fileName }
+        // Ambiguous file names would anchor a candidate to the wrong hash —
+        // only documents with unique names are eligible anchor targets.
+        val docsByName = documents.groupBy { it.fileName }
+            .filterValues { it.size == 1 }
+            .mapValues { (_, v) -> v.single() }
         val records = parseCandidates(response)
             .take(MAX_CANDIDATES_PER_REVIEW)
             .mapNotNull { candidate ->
@@ -136,10 +140,24 @@ object G3ReviewPass {
     internal fun parseCandidates(response: String): List<NominatedCandidate> {
         val start = response.indexOf('[')
         if (start < 0) return emptyList()
+        // Bracket-match while tracking string literals so brackets inside
+        // quoted evidence text (e.g. "[00:12]") don't derail the scan.
         var depth = 0
         var end = -1
+        var inString = false
+        var escaped = false
         for (i in start until response.length) {
-            when (response[i]) {
+            val ch = response[i]
+            if (inString) {
+                when {
+                    escaped -> escaped = false
+                    ch == '\\' -> escaped = true
+                    ch == '"' -> inString = false
+                }
+                continue
+            }
+            when (ch) {
+                '"' -> inString = true
                 '[' -> depth++
                 ']' -> {
                     depth--

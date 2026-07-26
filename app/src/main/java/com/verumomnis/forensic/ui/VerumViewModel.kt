@@ -192,6 +192,8 @@ data class UiState(
     val sealPdfName: String = "",
     val sealPdfSize: Long = 0L,
     val sealType: String = "private",
+    /** Sealing mode mirroring the website: "seal-only" (default) or "forensic". */
+    val sealMode: String = "seal-only",
     val sealIdentity: SealIdentityInput = SealIdentityInput(),
     val passwordProtect: Boolean = false,
     val sealPassword: String = "",
@@ -646,6 +648,10 @@ class VerumViewModel(
         _state.update { it.copy(sealType = type) }
     }
 
+    fun setSealMode(mode: String) {
+        _state.update { it.copy(sealMode = mode) }
+    }
+
     fun setIdentity(identity: SealIdentityInput) {
         _state.update { it.copy(sealIdentity = identity) }
     }
@@ -801,6 +807,36 @@ class VerumViewModel(
                     )
                 }
                 postEngine("Website-format seal complete: ${result.sealId} · ${result.verifyUrl}")
+
+                // Seal + Forensic Analysis mode (website parity): after the seal is
+                // applied, the same document goes through the Nine-Brain scan and a
+                // sealed forensic report is generated for human review.
+                if (_state.value.sealMode == "forensic") {
+                    val text = runCatching {
+                        com.verumomnis.forensic.engine.PdfBoxTextExtractor().extractText(bytes)
+                    }.getOrDefault("").trim()
+                    if (text.isNotBlank()) {
+                        setPendingFiles(
+                            listOf(
+                                PendingFilePreview(
+                                    fileName = name,
+                                    mimeType = "application/pdf",
+                                    sizeBytes = bytes.size.toLong(),
+                                    sha512 = sha512ForAnchor,
+                                    displayText = text.take(280) + if (text.length > 280) "…" else "",
+                                    isMedia = false,
+                                    documentText = text
+                                )
+                            )
+                        )
+                        confirmAndSeal(caseName = name.removeSuffix(".pdf"), now = now)
+                    } else {
+                        postEngine(
+                            "Forensic scan could not run — no extractable text in $name. " +
+                                "The scan did not complete; absence of findings is NOT a clean result."
+                        )
+                    }
+                }
             }.onFailure { e ->
                 _state.update { it.copy(sealBusy = false, sealError = "Seal failed: ${e.message}") }
                 postEngine("Seal failed: ${e.message}")

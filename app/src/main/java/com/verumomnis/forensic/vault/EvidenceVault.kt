@@ -2,9 +2,11 @@ package com.verumomnis.forensic.vault
 
 import android.content.Context
 import com.verumomnis.forensic.crypto.Sha512
+import com.verumomnis.forensic.model.ForensicReport
 import java.io.File
 import java.time.Instant
 import javax.crypto.SecretKey
+import kotlinx.serialization.json.Json
 
 /**
  * Evidence Vault (Part VII). Local storage following the specified directory
@@ -65,6 +67,25 @@ class EvidenceVault(private val root: File) {
     fun loadOtsProof(shortcode: String): String? {
         val file = File(seals, "seal_$shortcode.ots")
         return if (file.exists()) file.readText() else null
+    }
+
+    /** Persists a generated report's JSON snapshot so it can later be loaded for comparison. */
+    fun storeReport(report: ForensicReport) {
+        initialize()
+        val safeName = report.reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        File(reportsSealed, "$safeName.json").writeText(Json.encodeToString(ForensicReport.serializer(), report))
+    }
+
+    /** All previously generated reports, most recent first, for the Report Comparison screen. */
+    fun listReports(): List<ForensicReport> {
+        val files = reportsSealed.listFiles { f -> f.extension == "json" } ?: return emptyList()
+        return files.mapNotNull { file ->
+            try {
+                Json.decodeFromString(ForensicReport.serializer(), file.readText())
+            } catch (_: Exception) {
+                null
+            }
+        }.sortedByDescending { it.createdAt }
     }
 
     fun storeConfig(name: String, json: String) {

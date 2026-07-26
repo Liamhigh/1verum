@@ -74,7 +74,10 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
+private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
+
+/** Verification is centralised on the website — all verify actions open it. */
+private const val WEBSITE_VERIFY_URL = "https://www.verumglobal.foundation/verify.html"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -235,7 +238,6 @@ fun VerumApp(
                                 Screen.TAX -> "Tax Return"
                                 Screen.VAULT -> "Evidence Vault"
                                 Screen.SEAL_DOCUMENT -> "Seal Document"
-                                Screen.VERIFY_DOCUMENT -> "Verify Document"
                                 Screen.SCAN_SEAL -> "Scan Seal QR"
                                 Screen.SCAN_SEAL_RESULT -> "Seal Verification"
                                 Screen.CONSTITUTION -> "Constitution"
@@ -286,22 +288,15 @@ fun VerumApp(
                             Screen.TAX -> TaxScreen(viewModel)
                             Screen.VAULT -> VaultScreen(
                                 state = state,
-                                onVerify = { navigate(Screen.VERIFY_DOCUMENT) }
+                                onVerify = { openWebsiteVerify(context) }
                             )
                             Screen.STORY -> {}
                             Screen.SEAL_DOCUMENT -> SealDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
                                 onBack = { goBack() },
-                                onNavigateVerify = { navigate(Screen.VERIFY_DOCUMENT) },
+                                onNavigateReport = { navigate(Screen.REPORT) },
                                 onNavigateDocuments = { /* no-op — documents screen not implemented */ }
-                            )
-                            Screen.VERIFY_DOCUMENT -> VerifyDocumentScreen(
-                                state = state,
-                                viewModel = viewModel,
-                                onBack = { goBack() },
-                                onNavigateSeal = { navigate(Screen.SEAL_DOCUMENT) },
-                                onNavigateDocuments = { }
                             )
                             Screen.SCAN_SEAL -> ScanSealScreen(
                                 state = state,
@@ -345,7 +340,7 @@ fun VerumApp(
                         shareWebsiteSealEnabled = state.websiteSealedFile != null,
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
-                        onVerifyScreen = { showMenu = false; navigate(Screen.VERIFY_DOCUMENT) },
+                        onVerifyWebsite = { showMenu = false; openWebsiteVerify(context) },
                         onScanSeal = { showMenu = false; navigate(Screen.SCAN_SEAL) },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
                         onDraftEmail = { showMenu = false; navigate(Screen.EMAIL) },
@@ -389,7 +384,7 @@ private fun ActionsSheet(
     shareWebsiteSealEnabled: Boolean,
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
-    onVerifyScreen: () -> Unit,
+    onVerifyWebsite: () -> Unit,
     onScanSeal: () -> Unit,
     onDeepResearch: () -> Unit,
     onDraftEmail: () -> Unit,
@@ -416,7 +411,7 @@ private fun ActionsSheet(
         }
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
-        ActionRow(Icons.Filled.TaskAlt, "Verify Document (screen)", "Open the verify page", onVerifyScreen)
+        ActionRow(Icons.Filled.TaskAlt, "Verify on verumglobal.foundation", "The website is the central verification hub", onVerifyWebsite)
         ActionRow(Icons.Filled.QrCodeScanner, "Scan Seal QR", "Point camera at a sealed document QR", onScanSeal)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)
@@ -430,6 +425,14 @@ private fun ActionsSheet(
         ActionRow(Icons.Filled.Settings, "Settings", "App configuration, privacy, security", onSettings)
         ActionRow(Icons.Filled.AccountBalance, "Read Constitution", "Verum Omnis governing principles", onReadConstitution)
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+private fun openWebsiteVerify(context: android.content.Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(WEBSITE_VERIFY_URL))
+        )
     }
 }
 

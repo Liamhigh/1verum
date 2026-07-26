@@ -1,9 +1,12 @@
 package com.verumomnis.forensic.ui
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +44,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -55,9 +59,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -76,9 +84,12 @@ import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.SourceSans
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.VoBlueBorder
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoGoldDark
 import com.verumomnis.forensic.ui.theme.VoGoldSoft
+import com.verumomnis.forensic.ui.theme.VoHeading
 import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurfaceAlt
@@ -95,7 +106,7 @@ fun SealDocumentScreen(
     state: UiState,
     viewModel: VerumViewModel,
     onBack: () -> Unit,
-    onNavigateVerify: () -> Unit,
+    onNavigateReport: () -> Unit = {},
     onNavigateDocuments: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -125,11 +136,13 @@ fun SealDocumentScreen(
             ) {
                 NavLink("Seal Document", selected = true, onClick = {})
                 Spacer(Modifier.width(24.dp))
-                NavLink("Verify", selected = false, onClick = onNavigateVerify)
+                NavLink("Verify on Website", selected = false, onClick = { openWebsiteVerify(context) })
             }
             Spacer(Modifier.height(8.dp))
             HeaderSection()
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
+            LawEnforcementBanner()
+            Spacer(Modifier.height(20.dp))
             UploadZone(
                 hasFile = state.sealPdfBytes != null,
                 onClick = { picker.launch(arrayOf("application/pdf")) }
@@ -140,6 +153,8 @@ fun SealDocumentScreen(
             }
             Spacer(Modifier.height(20.dp))
             SealTypeSelector(selected = state.sealType, onSelect = viewModel::setSealType)
+            Spacer(Modifier.height(20.dp))
+            SealingModeSelector(selected = state.sealMode, onSelect = viewModel::setSealMode)
             if (state.sealType == "commercial") {
                 Spacer(Modifier.height(16.dp))
                 Label("Organisation Name")
@@ -156,7 +171,12 @@ fun SealDocumentScreen(
                 onPasswordChange = { p, c -> viewModel.setPassword(p, c) }
             )
             Spacer(Modifier.height(24.dp))
-            SealButton(enabled = state.sealPdfBytes != null && !state.sealBusy, busy = state.sealBusy, onClick = { viewModel.sealDocument() })
+            SealButton(
+                label = if (state.sealMode == "forensic") "Seal + Forensic Scan" else "Seal Document",
+                enabled = state.sealPdfBytes != null && !state.sealBusy,
+                busy = state.sealBusy,
+                onClick = { viewModel.sealDocument() }
+            )
             if (state.sealError.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text(state.sealError, color = VoRed, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -165,9 +185,12 @@ fun SealDocumentScreen(
                 Spacer(Modifier.height(24.dp))
                 PipelineSection(state.sealPipeline)
             }
+            if (state.sealMode == "forensic") {
+                ForensicScanStatus(state = state, onOpenReport = onNavigateReport)
+            }
             state.sealResult?.let { result ->
                 Spacer(Modifier.height(24.dp))
-                ResultsCard(result = result, viewModel = viewModel, context = context, onVerifyClick = onNavigateVerify)
+                ResultsCard(result = result, viewModel = viewModel, context = context, onVerifyClick = { openWebsiteVerify(context) })
             }
             Spacer(Modifier.height(32.dp))
             InfoSection()
@@ -191,15 +214,14 @@ private fun NavLink(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HeaderSection() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Icon(
-            painter = painterResource(R.drawable.vo_badge),
+        Image(
+            painter = painterResource(R.drawable.vo_banner),
             contentDescription = "Verum Omnis",
-            tint = VoAccentBlue,
-            modifier = Modifier.size(72.dp)
+            modifier = Modifier.fillMaxWidth(0.7f)
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "AI FORENSICS FOR TRUTH — CLIENT-SIDE",
+            "AI FORENSICS FOR TRUTH — CLIENT-SIDE — NOTHING LEAVES YOUR DEVICE",
             fontFamily = JetBrainsMono,
             fontSize = 11.sp,
             letterSpacing = 1.2.sp,
@@ -212,7 +234,7 @@ private fun HeaderSection() {
             fontFamily = Cormorant,
             fontWeight = FontWeight.Light,
             fontSize = 34.sp,
-            color = VoTextPrimary,
+            color = VoHeading,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
@@ -228,13 +250,27 @@ private fun HeaderSection() {
     }
 }
 
+/**
+ * Upload zone mirroring the website: dashed blue border that turns gold once
+ * a file is selected, 16dp radius, faint blue-tinted background.
+ */
 @Composable
 private fun UploadZone(hasFile: Boolean, onClick: () -> Unit) {
+    val borderColor = if (hasFile) VoGold else VoBlueBorder
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
-            .border(width = 2.dp, color = VoBorder, shape = RoundedCornerShape(16.dp))
+            .drawBehind {
+                drawRoundRect(
+                    color = borderColor,
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(12.dp.toPx() / 2, 8.dp.toPx() / 2))
+                    ),
+                    cornerRadius = CornerRadius(16.dp.toPx())
+                )
+            }
             .clip(RoundedCornerShape(16.dp))
             .background(VoSurfaceAlt.copy(alpha = 0.08f))
             .clickable(onClick = onClick),
@@ -243,9 +279,138 @@ private fun UploadZone(hasFile: Boolean, onClick: () -> Unit) {
     ) {
         Icon(Icons.Filled.FileUpload, contentDescription = null, tint = if (hasFile) VoGold else VoAccentBlue, modifier = Modifier.size(48.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Upload PDF Document", fontFamily = Cormorant, fontSize = 22.sp, color = VoTextPrimary)
+        Text("Upload PDF Document", fontFamily = Cormorant, fontSize = 22.sp, color = VoHeading)
         Spacer(Modifier.height(6.dp))
         Text("Tap to browse. Max 50MB.", fontSize = 13.sp, color = VoAccentBlue)
+    }
+}
+
+/** Website parity: prominent free-for-law-enforcement banner under the header. */
+@Composable
+private fun LawEnforcementBanner() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(VoGold.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, VoGold.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            "✓ FREE FOR LAW ENFORCEMENT & PRIVATE CITIZENS",
+            color = VoGold,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Secure document sealing with forensic verification — powered by the Verum Omnis cryptographic platform. Commercial sealing requires licensing.",
+            color = VoTextMuted,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/**
+ * Sealing mode selector mirroring the website's mode cards:
+ * "Seal Only — Tamper Protection" (default) vs "Seal + Forensic Analysis".
+ */
+@Composable
+private fun SealingModeSelector(selected: String, onSelect: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Label("Sealing Mode")
+        ModeCard(
+            title = "🛡 Seal Only — Tamper Protection (default)",
+            body = "Cryptographic seal + blockchain timestamp only. No content is analysed and nothing leaves this device. You receive the sealed PDF and a Seal Certificate.",
+            active = selected == "seal-only",
+            onClick = { onSelect("seal-only") }
+        )
+        Spacer(Modifier.height(10.dp))
+        ModeCard(
+            title = "🔍 Seal + Forensic Analysis",
+            body = "Everything in Seal Only, plus an on-device forensic scan by the Nine-Brain engine (indicator score + findings for human review) and a sealed forensic report.",
+            active = selected == "forensic",
+            onClick = { onSelect("forensic") }
+        )
+    }
+}
+
+@Composable
+private fun ModeCard(title: String, body: String, active: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) VoGold.copy(alpha = 0.08f) else VoSurfaceAlt.copy(alpha = 0.08f))
+            .border(1.dp, if (active) VoGold else VoBlueBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp)
+    ) {
+        Text(
+            title,
+            color = if (active) VoGold else VoTextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(body, color = if (active) VoTextPrimary else VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
+    }
+}
+
+/**
+ * Live status of the Nine-Brain forensic scan that runs after sealing in
+ * "Seal + Forensic Analysis" mode, with a link to the sealed report.
+ */
+@Composable
+private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
+    val scanning = state.sealStage != SealStage.IDLE && state.sealStage != SealStage.DONE && state.sealStage != SealStage.ERROR
+    val done = state.report != null
+    if (!scanning && !done) return
+    Spacer(Modifier.height(24.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(VoSurfaceAlt.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Text("Forensic Scan", fontFamily = Cormorant, fontSize = 20.sp, color = VoGold)
+        Spacer(Modifier.height(10.dp))
+        if (scanning) {
+            Text(state.sealStage.label, color = VoTextPrimary, fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { state.sealStage.progress },
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                color = VoGold,
+                trackColor = VoBackground
+            )
+        }
+        if (done) {
+            Text(
+                "Scan complete. Findings are forensic indicators for human review — not determinations of fraud.",
+                color = VoTextMuted,
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            VerumPrimaryButton(
+                label = "View Forensic Report",
+                onClick = onOpenReport,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/** The website is the central verification hub — verify actions open it. */
+private fun openWebsiteVerify(context: Context) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.verumglobal.foundation/verify.html")))
     }
 }
 
@@ -437,28 +602,30 @@ private fun VoTextField(
     )
 }
 
+/** Gold gradient CTA per DESIGN_LOCK: #D4A843 → #b8942a, 12dp radius. */
 @Composable
-private fun SealButton(enabled: Boolean, busy: Boolean, onClick: () -> Unit) {
+private fun SealButton(label: String, enabled: Boolean, busy: Boolean, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp),
+            .height(54.dp)
+            .alpha(if (enabled) 1f else 0.4f),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, disabledContainerColor = VoGold.copy(alpha = 0.4f)),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, disabledContainerColor = Color.Transparent),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(VoGold, VoGoldSoft.copy(alpha = 0.85f)))),
+                .background(Brush.verticalGradient(listOf(VoGold, VoGoldDark))),
             contentAlignment = Alignment.Center
         ) {
             if (busy) {
                 CircularProgressIndicator(color = VoBackground, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             } else {
-                Text("SEAL DOCUMENT", color = VoBackground, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
+                Text(label.uppercase(), color = VoBackground, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
             }
         }
     }

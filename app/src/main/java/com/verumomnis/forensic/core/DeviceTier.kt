@@ -4,7 +4,12 @@ package com.verumomnis.forensic.core
  * Device-tier LLM architecture (Part III of the specification).
  *
  * NO Mistral. The Android app runs Gemma 3 (bundled), Phi-3 (2GB+) and Gemma 4
- * (4GB+) only. Legal + R&D brains load on premium (8GB+) devices.
+ * (8GB+) only. Legal + R&D brains load on premium (8GB+) devices.
+ *
+ * The 8GB Gemma 4 threshold matches ON_DEVICE_LLM_ARCHITECTURE.md's "Flagship
+ * (8GB+ RAM)" tier and is confirmed by real-device testing: on a 5.4GB-RAM phone,
+ * Gemma 4's 7.7GB weight file loads but generation drops to ~20+ seconds/token as
+ * the OS thrashes reclaiming memory from other apps — unusable below this tier.
  *
  * The 9-Brain forensic engine ALWAYS runs regardless of how many LLMs load, so
  * verification is ALWAYS triple, never dual.
@@ -45,14 +50,14 @@ enum class DeviceTier(val label: String) {
 object ModelLoader {
 
     /** A flagship device can run Gemma 4 and the premium legal/R&D brains. */
-    fun isFlagship(deviceRamGb: Int): Boolean = deviceRamGb >= 4
+    fun isFlagship(deviceRamGb: Int): Boolean = deviceRamGb >= 8
 
     /** Mirrors loadModels(deviceRamGB) from the specification.
      *
      * Roles under the Constitution-absorbed, unrestricted communication model:
      *  - Gemma 3  → forensic report writer (always present, bundled)
      *  - Phi-3    → communicator for standard 2GB+ devices
-     *  - Gemma 4  → communicator for flagship 4GB+ devices
+     *  - Gemma 4  → communicator for flagship 8GB+ devices
      */
     fun loadModels(deviceRamGb: Int): List<Llm> {
         val models = mutableListOf<Llm>()

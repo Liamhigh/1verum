@@ -60,24 +60,29 @@
 
 | Dependency | Version | Source | Purpose |
 |-----------|---------|--------|---------|
-| llama.cpp | master (commit `b4e38b9`) | GitHub/ggerganov | On-device LLM inference |
-| llama.cpp JNI | (built from source) | Local build | Android JNI bridge |
+| llama.cpp | commit `ff067f76dd8e9e05f0528056f1274adf01a54d70` (2026-07-26) | GitHub/ggerganov, fetched via CMake FetchContent at build time (see app/src/main/cpp/CMakeLists.txt) — not vendored into this repo | On-device LLM inference |
+| llama.cpp JNI | app/src/main/cpp/voinference_jni.cpp | Local build | Android JNI bridge |
 
 ## On-Device Models
 
-| Model | Version | Quantization | Size | Download Source | SHA-256 Verification |
-|-------|---------|-------------|------|----------------|---------------------|
-| Gemma 3 4B Instruct | 3.0.0 | Q4_K_M | 2.5GB | Kaggle/google/gemma-3-4b-it | TBD |
-| Gemma 3 4B Instruct | 3.0.0 | Q3_K_S | 1.8GB | Kaggle/google/gemma-3-4b-it | TBD |
-| PHI-3 Mini 4K Instruct | 3.5 | Q4_K_M | 2.3GB | HuggingFace/microsoft/Phi-3-mini-4k-instruct | TBD |
-| PHI-3 Mini 4K Instruct | 3.5 | Q3_K_S | 1.6GB | HuggingFace/microsoft/Phi-3-mini-4k-instruct | TBD |
-| Command R (4B) | v1.0 | Q4_K_M | 2.4GB | HuggingFace/CohereForAI/c4ai-command-r-v01 | TBD |
-| Command R (4B) | v1.0 | Q3_K_S | 1.7GB | HuggingFace/CohereForAI/c4ai-command-r-v01 | TBD |
-| Gemma 4 12B Instruct | 4.0.0 | Q4_K_M | 7.5GB | Kaggle/google/gemma-4-12b-it | TBD |
-| Whisper.cpp (Base) | master | Q5_0 | 150MB | GitHub/ggerganov/whisper.cpp | TBD |
-| Whisper.cpp (Medium) | master | Q5_0 | 1.5GB | GitHub/ggerganov/whisper.cpp | TBD |
+Three models, matching what `core/DeviceTier.kt` actually loads (Command R was in an earlier
+draft of this doc but was never implemented — Phi-3 is the real entry/mid-tier communicator).
+URLs and hashes below are hard-coded in `core/Constitution.kt` and verified by
+`ModelDownloadManager` before a model is ever loaded — confirmed reachable and hashed 2026-07-26.
 
-All model hashes MUST be verified by B9 on every app launch.
+| Model | Quantization | Size | Download Source | SHA-256 |
+|-------|-------------|------|----------------|---------|
+| Gemma 3 4B Instruct | Q4_K_M | 2.49GB | huggingface.co/bartowski/google_gemma-3-4b-it-GGUF | `4996030242583a40aa151ff93f49ed787ac8c25e4120c3ae4588b2e2a7d1ae94` |
+| Phi-3 Mini 4K Instruct | q4 | 2.39GB | huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf (official, MIT, ungated) | `8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef` |
+| Gemma 4 12B Instruct | Q4_K_M | 7.66GB | huggingface.co/bartowski/gemma-4-12B-it-GGUF | `d333b368be6cd655563fce18aede26027e208fdb13816d35eb06983ce054044b` |
+
+Whisper.cpp (audio transcription) is a separate, not-yet-integrated effort — see `Transcriber.kt`'s
+`NoModelTranscriber`/`ProvidedTranscriptTranscriber` for the current state.
+
+All three files above were confirmed publicly downloadable with no license gate or account
+required (bartowski's GGUF re-uploads don't enforce Google's Kaggle/HF gating; Phi-3's official
+repo was never gated). `ModelDownloadManager` re-verifies the SHA-256 of every downloaded file
+before `LlamaModel.load()` will touch it, and refuses to load on a mismatch.
 
 ## Cryptographic & Blockchain
 

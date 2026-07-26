@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#0a0f18;font-family:'Segoe UI',system-ui,sans-serif}
+  a{color:#4A7EC7}a:hover{color:#F8F9FA}
+  @keyframes vo-pulse{0%,100%{box-shadow:0 0 0 0 rgba(212,168,67,.55)}50%{box-shadow:0 0 0 6px rgba(212,168,67,0)}}
+  @keyframes vo-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</helmet>
+<div style="display:flex;justify-content:center;align-items:flex-start;padding:48px 24px;background:radial-gradient(ellipse at 50% 0%, #0d1626 0%, #05090f 70%);min-height:100vh;box-sizing:border-box">
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412px,892px">
+<div style="height:100%;display:flex;flex-direction:column;background:#040D1B;color:#D5D8DD;position:relative;overflow:hidden">
+
+<sc-if value="{{ hasNotification }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ openNotification }}" style="position:absolute;top:10px;left:10px;right:10px;z-index:50;background:rgba(11,21,38,0.97);backdrop-filter:blur(6px);border:1px solid {{ notifBorder }};border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 10px 30px rgba(0,0,0,0.4);cursor:pointer;animation:vo-fade-in 0.25s ease">
+    <img src="app_icon_circle.png" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;margin-top:1px">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;justify-content:space-between;gap:8px">
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:#4A7EC7">Verum Omnis</div>
+        <div onClick="{{ dismissNotification }}" style="color:#5b6a82;font-size:12px">&#10005;</div>
+      </div>
+      <div style="font-size:13px;color:{{ notifTitleColor }};margin-top:3px">{{ notifTitle }}</div>
+      <div style="font-size:11.5px;color:#D5D8DD;margin-top:2px">{{ notifBody }}</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">
+  <div style="padding:32px 20px 20px;text-align:center;background:radial-gradient(ellipse at 50% 0%, rgba(212,168,67,0.08) 0%, transparent 70%)">
+    <img src="banner_dark.png" style="width:min(260px,80%);height:auto;margin-bottom:16px">
+    <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;font-weight:300;color:#F8F9FA;letter-spacing:-0.02em">Truth for All</div>
+    <div style="font-size:12.5px;color:#D5D8DD;margin-top:10px;line-height:1.6;max-width:280px;margin-left:auto;margin-right:auto">A constitutional forensic AI platform built to democratize justice. Free for every citizen.</div>
+  </div>
+  <div style="display:flex;gap:10px;padding:0 20px 20px">
+    <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;color:#D4A843">3</div>
+      <div style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Sealed</div>
+    </div>
+    <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;color:#22c55e">2</div>
+      <div style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Verified</div>
+    </div>
+    <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;font-weight:600;color:#F87171">1</div>
+      <div style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Flagged</div>
+    </div>
+  </div>
+  <div style="padding:0 20px 22px;display:flex;gap:10px">
+    <div onClick="{{ goVerifyTab }}" style="flex:1;border:1px solid rgba(26,46,82,0.6);color:#F8F9FA;text-align:center;padding:14px 8px;border-radius:12px;font-size:12.5px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer">Verify Document</div>
+    <div onClick="{{ startSeal }}" style="flex:1;background:linear-gradient(135deg,#D4A843,#b8942a);color:#040D1B;text-align:center;padding:14px 8px;border-radius:12px;font-size:12.5px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;font-weight:600">Seal Document</div>
+  </div>
+  <div style="padding:0 20px 26px;flex:1">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+      <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:#4A7EC7">Recent Activity</div>
+      <div onClick="{{ goHome }}" style="font-family:'Courier New',monospace;font-size:10.5px;color:#D4A843;cursor:pointer">View All</div>
+    </div>
+    <sc-for list="{{ recentThreads }}" as="t" hint-placeholder-count="2">
+      <div onClick="{{ openThread }}" data-id="{{ t.id }}" style="display:flex;gap:12px;align-items:center;padding:12px 10px;border-radius:12px;cursor:pointer" style-hover="background:rgba(15,52,96,0.15)">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(15,52,96,0.25);border:1px solid rgba(26,46,82,0.6);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="font-family:'Cormorant Garamond',serif;color:#D4A843;font-size:15px;font-weight:600">{{ t.initial }}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;color:#F8F9FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
+          <div style="font-size:11.5px;color:{{ t.lastColor }};margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.last }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:center;gap:18px;padding:14px 20px 4px">
+    <div onClick="{{ goConstitution }}" style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;cursor:pointer">Constitution</div>
+    <div onClick="{{ goDocuments }}" style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;cursor:pointer">Documents</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isConstitution }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%">
+  <div style="display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div onClick="{{ goLanding }}" style="cursor:pointer;color:#4A7EC7;font-size:18px">&#8592;</div>
+    <div style="color:#F8F9FA;font-size:15px">Constitution</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:22px 20px 30px">
+    <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#D4A843">v6.0 Final &middot; Sealed &middot; Immutable</div>
+    <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:300;color:#F8F9FA;margin-top:8px;letter-spacing:-0.01em">Truth for All</div>
+    <div style="font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-size:15px;color:#D5D8DD;margin-top:14px;line-height:1.6;border-left:3px solid #D4A843;padding-left:14px">&ldquo;The truth does not require belief. It requires only that you look.&rdquo;</div>
+
+    <div style="display:flex;gap:10px;margin-top:22px">
+      <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;color:#D4A843">9</div>
+        <div style="font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.05em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Brains</div>
+      </div>
+      <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;color:#D4A843">15</div>
+        <div style="font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.05em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Directives</div>
+      </div>
+      <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;color:#D4A843">3x</div>
+        <div style="font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.05em;text-transform:uppercase;color:#4A7EC7;margin-top:2px">Verified</div>
+      </div>
+    </div>
+
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;margin-top:26px;margin-bottom:10px">Triple Verification Doctrine</div>
+    <div style="font-size:12.5px;color:#D5D8DD;line-height:1.6">Thesis / Antithesis / Synthesis &mdash; every conclusion requires three independent verifiers. Never dual, never single.</div>
+
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;margin-top:22px;margin-bottom:10px">Prime Directives (Selected)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="background:rgba(4,13,27,0.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#D5D8DD;line-height:1.5"><span style="color:#D4A843">Art. III</span> &mdash; Truth over Probability: ordinal confidence only, never fabricated results.</div>
+      <div style="background:rgba(4,13,27,0.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#D5D8DD;line-height:1.5"><span style="color:#D4A843">Art. IV</span> &mdash; Evidence before Narrative: no anchor, no sentence.</div>
+      <div style="background:rgba(4,13,27,0.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#D5D8DD;line-height:1.5"><span style="color:#D4A843">Art. X</span> &mdash; Non-Weaponization: no brute-force, no unauthorized access.</div>
+    </div>
+
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;margin-top:22px;margin-bottom:10px">Access Model</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:#D5D8DD">
+      <div style="display:flex;justify-content:space-between"><span>Private citizens</span><span style="color:#22c55e">Free</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Law enforcement</span><span style="color:#22c55e">Free</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Commercial use</span><span style="color:#D4A843">Licence required</span></div>
+    </div>
+
+    <div style="margin-top:24px;padding:14px;background:rgba(212,168,67,0.06);border:1px solid rgba(212,168,67,0.25);border-radius:12px">
+      <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.04em">CONSTITUTION SEAL</div>
+      <div style="font-family:'Courier New',monospace;font-size:11px;color:#F8F9FA;margin-top:4px">VO-4FFEA8A806C1</div>
+      <div style="font-family:'Courier New',monospace;font-size:10px;color:#22c55e;margin-top:4px;word-break:break-all">4ffea8a806c1a01bd1a1541eaa212d75dd127e9&hellip;</div>
+    </div>
+    <div onClick="{{ goDocuments }}" style="text-align:center;margin-top:20px;font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;cursor:pointer">View Documents &amp; Resources</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDocuments }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%">
+  <div style="display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div onClick="{{ goLanding }}" style="cursor:pointer;color:#4A7EC7;font-size:18px">&#8592;</div>
+    <div style="color:#F8F9FA;font-size:15px">Documents &amp; Resources</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px">
+    <div style="background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:18px;margin-bottom:14px" onClick="{{ goConstitution }}" style-hover="border-color:#D4A843">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;color:#D4A843;font-weight:400">Constitution v6.0 Final</div>
+      <div style="font-size:12.5px;color:#8a93a3;margin-top:6px;line-height:1.6">The foundational document governing all Verum Omnis systems. Establishes the AI Non-Weaponization Doctrine and the evidentiary standards for forensic AI.</div>
+    </div>
+    <div style="background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:18px;margin-bottom:14px">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;color:#D4A843;font-weight:400">Document Sealing Standard (VO-DSS-1.2)</div>
+      <div style="font-size:12.5px;color:#8a93a3;margin-top:6px;line-height:1.6">Technical specification for the cryptographic sealing system. Covers SHA-512 fingerprints, OpenTimestamps Bitcoin anchoring, QR code encoding, and chain of custody.</div>
+    </div>
+    <div style="background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:18px;margin-bottom:14px" onClick="{{ startSeal }}" style-hover="border-color:#D4A843">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;color:#D4A843;font-weight:400">Document Sealing Service</div>
+      <div style="font-size:12.5px;color:#8a93a3;margin-top:6px;line-height:1.6">Apply a forensic-grade cryptographic seal to any PDF. Client-side processing &mdash; nothing leaves your device.</div>
+    </div>
+    <div style="background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:18px" onClick="{{ goVerifyTab }}" style-hover="border-color:#D4A843">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;color:#D4A843;font-weight:400">Seal Verification Service</div>
+      <div style="font-size:12.5px;color:#8a93a3;margin-top:6px;line-height:1.6">Verify a sealed document by its SHA-512 fingerprint or by re-computing the hash from the original file.</div>
+    </div>
+    <div style="text-align:center;font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;margin-top:26px;line-height:1.8">Verum Omnis Foundation &mdash; Patent Pending<br/>Constitution v6.0 Final &mdash; Article X Non-Weaponization Doctrine</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%">
+  <div style="padding:20px 20px 14px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="banner_dark.png" style="height:26px;width:auto">
+      <div style="margin-left:auto;font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#D4A843">Vault</div>
+    </div>
+    <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:300;color:#F8F9FA;letter-spacing:-0.02em;margin-top:8px">Evidence Vault</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 4px">
+    <div style="display:flex;gap:8px;overflow-x:auto;flex:1">
+      <sc-for list="{{ folders }}" as="f" hint-placeholder-count="4">
+        <div onClick="{{ selectFolder }}" data-folder="{{ f.key }}" style="{{ f.chipStyle }}">{{ f.label }} <span style="opacity:0.6">{{ f.count }}</span></div>
+      </sc-for>
+    </div>
+    <sc-if value="{{ vaultNotEmpty }}" hint-placeholder-val="{{ true }}">
+      <div onClick="{{ askEmptyVault }}" style="flex-shrink:0;font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.05em;color:#F87171;cursor:pointer;padding:6px 4px">Empty Vault</div>
+    </sc-if>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:8px 12px 90px">
+    <sc-if value="{{ filteredEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="text-align:center;padding:60px 20px;color:#4A7EC7;font-size:13px">No documents in this folder.</div>
+    </sc-if>
+    <sc-for list="{{ filteredThreads }}" as="t" hint-placeholder-count="3">
+      <div onClick="{{ openThread }}" data-id="{{ t.id }}" style="display:flex;gap:12px;align-items:flex-start;padding:14px 10px;border-radius:14px;cursor:pointer;margin-bottom:4px" style-hover="background:rgba(15,52,96,0.15)">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(15,52,96,0.25);border:1px solid rgba(26,46,82,0.6);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+          <span style="font-family:'Cormorant Garamond',serif;color:#D4A843;font-size:18px;font-weight:600">{{ t.initial }}</span>
+          <div style="{{ t.dotStyle }}"></div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <div style="font-size:14.5px;color:#F8F9FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
+            <div style="font-family:'Courier New',monospace;font-size:10px;color:#4A7EC7;flex-shrink:0">{{ t.time }}</div>
+          </div>
+          <div style="font-size:12.5px;color:{{ t.lastColor }};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.last }}</div>
+          <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#3d4c63;margin-top:2px">{{ t.path }}</div>
+        </div>
+        <div onClick="{{ deleteThread }}" data-id="{{ t.id }}" style="flex-shrink:0;color:#5b6a82;font-size:15px;padding:4px" style-hover="color:#F87171">&#128465;</div>
+      </div>
+    </sc-for>
+  </div>
+  <div onClick="{{ openSheet }}" style="position:absolute;right:20px;bottom:24px;width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#D4A843,#b8942a);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(212,168,67,0.35);cursor:pointer" style-hover="transform:translateY(-2px)">
+    <div style="font-size:28px;color:#040D1B;font-weight:300;line-height:1">+</div>
+  </div>
+  <sc-if value="{{ confirmEmpty }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:30px">
+      <div style="background:#0B1526;border:1px solid rgba(239,68,68,0.4);border-radius:16px;padding:22px;text-align:center">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;color:#F8F9FA">Empty the vault?</div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:8px;line-height:1.5">This removes all documents from this device. Sealed proofs already anchored on-chain are unaffected.</div>
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <div onClick="{{ cancelEmptyVault }}" style="flex:1;border:1px solid rgba(26,46,82,0.6);color:#D5D8DD;padding:10px;border-radius:10px;cursor:pointer;font-size:12.5px">Cancel</div>
+          <div onClick="{{ confirmEmptyVault }}" style="flex:1;background:#ef4444;color:#fff;padding:10px;border-radius:10px;cursor:pointer;font-size:12.5px">Delete All</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSheet }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;position:relative">
+  <div onClick="{{ goHome }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
+  <div style="position:absolute;left:0;right:0;bottom:0;background:#0B1526;border-top:1px solid rgba(26,46,82,0.6);border-radius:20px 20px 0 0;padding:22px 20px 32px;animation:vo-fade-in 0.25s ease">
+    <div style="width:36px;height:4px;border-radius:2px;background:rgba(213,216,221,0.25);margin:0 auto 18px"></div>
+    <div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#4A7EC7;margin-bottom:14px">New Document</div>
+    <div onClick="{{ startSeal }}" style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:12px;border:1px solid rgba(212,168,67,0.35);background:rgba(212,168,67,0.06);cursor:pointer;margin-bottom:10px">
+      <div style="width:36px;height:36px;border-radius:10px;background:rgba(212,168,67,0.15);display:flex;align-items:center;justify-content:center;color:#D4A843;font-size:16px">&#128274;</div>
+      <div><div style="color:#F8F9FA;font-size:15px">Seal Document</div><div style="color:#4A7EC7;font-size:11.5px;margin-top:2px">Watermark, QR, SHA-512 fingerprint</div></div>
+    </div>
+    <div onClick="{{ startScan }}" style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:12px;border:1px solid rgba(26,46,82,0.6);background:rgba(15,52,96,0.1);cursor:pointer;margin-bottom:10px">
+      <div style="width:36px;height:36px;border-radius:10px;background:rgba(74,126,199,0.15);display:flex;align-items:center;justify-content:center;color:#4A7EC7;font-size:16px">&#128269;</div>
+      <div><div style="color:#F8F9FA;font-size:15px">Forensic Scan</div><div style="color:#4A7EC7;font-size:11.5px;margin-top:2px">Runs the 9-Brain forensic engine (B1&ndash;B8)</div></div>
+    </div>
+    <div onClick="{{ goVerifyTab }}" style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:12px;border:1px solid rgba(26,46,82,0.6);background:rgba(15,52,96,0.1);cursor:pointer">
+      <div style="width:36px;height:36px;border-radius:10px;background:rgba(34,197,94,0.12);display:flex;align-items:center;justify-content:center;color:#22c55e;font-size:16px">&#10003;</div>
+      <div><div style="color:#F8F9FA;font-size:15px">Verify Document</div><div style="color:#4A7EC7;font-size:11.5px;margin-top:2px">Check a seal ID or hash</div></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCompose }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%">
+  <div style="display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div onClick="{{ goHome }}" style="cursor:pointer;color:#4A7EC7;font-size:18px">&#8592;</div>
+    <div style="color:#F8F9FA;font-size:15px">{{ composeTitle }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px">
+    <div style="display:flex;gap:12px;margin-bottom:18px">
+      <div onClick="{{ attachFile }}" style="flex:1;border:1px dashed #1A2E52;border-radius:14px;padding:26px 10px;text-align:center;cursor:pointer" style-hover="border-color:#D4A843;background:rgba(212,168,67,0.05)">
+        <div style="font-size:24px;color:#4A7EC7">&#128196;</div>
+        <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;margin-top:8px">Attach PDF</div>
+        <div style="font-size:10px;color:#5b6a82;margin-top:3px">from files</div>
+      </div>
+      <div onClick="{{ attachCamera }}" style="flex:1;border:1px dashed #1A2E52;border-radius:14px;padding:26px 10px;text-align:center;cursor:pointer" style-hover="border-color:#D4A843;background:rgba(212,168,67,0.05)">
+        <div style="font-size:24px;color:#4A7EC7">&#128247;</div>
+        <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#4A7EC7;margin-top:8px">Scan Document</div>
+        <div style="font-size:10px;color:#5b6a82;margin-top:3px">use camera</div>
+      </div>
+    </div>
+    <sc-if value="{{ hasAttachment }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:10px 12px;margin-bottom:18px">
+        <span style="color:#22c55e;font-size:14px">&#10003;</span>
+        <span style="font-family:'Courier New',monospace;font-size:11px;color:#D5D8DD">{{ attachmentLabel }}</span>
+      </div>
+    </sc-if>
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.06em;color:#4A7EC7;text-transform:uppercase;margin-bottom:8px">Filename</div>
+    <input value="{{ composeName }}" onChange="{{ onComposeName }}" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:12px 14px;color:#F8F9FA;font-family:'Courier New',monospace;font-size:12px;margin-bottom:18px"/>
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.06em;color:#4A7EC7;text-transform:uppercase;margin-bottom:8px">Note (optional)</div>
+    <input value="{{ composeNote }}" onChange="{{ onComposeNote }}" placeholder="Add context for this thread…" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:12px 14px;color:#F8F9FA;font-family:'Segoe UI',system-ui;font-size:13px;margin-bottom:22px"/>
+
+    <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.06em;color:#4A7EC7;text-transform:uppercase;margin-bottom:8px">Seal Type</div>
+    <div style="display:flex;gap:10px;margin-bottom:22px">
+      <div onClick="{{ setSealTypePrivate }}" style="{{ privateTypeStyle }}">&#127968; Private (Free)</div>
+      <div onClick="{{ setSealTypeCommercial }}" style="{{ commercialTypeStyle }}">&#127970; Commercial</div>
+    </div>
+    <sc-if value="{{ isCommercialType }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-bottom:22px">
+        <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.06em;color:#4A7EC7;text-transform:uppercase;margin-bottom:8px">Organisation Name</div>
+        <input value="{{ orgName }}" onChange="{{ onOrgName }}" placeholder="e.g., Standard Bank, FNB, Legal Firm…" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:12px 14px;color:#F8F9FA;font-size:13px;margin-bottom:10px"/>
+        <div style="background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:10px;padding:12px;font-size:11.5px;color:#D4A843;line-height:1.6">&#9888; Commercial use requires a licence. Free for law enforcement &amp; private citizens.</div>
+      </div>
+    </sc-if>
+
+    <div onClick="{{ toggleIdentity }}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.06em;color:#4A7EC7;text-transform:uppercase;cursor:pointer;margin-bottom:14px">&#128100; + Add Sender Identity (optional)</div>
+    <sc-if value="{{ showIdentity }}" hint-placeholder-val="{{ false }}">
+      <div style="background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:12px;padding:16px;margin-bottom:22px">
+        <div style="font-size:11.5px;color:#8a93a3;margin-bottom:12px;line-height:1.5">Appears only in your private Seal Certificate for affidavit pre-fill and chain of custody &mdash; never in the public QR unless opted in below.</div>
+        <input value="{{ senderName }}" onChange="{{ onSenderName }}" placeholder="Full name" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px;margin-bottom:10px"/>
+        <input value="{{ senderId }}" onChange="{{ onSenderId }}" placeholder="ID / Passport number" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px;margin-bottom:10px"/>
+        <input value="{{ senderAddress }}" onChange="{{ onSenderAddress }}" placeholder="Physical address" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px;margin-bottom:10px"/>
+        <input value="{{ senderEmail }}" onChange="{{ onSenderEmail }}" placeholder="Contact email" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px;margin-bottom:12px"/>
+        <div onClick="{{ toggleIdentityInQr }}" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+          <div style="{{ identityQrBoxStyle }}"></div>
+          <div style="font-size:11.5px;color:#D5D8DD;line-height:1.5">Include identity + GPS in the public QR code. <span style="color:#D4A843">Anyone holding the document can read this.</span></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div onClick="{{ togglePassword }}" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px">
+      <div style="{{ passwordBoxStyle }}"></div>
+      <div style="font-size:13px;color:#D5D8DD">&#128274; Password protect (delivery receipt mode)</div>
+    </div>
+    <sc-if value="{{ showPassword }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-bottom:22px">
+        <div style="font-size:11.5px;color:#8a93a3;margin-bottom:10px;line-height:1.5">Recipient must contact you for the password before opening &mdash; that request is your delivery receipt.</div>
+        <input type="password" value="{{ docPassword }}" onChange="{{ onDocPassword }}" placeholder="Password (min 8 characters)" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px;margin-bottom:10px"/>
+        <input type="password" value="{{ docPasswordConfirm }}" onChange="{{ onDocPasswordConfirm }}" placeholder="Confirm password" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:11px 14px;color:#F8F9FA;font-size:13px"/>
+      </div>
+    </sc-if>
+
+    <div onClick="{{ confirmCompose }}" style="background:linear-gradient(135deg,#D4A843,#b8942a);color:#040D1B;text-align:center;padding:14px;border-radius:12px;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;font-weight:600">{{ composeCta }}</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPipeline }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%;position:relative">
+  <div style="display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div onClick="{{ goHome }}" style="cursor:pointer;color:#4A7EC7;font-size:18px">&#8592;</div>
+    <div style="flex:1;min-width:0">
+      <div style="color:#F8F9FA;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pipelineName }}</div>
+      <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pipelineStatusColor }}">{{ pipelineStatusLabel }}</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 14px 20px;display:flex;flex-direction:column;gap:10px">
+    <div style="align-self:flex-end;max-width:82%;background:rgba(74,126,199,0.18);border:1px solid rgba(26,46,82,0.6);border-radius:14px 14px 3px 14px;padding:10px 14px">
+      <div style="font-size:13px;color:#F8F9FA">Uploaded &mdash; {{ pipelineName }}</div>
+    </div>
+    <sc-for list="{{ stepRows }}" as="s" hint-placeholder-count="8">
+      <div style="display:flex;gap:10px;align-items:flex-start;max-width:88%;animation:vo-fade-in 0.3s ease">
+        <img src="app_icon_circle.png" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px;opacity:{{ s.avatarOpacity }}">
+        <div style="{{ s.bubbleStyle }}">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="{{ s.dotStyle }}"></div>
+            <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:{{ s.labelColor }}">{{ s.label }}</div>
+            <div style="margin-left:auto;font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.06em;color:{{ s.stateColor }}">{{ s.stateText }}</div>
+          </div>
+          <div style="font-size:12px;color:#D5D8DD;margin-top:4px;line-height:1.4">{{ s.desc }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ showSummary }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;align-items:flex-start;max-width:92%;animation:vo-fade-in 0.4s ease">
+        <img src="app_icon_circle.png" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px">
+        <div style="{{ summaryStyle }}">
+          <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:500;color:{{ summaryTitleColor }}">{{ summaryTitle }}</div>
+          <div style="font-family:'Courier New',monospace;font-size:10.5px;color:#4A7EC7;margin-top:8px;letter-spacing:0.04em">SEAL ID</div>
+          <div style="font-family:'Courier New',monospace;font-size:12px;color:#F8F9FA;margin-top:2px">{{ sealId }}</div>
+          <div style="font-family:'Courier New',monospace;font-size:10.5px;color:#4A7EC7;margin-top:10px;letter-spacing:0.04em">SHA-512</div>
+          <div style="font-family:'Courier New',monospace;font-size:11px;color:#22c55e;margin-top:2px;word-break:break-all">{{ sha512Short }}</div>
+          <sc-if value="{{ isFlagged }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px">
+              <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;color:#F87171;text-transform:uppercase">Fraud Score {{ fraudScore }}/100</div>
+              <div style="font-size:11.5px;color:#D5D8DD;margin-top:4px">Matched: {{ fraudKeywords }}</div>
+            </div>
+          </sc-if>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <div onClick="{{ openQrDetail }}" style="width:52px;height:52px;border:1px dashed rgba(74,126,199,0.5);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-size:8px;color:#4A7EC7;text-align:center;line-height:1.2;cursor:pointer" style-hover="border-color:#D4A843;color:#D4A843">QR&nbsp;CODE</div>
+            <div style="flex:1;display:flex;align-items:center;font-size:11px;color:#4A7EC7;line-height:1.4">verumglobal.foundation/verify.html?h={{ sha512Prefix }}&hellip;</div>
+          </div>
+          <div onClick="{{ openShareSheet }}" style="margin-top:14px;text-align:center;background:rgba(74,126,199,0.12);border:1px solid rgba(74,126,199,0.35);color:#4A7EC7;padding:10px;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer">&#8593; Share / Export</div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+  <sc-if value="{{ showQrDetail }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeQrDetail }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:26px;z-index:60">
+      <div onClick="{{ stopProp }}" style="background:#0B1526;border:1px solid rgba(212,168,67,0.35);border-radius:16px;padding:22px;max-width:100%">
+        <div style="width:150px;height:150px;margin:0 auto 16px;border:1px dashed rgba(74,126,199,0.5);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-size:10px;color:#4A7EC7;text-align:center;line-height:1.4">QR CODE<br/>PLACEHOLDER</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em">SEAL ID</div>
+        <div style="font-size:12px;color:#F8F9FA;margin-top:2px">{{ sealId }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">SHA-512</div>
+        <div style="font-size:10.5px;color:#22c55e;margin-top:2px;word-break:break-all">{{ sha512Short }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">TIMESTAMP</div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:2px">{{ qrTimestamp }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">GPS &middot; DEVICE</div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:2px">{{ qrGps }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">VERIFY URL</div>
+        <div style="font-size:11px;color:#4A7EC7;margin-top:2px;word-break:break-all">verumglobal.foundation/verify.html?h={{ sha512Prefix }}&amp;m=&hellip;</div>
+        <div onClick="{{ closeQrDetail }}" style="margin-top:16px;text-align:center;background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.35);color:#D4A843;padding:9px;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer">Close</div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ showShareSheet }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeShareSheet }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:60">
+      <div onClick="{{ stopProp }}" style="position:absolute;left:0;right:0;bottom:0;background:#0B1526;border-top:1px solid rgba(26,46,82,0.6);border-radius:20px 20px 0 0;padding:22px 20px 32px">
+        <div style="width:36px;height:4px;border-radius:2px;background:rgba(213,216,221,0.25);margin:0 auto 18px"></div>
+        <div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#4A7EC7;margin-bottom:14px">Share / Export</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#D4A843">&#128196;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Share Sealed PDF</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">Watermark, QR &amp; footer on every page</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#128279;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Share Verification Link</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">verumglobal.foundation/verify.html?h=&hellip;</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#8635;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Export .OTS Proof</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">Bitcoin OpenTimestamps proof file</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#10697;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Copy Seal ID</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">{{ sealId }}</div></div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isThread }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%;position:relative">
+  <div style="display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div onClick="{{ goHome }}" style="cursor:pointer;color:#4A7EC7;font-size:18px">&#8592;</div>
+    <div style="flex:1;min-width:0">
+      <div style="color:#F8F9FA;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ activeThreadName }}</div>
+      <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pipelineStatusColor }}">{{ pipelineStatusLabel }}</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 14px 20px;display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ stepRows }}" as="s" hint-placeholder-count="8">
+      <div style="display:flex;gap:10px;align-items:flex-start;max-width:88%">
+        <img src="app_icon_circle.png" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px">
+        <div style="{{ s.bubbleStyle }}">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="{{ s.dotStyle }}"></div>
+            <div style="font-family:'Courier New',monospace;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:{{ s.labelColor }}">{{ s.label }}</div>
+            <div style="margin-left:auto;font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.06em;color:{{ s.stateColor }}">{{ s.stateText }}</div>
+          </div>
+          <div style="font-size:12px;color:#D5D8DD;margin-top:4px;line-height:1.4">{{ s.desc }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;gap:10px;align-items:flex-start;max-width:92%">
+      <img src="app_icon_circle.png" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px">
+      <div style="{{ summaryStyle }}">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:500;color:{{ summaryTitleColor }}">{{ summaryTitle }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:10.5px;color:#4A7EC7;margin-top:8px;letter-spacing:0.04em">SEAL ID</div>
+        <div style="font-family:'Courier New',monospace;font-size:12px;color:#F8F9FA;margin-top:2px">{{ sealId }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:10.5px;color:#4A7EC7;margin-top:10px;letter-spacing:0.04em">SHA-512</div>
+        <div style="font-family:'Courier New',monospace;font-size:11px;color:#22c55e;margin-top:2px;word-break:break-all">{{ sha512Short }}</div>
+        <sc-if value="{{ isFlagged }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:12px;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px">
+            <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.06em;color:#F87171;text-transform:uppercase">Fraud Score {{ fraudScore }}/100</div>
+            <div style="font-size:11.5px;color:#D5D8DD;margin-top:4px">Matched: {{ fraudKeywords }}</div>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <div onClick="{{ openQrDetail }}" style="width:52px;height:52px;border:1px dashed rgba(74,126,199,0.5);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-size:8px;color:#4A7EC7;text-align:center;line-height:1.2;cursor:pointer" style-hover="border-color:#D4A843;color:#D4A843">QR&nbsp;CODE</div>
+          <div style="flex:1;display:flex;align-items:center;font-size:11px;color:#4A7EC7;line-height:1.4">verumglobal.foundation/verify.html?h={{ sha512Prefix }}&hellip;</div>
+        </div>
+        <div onClick="{{ openShareSheet }}" style="margin-top:14px;text-align:center;background:rgba(74,126,199,0.12);border:1px solid rgba(74,126,199,0.35);color:#4A7EC7;padding:10px;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer">&#8593; Share / Export</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:#3d4c63;margin:8px 0">Ask Verum AI about this document</div>
+
+    <sc-for list="{{ chatMessages }}" as="m" hint-placeholder-count="0">
+      <sc-if value="{{ m.isUser }}" hint-placeholder-val="{{ false }}">
+        <div style="align-self:flex-end;max-width:82%;background:rgba(74,126,199,0.18);border:1px solid rgba(26,46,82,0.6);border-radius:14px 14px 3px 14px;padding:10px 14px">
+          <div style="font-size:13px;color:#F8F9FA">{{ m.text }}</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ m.isAi }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:10px;align-items:flex-start;max-width:90%">
+          <img src="app_icon_circle.png" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:2px">
+          <div style="flex:1;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:3px 14px 14px 14px;padding:12px 14px">
+            <div style="font-size:13px;color:#D5D8DD;line-height:1.5">{{ m.text }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+              <span style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.04em;color:#4A7EC7;background:rgba(74,126,199,0.12);border:1px solid rgba(26,46,82,0.5);border-radius:6px;padding:3px 8px">{{ m.citation }}</span>
+              <span style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.04em;color:{{ m.confidenceColor }};background:rgba(212,168,67,0.08);border:1px solid rgba(212,168,67,0.3);border-radius:6px;padding:3px 8px">{{ m.confidence }}</span>
+              <span style="font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:0.04em;color:#D5D8DD;background:rgba(15,52,96,0.15);border:1px solid rgba(26,46,82,0.5);border-radius:6px;padding:3px 8px">{{ m.statute }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-for>
+  </div>
+  <div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid rgba(26,46,82,0.5)">
+    <input value="{{ chatInput }}" onChange="{{ onChatInput }}" onKeyDown="{{ onChatKeyDown }}" placeholder="Ask about this document…" style="flex:1;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:20px;padding:10px 16px;color:#F8F9FA;font-size:13px"/>
+    <div onClick="{{ sendChat }}" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#D4A843,#b8942a);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#040D1B;font-size:15px">&#10148;</div>
+  </div>
+  <sc-if value="{{ showQrDetail }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeQrDetail }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:26px;z-index:60">
+      <div onClick="{{ stopProp }}" style="background:#0B1526;border:1px solid rgba(212,168,67,0.35);border-radius:16px;padding:22px;max-width:100%">
+        <div style="width:150px;height:150px;margin:0 auto 16px;border:1px dashed rgba(74,126,199,0.5);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-size:10px;color:#4A7EC7;text-align:center;line-height:1.4">QR CODE<br/>PLACEHOLDER</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em">SEAL ID</div>
+        <div style="font-size:12px;color:#F8F9FA;margin-top:2px">{{ sealId }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">SHA-512</div>
+        <div style="font-size:10.5px;color:#22c55e;margin-top:2px;word-break:break-all">{{ sha512Short }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">TIMESTAMP</div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:2px">{{ qrTimestamp }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">GPS &middot; DEVICE</div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:2px">{{ qrGps }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;letter-spacing:0.06em;margin-top:10px">VERIFY URL</div>
+        <div style="font-size:11px;color:#4A7EC7;margin-top:2px;word-break:break-all">verumglobal.foundation/verify.html?h={{ sha512Prefix }}&amp;m=&hellip;</div>
+        <div onClick="{{ closeQrDetail }}" style="margin-top:16px;text-align:center;background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.35);color:#D4A843;padding:9px;border-radius:10px;font-family:'Courier New',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer">Close</div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ showShareSheet }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeShareSheet }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:60">
+      <div onClick="{{ stopProp }}" style="position:absolute;left:0;right:0;bottom:0;background:#0B1526;border-top:1px solid rgba(26,46,82,0.6);border-radius:20px 20px 0 0;padding:22px 20px 32px">
+        <div style="width:36px;height:4px;border-radius:2px;background:rgba(213,216,221,0.25);margin:0 auto 18px"></div>
+        <div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#4A7EC7;margin-bottom:14px">Share / Export</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#D4A843">&#128196;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Share Sealed PDF</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">Watermark, QR &amp; footer on every page</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#128279;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Share Verification Link</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">verumglobal.foundation/verify.html?h=&hellip;</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid rgba(26,46,82,0.4);cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#8635;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Export .OTS Proof</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">Bitcoin OpenTimestamps proof file</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 4px;cursor:pointer">
+          <span style="font-size:16px;color:#4A7EC7">&#10697;</span>
+          <div><div style="color:#F8F9FA;font-size:14px">Copy Seal ID</div><div style="color:#4A7EC7;font-size:11px;margin-top:2px">{{ sealId }}</div></div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isVerify }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;height:100%">
+  <div style="padding:20px 20px 14px;border-bottom:1px solid rgba(26,46,82,0.5)">
+    <div style="font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#D4A843">Verify</div>
+    <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:24px;font-weight:300;color:#F8F9FA;margin-top:6px">Check a Seal</div>
+    <div style="font-size:12px;color:#D5D8DD;margin-top:6px;line-height:1.5">Scan a document's QR code or paste its seal hash to confirm authenticity and view its chain of custody.</div>
+    <div style="font-family:'Courier New',monospace;font-size:9.5px;color:#4A7EC7;margin-top:10px">Verification runs against the sealed record at verumglobal.foundation/verify.html</div>
+  </div>
+  <div style="padding:18px 20px;flex:1;overflow-y:auto">
+    <div onClick="{{ scanQr }}" style="border:1px dashed #1A2E52;border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;margin-bottom:16px" style-hover="border-color:#D4A843;background:rgba(212,168,67,0.05)">
+      <div style="font-size:28px;color:#4A7EC7">&#9737;</div>
+      <div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#4A7EC7;margin-top:8px">Tap to scan QR code</div>
+    </div>
+    <input value="{{ verifyInput }}" onChange="{{ onVerifyInput }}" placeholder="Or paste SHA-512 / Seal ID" style="width:100%;box-sizing:border-box;background:rgba(4,13,27,0.5);border:1px solid #1A2E52;border-radius:10px;padding:12px 14px;color:#F8F9FA;font-family:'Courier New',monospace;font-size:12px;margin-bottom:12px"/>
+    <div onClick="{{ runVerify }}" style="background:linear-gradient(135deg,#D4A843,#b8942a);color:#040D1B;text-align:center;padding:13px;border-radius:12px;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;font-weight:600">Verify</div>
+
+    <sc-if value="{{ hasVerifyResult }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:20px;background:rgba(15,52,96,0.08);border:1px solid rgba(26,46,82,0.5);border-radius:16px;padding:18px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:{{ verifyResultColor }}"></div>
+          <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;color:{{ verifyResultColor }}">{{ verifyResultTitle }}</div>
+        </div>
+        <div style="font-size:12px;color:#D5D8DD;margin-top:8px;line-height:1.5">{{ verifyResultDesc }}</div>
+        <div style="font-family:'Courier New',monospace;font-size:10.5px;color:#4A7EC7;margin-top:12px;letter-spacing:0.04em">CHAIN OF CUSTODY</div>
+        <sc-for list="{{ verifyChain }}" as="c" hint-placeholder-count="2">
+          <div style="display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:11px;padding:8px 0;border-bottom:1px solid rgba(26,46,82,0.3)">
+            <span style="color:#F8F9FA">{{ c.id }}</span>
+            <span style="color:#4A7EC7">{{ c.date }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;border-top:1px solid rgba(26,46,82,0.5);background:rgba(4,13,27,0.9)">
+  <div onClick="{{ goLanding }}" style="flex:1;text-align:center;padding:10px 0 8px;cursor:pointer">
+    <div style="font-size:16px;color:{{ landingTabColor }}">&#8962;</div>
+    <div style="font-family:'Courier New',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:{{ landingTabColor }};margin-top:2px">Home</div>
+  </div>
+  <div onClick="{{ goHome }}" style="flex:1;text-align:center;padding:10px 0 8px;cursor:pointer">
+    <div style="font-size:16px;color:{{ vaultTabColor }}">&#9724;</div>
+    <div style="font-family:'Courier New',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:{{ vaultTabColor }};margin-top:2px">Vault</div>
+  </div>
+  <div onClick="{{ goVerifyTab }}" style="flex:1;text-align:center;padding:10px 0 8px;cursor:pointer">
+    <div style="font-size:16px;color:{{ verifyTabColor }}">&#10003;</div>
+    <div style="font-family:'Courier New',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:{{ verifyTabColor }};margin-top:2px">Verify</div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-import>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SEAL_STEPS = [
+  {label:'GPS + Device', desc:'Capturing geolocation & device fingerprint'},
+  {label:'SHA-256', desc:'Computing hash for OpenTimestamps'},
+  {label:'OpenTimestamps', desc:'Submitting digest to calendar servers'},
+  {label:'A4 Watermark', desc:'Applying full-page watermark at 20% opacity'},
+  {label:'Clean QR Code', desc:'Encoding hash + identity + GPS + device'},
+  {label:'Seal Footer', desc:'Writing hash + timestamp to every page'},
+  {label:'Finalize', desc:'Preparing sealed PDF package'},
+  {label:'SHA-512', desc:'Verum Forensic Fingerprint — final seal'},
+];
+const SCAN_STEPS = [
+  {label:'B1 · Contradiction', desc:'Cross-checks statements for direct and implied contradictions'},
+  {label:'B2 · Document Forensics', desc:'Inspects structure, metadata and edit history for tampering'},
+  {label:'B3 · Communications', desc:'Analyses emails/chats for coercion, pressure and intent'},
+  {label:'B4 · Linguistics & Deception', desc:'Flags deceptive language and fraud keyword patterns'},
+  {label:'B5 · Timeline & Geolocation', desc:'Reconstructs event sequence against GPS and timestamps'},
+  {label:'B6 · Financial', desc:'Detects financial fraud patterns and anomalies'},
+  {label:'B7 · Legal Mapping', desc:'Maps findings to applicable statutes and jurisdiction'},
+  {label:'B8 · Audio & Voice', desc:'Analyses any attached audio for voice-stress indicators'},
+];
+const THREADS = [
+  {id:1, name:'Employment_Contract.pdf', initial:'E', mode:'seal', flagged:false, time:'09:41', done:true, folder:'sealed', path:'/reports/sealed/'},
+  {id:2, name:'Wire_Transfer_Notice.pdf', initial:'W', mode:'scan', flagged:true, time:'Yesterday', done:true, folder:'sealed', path:'/reports/sealed/'},
+  {id:4, name:'NDA_Draft_v3.pdf', initial:'N', mode:'seal', flagged:false, time:'2 days', done:true, folder:'processed', path:'/evidence/processed/'},
+  {id:5, name:'Bank_Statement_Q2.pdf', initial:'B', mode:'seal', flagged:false, time:'3 days', done:false, folder:'raw', path:'/evidence/raw/'},
+];
+const FOLDER_LABELS = [
+  {key:'all', label:'All'},
+  {key:'raw', label:'Raw'},
+  {key:'processed', label:'Processed'},
+  {key:'sealed', label:'Sealed'},
+];
+
+function dotStyle(color, glow) {
+  return `width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0${glow ? `;animation:vo-pulse 1.4s ease-in-out infinite` : ''}`;
+}
+function bubbleStyle(borderColor, bg) {
+  return `flex:1;background:${bg};border:1px solid ${borderColor};border-radius:3px 14px 14px 14px;padding:10px 14px`;
+}
+
+class Component extends DCLogic {
+  state = {
+    screen: 'landing', // landing | home | sheet | compose | pipeline | thread | verify
+    tab: 'home',
+    mode: null,
+    pipelineName: '',
+    stepIndex: -1,
+    flagged: false,
+    activeThread: null,
+    verifyInput: '',
+    verifyResult: null,
+    composeName: '',
+    composeNote: '',
+    attachSource: null,
+    sealTypeCommercial: false,
+    orgName: '',
+    showIdentity: false,
+    senderName: '', senderId: '', senderAddress: '', senderEmail: '',
+    identityInQr: false,
+    showPassword: false,
+    docPassword: '', docPasswordConfirm: '',
+    vaultFolder: 'all',
+    chatMessages: [],
+    chatInput: '',
+    threadsList: THREADS.slice(),
+    confirmEmpty: false,
+    notification: null,
+    showQrDetail: false,
+    showShareSheet: false,
+  };
+
+  componentWillUnmount() { if (this.timer) clearInterval(this.timer); if (this.notifTimer) clearTimeout(this.notifTimer); }
+
+  openSheet = () => this.setState({ screen: 'sheet' });
+  goHome = () => { if (this.timer) clearInterval(this.timer); this.setState({ screen: 'home', tab: 'vault' }); };
+  goVerifyTab = () => this.setState({ screen: 'verify', tab: 'verify' });
+  goLanding = () => { if (this.timer) clearInterval(this.timer); this.setState({ screen: 'landing', tab: 'home' }); };
+  goConstitution = () => { if (this.timer) clearInterval(this.timer); this.setState({ screen: 'constitution' }); };
+  goDocuments = () => { if (this.timer) clearInterval(this.timer); this.setState({ screen: 'documents' }); };
+
+  composeDefaults = { composeNote: '', attachSource: null, sealTypeCommercial: false, orgName: '', showIdentity: false, senderName: '', senderId: '', senderAddress: '', senderEmail: '', identityInQr: false, showPassword: false, docPassword: '', docPasswordConfirm: '' };
+  startSeal = () => this.setState({ screen: 'compose', mode: 'seal', composeName: 'New_Document.pdf', ...this.composeDefaults });
+  startScan = () => this.setState({ screen: 'compose', mode: 'scan', composeName: 'New_Document.pdf', ...this.composeDefaults });
+  setSealTypePrivate = () => this.setState({ sealTypeCommercial: false });
+  setSealTypeCommercial = () => this.setState({ sealTypeCommercial: true });
+  onOrgName = (e) => this.setState({ orgName: e.target.value });
+  toggleIdentity = () => this.setState(s => ({ showIdentity: !s.showIdentity }));
+  onSenderName = (e) => this.setState({ senderName: e.target.value });
+  onSenderId = (e) => this.setState({ senderId: e.target.value });
+  onSenderAddress = (e) => this.setState({ senderAddress: e.target.value });
+  onSenderEmail = (e) => this.setState({ senderEmail: e.target.value });
+  toggleIdentityInQr = () => this.setState(s => ({ identityInQr: !s.identityInQr }));
+  togglePassword = () => this.setState(s => ({ showPassword: !s.showPassword }));
+  onDocPassword = (e) => this.setState({ docPassword: e.target.value });
+  onDocPasswordConfirm = (e) => this.setState({ docPasswordConfirm: e.target.value });
+  attachFile = () => this.setState({ attachSource: 'file', composeName: this.state.composeName || 'Scanned_Statement.pdf' });
+  attachCamera = () => this.setState({ attachSource: 'camera', composeName: 'Camera_Scan_' + new Date().toISOString().slice(0,10) + '.pdf' });
+  onComposeName = (e) => this.setState({ composeName: e.target.value });
+  onComposeNote = (e) => this.setState({ composeNote: e.target.value });
+  confirmCompose = () => {
+    const s = this.state;
+    this.beginPipeline(s.mode, s.composeName || 'New_Document.pdf', s.mode === 'scan' && Math.random() > 0.5);
+  };
+
+  beginPipeline(mode, name, flagged) {
+    if (this.timer) clearInterval(this.timer);
+    const steps = mode === 'seal' ? SEAL_STEPS : SCAN_STEPS;
+    this.setState({ screen: 'pipeline', mode, pipelineName: name, stepIndex: 0, flagged });
+    this.timer = setInterval(() => {
+      this.setState(s => {
+        const next = s.stepIndex + 1;
+        if (next >= steps.length) {
+          clearInterval(this.timer);
+          this.fireNotification(mode, flagged, name);
+          return { stepIndex: steps.length };
+        }
+        return { stepIndex: next };
+      });
+    }, 850);
+  }
+
+  fireNotification(mode, flagged, name) {
+    const title = flagged ? 'Fraud Indicators Found' : (mode === 'seal' ? 'Document Sealed' : 'Scan Complete — Clean');
+    const body = `${name} — ${flagged ? 'review the forensic findings' : (mode === 'seal' ? 'SHA-512 fingerprint & Bitcoin anchor ready' : 'no indicators detected')}`;
+    if (this.notifTimer) clearTimeout(this.notifTimer);
+    this.setState({ notification: { title, body, flagged } });
+    this.notifTimer = setTimeout(() => this.setState({ notification: null }), 5000);
+  }
+  dismissNotification = (e) => { e.stopPropagation(); if (this.notifTimer) clearTimeout(this.notifTimer); this.setState({ notification: null }); };
+  openNotification = () => { if (this.notifTimer) clearTimeout(this.notifTimer); this.setState({ notification: null, screen: 'pipeline' }); };
+  openQrDetail = () => this.setState({ showQrDetail: true });
+  closeQrDetail = () => this.setState({ showQrDetail: false });
+  stopProp = (e) => e.stopPropagation();
+  openShareSheet = () => this.setState({ showShareSheet: true });
+  closeShareSheet = () => this.setState({ showShareSheet: false });
+
+  openThread = (e) => {
+    const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+    const t = THREADS.find(x => x.id === id);
+    if (this.timer) clearInterval(this.timer);
+    const total = t.mode === 'seal' ? SEAL_STEPS.length : SCAN_STEPS.length;
+    this.setState({ screen: 'thread', activeThread: t, mode: t.mode, flagged: t.flagged, stepIndex: t.done ? total : 0, chatMessages: [], chatInput: '' });
+  };
+
+  onChatInput = (e) => this.setState({ chatInput: e.target.value });
+  onChatKeyDown = (e) => { if (e.key === 'Enter') this.sendChat(); };
+  sendChat = () => {
+    const q = this.state.chatInput.trim();
+    if (!q) return;
+    const t = this.state.activeThread;
+    const flagged = t && t.flagged;
+    const hash = 'a1c825e8f3b6d9c2';
+    const ql = q.toLowerCase();
+    let text, confidence, confColor, statute;
+    if (flagged || /fraud|tamper|scam/.test(ql)) {
+      text = 'Fraud indicators were found on page 1: the phrases "wire transfer" and "urgent payment" match known advance-fee fraud patterns. This is a forensic indicator, not a legal determination — findings are disclosed alongside the sealed original under the Pristine Seal Doctrine.';
+      confidence = 'HIGH'; confColor = '#D4A843';
+      statute = 'Fraud Act 2006 s.2 (UK)';
+    } else if (/date|time|when/.test(ql)) {
+      text = 'This document was sealed with a GPS + device fingerprint and an OpenTimestamps Bitcoin anchor at the time of upload, which fixes the earliest provable date the content existed in this form.';
+      confidence = 'VERY_HIGH'; confColor = '#22c55e';
+      statute = 'Evidence Act — timestamp admissibility';
+    } else {
+      text = `Based on the sealed content (page 1, SHA-512 ${hash}…), I don't have a specific finding for that yet — ask about the seal, the fraud score, or the chain of custody and I'll cite the exact evidence anchor.`;
+      confidence = 'MODERATE'; confColor = '#4A7EC7';
+      statute = 'Chain of Custody — Art. IV';
+    }
+    this.setState(s => ({
+      chatInput: '',
+      chatMessages: [...s.chatMessages,
+        { isUser: true, text: q },
+        { isAi: true, text, citation: `Page 1 · SHA-512 ${hash}…`, confidence, confidenceColor: confColor, statute },
+      ],
+    }));
+  };
+
+  selectFolder = (e) => this.setState({ vaultFolder: e.currentTarget.getAttribute('data-folder') });
+  deleteThread = (e) => {
+    e.stopPropagation();
+    const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
+    this.setState(s => ({ threadsList: s.threadsList.filter(t => t.id !== id) }));
+  };
+  askEmptyVault = () => this.setState({ confirmEmpty: true });
+  cancelEmptyVault = () => this.setState({ confirmEmpty: false });
+  confirmEmptyVault = () => this.setState({ threadsList: [], confirmEmpty: false });
+  onVerifyInput = (e) => this.setState({ verifyInput: e.target.value });
+  scanQr = () => this.setState({ verifyInput: 'VO-8F21AC90D3E4' });
+  runVerify = () => {
+    const tampered = /tamper|VO-2C88/i.test(this.state.verifyInput);
+    this.setState({ verifyResult: tampered ? 'tampered' : 'verified' });
+  };
+
+  renderVals() {
+    const s = this.state;
+    const mode = s.mode || 'seal';
+    const steps = mode === 'seal' ? SEAL_STEPS : SCAN_STEPS;
+    const stepIndex = s.stepIndex;
+
+    const threads = s.threadsList.map(t => ({
+      ...t,
+      dotStyle: `position:absolute;bottom:-2px;right:-2px;width:11px;height:11px;border-radius:50%;border:2px solid #040D1B;background:${t.flagged ? '#ef4444' : '#22c55e'}`,
+      last: !t.done ? 'Awaiting processing' : (t.mode === 'seal' ? (t.flagged ? 'Flagged during seal' : 'Sealed · SHA-512 verified') : (t.flagged ? 'Fraud indicators found' : 'Scan complete · clean')),
+      lastColor: !t.done ? '#4A7EC7' : (t.flagged ? '#F87171' : '#8a93a3'),
+    }));
+    const vf = s.vaultFolder;
+    const filteredThreads = vf === 'all' ? threads : threads.filter(t => t.folder === vf);
+    const folders = FOLDER_LABELS.map(f => ({
+      key: f.key, label: f.label,
+      count: f.key === 'all' ? threads.length : threads.filter(t => t.folder === f.key).length,
+      chipStyle: `flex-shrink:0;padding:6px 14px;border-radius:20px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.04em;cursor:pointer;` + (vf === f.key ? 'background:rgba(212,168,67,0.15);border:1px solid #D4A843;color:#D4A843' : 'background:rgba(15,52,96,0.1);border:1px solid rgba(26,46,82,0.5);color:#4A7EC7'),
+    }));
+
+    const stepRows = steps.map((step, i) => {
+      const isFlaggedStep = s.flagged && mode === 'scan' && i === 3; // B4 Linguistics & Deception
+      let state_, dot, labelColor, stateColor, stateText, border, bg, avatarOpacity;
+      if (i < stepIndex) {
+        state_ = 'done';
+        dot = isFlaggedStep ? '#ef4444' : '#22c55e';
+        labelColor = '#D5D8DD'; stateColor = isFlaggedStep ? '#F87171' : '#22c55e'; stateText = isFlaggedStep ? 'FLAGGED' : 'COMPLETE';
+        border = isFlaggedStep ? 'rgba(239,68,68,0.4)' : 'rgba(34,197,94,0.25)';
+        bg = isFlaggedStep ? 'rgba(239,68,68,0.06)' : 'rgba(15,52,96,0.08)';
+        avatarOpacity = 1;
+      } else if (i === stepIndex) {
+        state_ = 'active';
+        dot = '#D4A843';
+        labelColor = '#D4A843'; stateColor = '#D4A843'; stateText = 'PROCESSING';
+        border = 'rgba(212,168,67,0.45)'; bg = 'rgba(212,168,67,0.06)';
+        avatarOpacity = 1;
+      } else {
+        state_ = 'pending';
+        dot = 'rgba(74,126,199,0.3)';
+        labelColor = '#4A7EC7'; stateColor = 'rgba(74,126,199,0.6)'; stateText = 'PENDING';
+        border = 'rgba(26,46,82,0.4)'; bg = 'rgba(15,52,96,0.03)';
+        avatarOpacity = 0.35;
+      }
+      return {
+        label: step.label, desc: step.desc,
+        dotStyle: dotStyle(dot, state_ === 'active'),
+        bubbleStyle: bubbleStyle(border, bg),
+        labelColor, stateColor, stateText, avatarOpacity,
+      };
+    });
+
+    const done = stepIndex >= steps.length;
+    const isFlagged = s.flagged && mode === 'scan';
+    const sealId = 'VO-' + (s.activeThread ? '8F21AC90D3E4' : '4B7D019ACE22');
+    const sha512Full = 'a1c825e8f3b6d9c2e4a7f0918b3c5d6e7f8091a2b3c4d5e6f7081920a3b4c5d6e7f80912a3b4c5d6e7f8091203a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e';
+    const pipelineStatusLabel = done ? (isFlagged ? 'Flagged' : (mode === 'seal' ? 'Sealed' : 'Scan Complete')) : 'Processing';
+    const pipelineStatusColor = done ? (isFlagged ? '#F87171' : '#22c55e') : '#D4A843';
+
+    return {
+      isLanding: s.screen === 'landing', recentThreads: threads.slice(0, 2), goLanding: this.goLanding,
+      isHome: s.screen === 'home', isSheet: s.screen === 'sheet', isPipeline: s.screen === 'pipeline',
+      isThread: s.screen === 'thread', isVerify: s.screen === 'verify', isCompose: s.screen === 'compose',
+      isConstitution: s.screen === 'constitution', goConstitution: this.goConstitution,
+      isDocuments: s.screen === 'documents', goDocuments: this.goDocuments,
+      showTabBar: s.screen !== 'sheet' && s.screen !== 'compose' && s.screen !== 'constitution' && s.screen !== 'documents',
+      landingTabColor: s.tab === 'home' ? '#D4A843' : '#4A7EC7',
+      composeTitle: mode === 'seal' ? 'New Seal' : 'New Forensic Scan',
+      composeName: s.composeName, composeNote: s.composeNote,
+      onComposeName: this.onComposeName, onComposeNote: this.onComposeNote, confirmCompose: this.confirmCompose,
+      composeCta: mode === 'seal' ? 'Seal Document' : 'Run Forensic Scan',
+      attachFile: this.attachFile, attachCamera: this.attachCamera,
+      hasAttachment: !!s.attachSource,
+      attachmentLabel: s.attachSource === 'camera' ? 'Captured via camera' : 'Attached from files',
+      isCommercialType: s.sealTypeCommercial,
+      setSealTypePrivate: this.setSealTypePrivate, setSealTypeCommercial: this.setSealTypeCommercial,
+      privateTypeStyle: `flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;font-size:12.5px;border:1px solid ${!s.sealTypeCommercial ? '#D4A843' : 'rgba(26,46,82,0.6)'};color:${!s.sealTypeCommercial ? '#D4A843' : '#4A7EC7'};background:${!s.sealTypeCommercial ? 'rgba(212,168,67,0.1)' : 'transparent'}`,
+      commercialTypeStyle: `flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;font-size:12.5px;border:1px solid ${s.sealTypeCommercial ? '#D4A843' : 'rgba(26,46,82,0.6)'};color:${s.sealTypeCommercial ? '#D4A843' : '#4A7EC7'};background:${s.sealTypeCommercial ? 'rgba(212,168,67,0.1)' : 'transparent'}`,
+      orgName: s.orgName, onOrgName: this.onOrgName,
+      showIdentity: s.showIdentity, toggleIdentity: this.toggleIdentity,
+      senderName: s.senderName, onSenderName: this.onSenderName,
+      senderId: s.senderId, onSenderId: this.onSenderId,
+      senderAddress: s.senderAddress, onSenderAddress: this.onSenderAddress,
+      senderEmail: s.senderEmail, onSenderEmail: this.onSenderEmail,
+      toggleIdentityInQr: this.toggleIdentityInQr,
+      identityQrBoxStyle: `width:18px;height:18px;border-radius:4px;flex-shrink:0;margin-top:1px;border:1px solid ${s.identityInQr ? '#D4A843' : '#1A2E52'};background:${s.identityInQr ? '#D4A843' : 'transparent'}`,
+      togglePassword: this.togglePassword, showPassword: s.showPassword,
+      passwordBoxStyle: `width:18px;height:18px;border-radius:4px;border:1px solid ${s.showPassword ? '#D4A843' : '#1A2E52'};background:${s.showPassword ? '#D4A843' : 'transparent'}`,
+      docPassword: s.docPassword, onDocPassword: this.onDocPassword,
+      docPasswordConfirm: s.docPasswordConfirm, onDocPasswordConfirm: this.onDocPasswordConfirm,
+      threads, filteredThreads, folders, selectFolder: this.selectFolder,
+      deleteThread: this.deleteThread, askEmptyVault: this.askEmptyVault, cancelEmptyVault: this.cancelEmptyVault, confirmEmptyVault: this.confirmEmptyVault,
+      confirmEmpty: s.confirmEmpty, vaultEmpty: threads.length === 0, vaultNotEmpty: threads.length > 0, filteredEmpty: filteredThreads.length === 0,
+      chatMessages: s.chatMessages, chatInput: s.chatInput, onChatInput: this.onChatInput, onChatKeyDown: this.onChatKeyDown, sendChat: this.sendChat,
+      hasNotification: !!s.notification, dismissNotification: this.dismissNotification, openNotification: this.openNotification,
+      showQrDetail: s.showQrDetail, openQrDetail: this.openQrDetail, closeQrDetail: this.closeQrDetail, stopProp: this.stopProp,
+      showShareSheet: s.showShareSheet, openShareSheet: this.openShareSheet, closeShareSheet: this.closeShareSheet,
+      qrTimestamp: '2026-07-16 09:41:22 UTC', qrGps: '-26.20, 28.05 · Africa/Johannesburg',
+      notifTitle: s.notification ? s.notification.title : '', notifBody: s.notification ? s.notification.body : '',
+      notifTitleColor: s.notification && s.notification.flagged ? '#F87171' : '#D4A843',
+      notifBorder: s.notification && s.notification.flagged ? 'rgba(239,68,68,0.4)' : 'rgba(212,168,67,0.35)',
+      openThread: this.openThread, openSheet: this.openSheet, goHome: this.goHome, goVerifyTab: this.goVerifyTab,
+      startSeal: this.startSeal, startScan: this.startScan,
+      pipelineName: s.pipelineName, activeThreadName: s.activeThread ? s.activeThread.name : '',
+      stepRows, showSummary: done, pipelineStatusLabel, pipelineStatusColor,
+      summaryStyle: `flex:1;background:${isFlagged ? 'rgba(239,68,68,0.06)' : 'rgba(212,168,67,0.06)'};border:1px solid ${isFlagged ? 'rgba(239,68,68,0.3)' : 'rgba(212,168,67,0.3)'};border-radius:3px 14px 14px 14px;padding:16px`,
+      summaryTitle: isFlagged ? 'Fraud Indicators Found' : (mode === 'seal' ? 'Document Sealed' : 'Scan Complete — Clean'),
+      summaryTitleColor: isFlagged ? '#F87171' : '#D4A843',
+      sealId, sha512Short: sha512Full.slice(0, 48) + '…', sha512Prefix: sha512Full.slice(0, 32),
+      isFlagged, fraudScore: 62, fraudKeywords: 'wire transfer, urgent payment',
+      verifyInput: s.verifyInput, onVerifyInput: this.onVerifyInput, scanQr: this.scanQr, runVerify: this.runVerify,
+      hasVerifyResult: !!s.verifyResult,
+      verifyResultColor: s.verifyResult === 'tampered' ? '#ef4444' : '#22c55e',
+      verifyResultTitle: s.verifyResult === 'tampered' ? 'TAMPER DETECTED' : 'VERIFIED AUTHENTIC',
+      verifyResultDesc: s.verifyResult === 'tampered' ? 'Hash mismatch against the sealed original. This document has been altered since sealing.' : 'This document matches its sealed SHA-512 fingerprint and OpenTimestamps proof. Chain of custody intact.',
+      verifyChain: [{id:'VO-8F21AC90D3E4', date:'2026-07-16'}, {id:'VO-6A11F8203BDE (prev)', date:'2026-07-02'}],
+      vaultTabColor: s.tab === 'vault' ? '#D4A843' : '#4A7EC7',
+      verifyTabColor: s.tab === 'verify' ? '#D4A843' : '#4A7EC7',
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -28,12 +28,21 @@ class ModelLoaderTest {
 
     @Test
     fun flagshipDeviceHasGemma4() {
-        val models = ModelLoader.loadModels(4)
+        val models = ModelLoader.loadModels(8)
         assertTrue(models.any { it.name == "Gemma 4" })
         val gemma4 = models.first { it.name == "Gemma 4" }
         assertEquals(LlmRole.COMMUNICATOR, gemma4.role)
         assertTrue(gemma4.flagship)
         assertEquals(LlmCommunicationStyle.UNRESTRICTED, gemma4.communicationStyle)
+    }
+
+    @Test
+    fun midRangeDeviceDoesNotGetGemma4() {
+        // Real-device evidence (see DeviceTier.kt doc comment): Gemma 4's 7.7GB file loads
+        // on a 5.4GB-RAM phone but generation drops to ~20+ seconds/token — unusable.
+        val models = ModelLoader.loadModels(4)
+        assertFalse(models.any { it.name == "Gemma 4" })
+        assertEquals(listOf("Gemma 3", "Phi-3"), models.map { it.name })
     }
 
     @Test

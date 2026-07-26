@@ -35,5 +35,10 @@ FetchContent_MakeAvailable(llama_cpp)
 
 add_library(voinference SHARED voinference_jni.cpp)
 
+# Android 15+ runs 16 KB memory pages on some devices, and Google Play requires every
+# native library to be 16 KB-aligned. NDK r27 still defaults to 4 KB max-page-size, so
+# without these flags the loader reports "LOAD segment not aligned" for libvoinference.so.
+target_link_options(voinference PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+
 target_link_libraries(voinference PRIVATE llama ggml log android)
 target_include_directories(voinference PRIVATE ${llama_cpp_SOURCE_DIR}/include ${llama_cpp_SOURCE_DIR}/ggml/include)

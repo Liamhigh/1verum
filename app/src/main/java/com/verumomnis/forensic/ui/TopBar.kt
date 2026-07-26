@@ -1,14 +1,22 @@
 package com.verumomnis.forensic.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,18 +29,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
+import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.VoBlueBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoTextMuted
 
 /**
- * Shared Verum Omnis top bar (verumglobal.foundation style): circular logo
- * badge, gold serif "VERUM OMNIS" wordmark and the current screen title as a
- * letter-spaced mono label. Used on every screen — the story/hero screen shows
- * the full-width banner instead.
+ * Shared Verum Omnis top bar, mirroring the verumglobal.foundation site header:
+ * circular logo badge, gold serif "VERUM OMNIS" wordmark, the current screen title
+ * as a letter-spaced mono label, and a hairline rule separating it from content.
+ *
+ * The bar owns the status-bar inset ([windowInsetsPadding]) because the app runs
+ * edge-to-edge (MainActivity.enableEdgeToEdge). Without it the wordmark renders
+ * underneath the system clock. The opaque background also stops the constellation
+ * background and scrolling content bleeding through behind the status bar.
  */
 @Composable
 fun VerumTopBar(
@@ -41,46 +57,73 @@ fun VerumTopBar(
     onBack: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(VoBackground)
+            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        if (onBack != null) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold)
-            }
-        } else {
-            Spacer(Modifier.width(8.dp))
-        }
-        Image(
-            painter = painterResource(R.drawable.vo_badge),
-            contentDescription = "Verum Omnis",
+        Row(
             modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "VERUM OMNIS",
-                fontFamily = Cormorant,
-                fontWeight = FontWeight.Bold,
-                color = VoGold,
-                fontSize = 16.sp,
-                letterSpacing = 2.sp
-            )
-            if (title.isNotBlank()) {
-                Text(
-                    title.uppercase(),
-                    fontFamily = JetBrainsMono,
-                    color = VoGold.copy(alpha = 0.65f),
-                    fontSize = 10.sp,
-                    letterSpacing = 1.5.sp
-                )
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(start = 4.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold)
+                }
+            } else {
+                Spacer(Modifier.width(12.dp))
             }
+            // The globe badge is shown only on root screens. Alongside a back arrow it is
+            // redundant, and on screens with two trailing actions (chat) the extra 44dp it
+            // costs truncated the wordmark to "VERUM O…".
+            if (onBack == null) {
+                Image(
+                    painter = painterResource(R.drawable.vo_badge),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                )
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    "VERUM OMNIS",
+                    fontFamily = Cormorant,
+                    fontWeight = FontWeight.Bold,
+                    color = VoGold,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (title.isNotBlank()) {
+                    Text(
+                        title.uppercase(),
+                        fontFamily = JetBrainsMono,
+                        color = VoTextMuted,
+                        fontSize = 9.sp,
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            trailing()
         }
-        trailing()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(VoBlueBorder)
+        )
     }
 }

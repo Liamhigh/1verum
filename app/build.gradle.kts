@@ -51,7 +51,10 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
-                arguments += "-DANDROID_STL=c++_shared"
+                // Static libc++: voinference is the only native library we ship, so there is
+                // nothing to share a runtime with. This also drops libc++_shared.so from the
+                // APK entirely — one fewer library needing 16 KB alignment (see CMakeLists).
+                arguments += "-DANDROID_STL=c++_static"
             }
         }
     }

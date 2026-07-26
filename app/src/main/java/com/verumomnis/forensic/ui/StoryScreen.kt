@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,10 +39,13 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
 @Composable
 fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
+    // This full-bleed hero screen sits outside the Scaffold, so it must inset itself or
+    // the banner renders under the status bar and the footer is clipped by the nav bar.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .windowInsetsPadding(WindowInsets.systemBars)
             .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -74,11 +81,17 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
         )
 
         Spacer(Modifier.height(24.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Stat("528", "pages sealed", Modifier.weight(1f))
-            Stat("111", "contradictions", Modifier.weight(1f))
-            Stat("9", "forensic brains", Modifier.weight(1f))
-            Stat("R0", "cost to litigant", Modifier.weight(1f))
+        // 2x2 rather than 4-across: four cards on a phone leave ~70dp of text width, which
+        // wrapped the labels mid-word ("contradi/ctions").
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Stat("528", "pages sealed", Modifier.weight(1f))
+                Stat("111", "contradictions", Modifier.weight(1f))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Stat("9", "forensic brains", Modifier.weight(1f))
+                Stat("R0", "cost to litigant", Modifier.weight(1f))
+            }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -124,8 +137,19 @@ private fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
             .padding(vertical = 14.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(value, color = VoGold, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 26.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = VoTextMuted, fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 12.sp)
+        Text(
+            value,
+            color = VoGold,
+            fontFamily = Cormorant,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 30.sp,
+            maxLines = 1,
+            // Cormorant Garamond defaults to old-style (text) figures, which set digits at
+            // x-height with descenders — "111" read as "III" and "R0" as "Ro" on device.
+            // Lining + tabular figures give the even, full-height numerals a stat needs.
+            style = TextStyle(fontFeatureSettings = "lnum, tnum")
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(label, color = VoTextMuted, fontSize = 11.sp, textAlign = TextAlign.Center, lineHeight = 14.sp)
     }
 }

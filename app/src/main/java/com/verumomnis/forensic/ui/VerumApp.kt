@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -227,7 +229,11 @@ fun VerumApp(
             } else {
                 Scaffold(
                     containerColor = Color.Transparent,
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    // Only the top inset is handled elsewhere: VerumTopBar consumes the
+                    // status-bar inset itself so its background paints behind the clock.
+                    // The bottom inset MUST be kept here, or screen content is clipped
+                    // underneath the system navigation bar.
+                    contentWindowInsets = WindowInsets.navigationBars,
                     topBar = {
                         VerumTopBar(
                             title = when (screen) {
@@ -266,7 +272,14 @@ fun VerumApp(
                         )
                     }
                 ) { padding ->
-                    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                    // imePadding here (rather than per-screen) keeps every text field in the
+                    // app — chat, case name, email, tax, seal — above the on-screen keyboard.
+                    Box(
+                        modifier = Modifier
+                            .padding(padding)
+                            .imePadding()
+                            .fillMaxSize()
+                    ) {
                         when (screen) {
                             Screen.SCAN_HOME -> ScanHomeScreen(
                                 state = state,

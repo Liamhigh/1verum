@@ -77,14 +77,19 @@ fun VerumTopBar(
             } else {
                 Spacer(Modifier.width(12.dp))
             }
-            Image(
-                painter = painterResource(R.drawable.vo_badge),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-            )
-            Spacer(Modifier.width(12.dp))
+            // The globe badge is shown only on root screens. Alongside a back arrow it is
+            // redundant, and on screens with two trailing actions (chat) the extra 44dp it
+            // costs truncated the wordmark to "VERUM O…".
+            if (onBack == null) {
+                Image(
+                    painter = painterResource(R.drawable.vo_badge),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                )
+                Spacer(Modifier.width(12.dp))
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(1.dp)
@@ -94,8 +99,8 @@ fun VerumTopBar(
                     fontFamily = Cormorant,
                     fontWeight = FontWeight.Bold,
                     color = VoGold,
-                    fontSize = 17.sp,
-                    letterSpacing = 2.sp,
+                    fontSize = 16.sp,
+                    letterSpacing = 1.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

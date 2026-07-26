@@ -256,12 +256,11 @@ fun VerumApp(
                             },
                             onBack = if (screen == Screen.SCAN_HOME) null else ({ goBack() }),
                             trailing = {
+                                // The device tier / RAM readout used to live here, but on the
+                                // chat screen (back arrow + logo + 2 icons) it squeezed the
+                                // wordmark down to "V…". It is diagnostic information and is
+                                // already shown in Settings > About (Device / RAM rows).
                                 if (screen == Screen.CHAT) {
-                                    Text(
-                                        "${state.deviceTier.label}·${state.deviceRamGb}GB",
-                                        color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp
-                                    )
-                                    Spacer(Modifier.width(6.dp))
                                     IconButton(
                                         onClick = { navigate(Screen.REPORT) },
                                         enabled = state.report != null

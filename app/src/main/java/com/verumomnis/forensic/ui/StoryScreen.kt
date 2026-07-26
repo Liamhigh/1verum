@@ -41,11 +41,14 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
     // This full-bleed hero screen sits outside the Scaffold, so it must inset itself or
     // the banner renders under the status bar and the footer is clipped by the nav bar.
+    // Inset BEFORE verticalScroll, so the scrolling viewport itself sits between the
+    // system bars. With the order reversed the viewport stays full-bleed and content
+    // scrolls underneath the opaque navigation bar.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .windowInsetsPadding(WindowInsets.systemBars)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -55,7 +58,17 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth(0.82f).clip(RoundedCornerShape(14.dp))
         )
         Spacer(Modifier.height(28.dp))
-        Text("AI FORENSICS FOR TRUTH", color = VoGold, fontSize = 12.sp, letterSpacing = 4.sp, fontWeight = FontWeight.SemiBold)
+        // 4sp tracking at 12sp overflowed to a second line ("TRUTH" alone) on a 411dp
+        // phone; 2.5sp keeps the site's letter-spaced eyebrow look on one line.
+        Text(
+            "AI FORENSICS FOR TRUTH",
+            color = VoGold,
+            fontSize = 11.sp,
+            letterSpacing = 2.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            textAlign = TextAlign.Center
+        )
         Spacer(Modifier.height(12.dp))
         Text("Truth for All", color = VoTextPrimary, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 52.sp)
         Spacer(Modifier.height(16.dp))

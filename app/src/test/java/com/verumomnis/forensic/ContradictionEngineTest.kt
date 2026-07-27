@@ -5,6 +5,7 @@ import com.verumomnis.forensic.engine.EntityExtractor
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.contradiction.EngineContradictionType
 import com.verumomnis.forensic.engine.contradiction.EngineSeverity
+import com.verumomnis.forensic.engine.contradiction.EngineStatementType
 import com.verumomnis.forensic.engine.contradiction.VerumContradictionEngine
 import com.verumomnis.forensic.engine.contradiction.getCaseConfig
 import com.verumomnis.forensic.model.ContradictionCategory
@@ -202,5 +203,58 @@ class ContradictionEngineTest {
 
         val defaultAllfuels = getCaseConfig("unknown")
         assertEquals("AllFuels Energy (Pty) Ltd", defaultAllfuels.name)
+    }
+
+    // -- Judicial pairing (OJRS wiring) --------------------------------------------------
+
+    @Test
+    fun `processFromTaggedInputs pairs force-tagged judicial text against sealed-side claims`() {
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-JUDICIAL")
+        val report = engine.processFromTaggedInputs(
+            listOf(
+                // Judicial side: force-tagged JUDICIAL_RECORD regardless of natural keyword detection.
+                VerumContradictionEngine.TaggedInput(
+                    text = "The agreement was never binding on either party.",
+                    sourceName = "OJRS:SAFLII:CCT99/20",
+                    forcedType = EngineStatementType.JUDICIAL_RECORD
+                ),
+                // Sealed-corpus side: left untagged, so its type is auto-detected — the
+                // wording ("agreement clause") naturally maps to CONTRACT_CLAUSE.
+                VerumContradictionEngine.TaggedInput(
+                    text = "The agreement clause confirms the contract is binding and enforceable.",
+                    sourceName = "evidence_doc.txt"
+                )
+            )
+        )
+
+        val judicialPairings = report.contradictions.filter { it.type == EngineContradictionType.JUDICIAL_VS_DOCUMENTARY }
+        assertTrue(
+            "Expected a JUDICIAL_VS_DOCUMENTARY pairing, got types: ${report.contradictions.map { it.type }}",
+            judicialPairings.isNotEmpty()
+        )
+    }
+
+    @Test
+    fun `processFromTaggedInputs without forced type falls back to keyword heuristics`() {
+        // Without forcing, a judgment line lacking "court"/"cct"/"judgment" is NOT
+        // classified JUDICIAL_RECORD — this is exactly why force-tagging is required
+        // for reliable OJRS pairing (see VerumContradictionEngine.TaggedInput doc).
+        val engine = VerumContradictionEngine(caseId = "VO-TEST-JUDICIAL-2")
+        val report = engine.processFromTaggedInputs(
+            listOf(
+                VerumContradictionEngine.TaggedInput(
+                    text = "The agreement was never binding on either party.",
+                    sourceName = "OJRS:SAFLII:CCT99/20"
+                    // forcedType intentionally omitted
+                ),
+                VerumContradictionEngine.TaggedInput(
+                    text = "The agreement clause confirms the contract is binding and enforceable.",
+                    sourceName = "evidence_doc.txt"
+                )
+            )
+        )
+
+        val judicialPairings = report.contradictions.filter { it.type == EngineContradictionType.JUDICIAL_VS_DOCUMENTARY }
+        assertTrue(judicialPairings.isEmpty())
     }
 }

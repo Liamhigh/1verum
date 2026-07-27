@@ -68,10 +68,54 @@ class VerumContradictionEngine(
         return runPipeline(atoms)
     }
 
+    /**
+     * A text input paired with an optional forced [EngineStatementType], so callers can
+     * guarantee a claim's classification instead of relying on [ClaimExtractor]'s per-line
+     * keyword heuristics (which only tag a line JUDICIAL_RECORD if that specific line
+     * contains a matching keyword — a multi-paragraph judgment can silently miss most of
+     * its own atoms otherwise).
+     *
+     * Used for OJRS judicial-text pairing. NEVER feed these inputs into the sealed evidence
+     * corpus hashed by ForensicService.scan() — externally-fetched text must stay outside
+     * the seal.
+     */
+    data class TaggedInput(
+        val text: String,
+        val sourceName: String,
+        val forcedType: EngineStatementType? = null,
+        val dateMillis: Long? = null
+    )
+
+    /**
+     * Process externally-sourced, force-tagged text (e.g. downloaded judgments) so the
+     * existing detectors (detectJudicialVsDocumentary, detectConsciousnessOfGuilt) can
+     * pair them against already-processed claims reliably. See [TaggedInput].
+     */
+    fun processFromTaggedInputs(inputs: List<TaggedInput>): EngineForensicReport {
+        val atoms = mutableListOf<EngineEvidenceAtom>()
+        val forcedTypes = mutableListOf<EngineStatementType?>()
+        for (input in inputs) {
+            val inputAtoms = ClaimExtractor.extractFromText(input.text, input.sourceName, input.dateMillis)
+            atoms += inputAtoms
+            repeat(inputAtoms.size) { forcedTypes += input.forcedType }
+        }
+        return runPipeline(atoms, forcedTypes)
+    }
+
     /** Shared pipeline — all entry points converge here. */
-    private fun runPipeline(atoms: List<EngineEvidenceAtom>): EngineForensicReport {
+    private fun runPipeline(
+        atoms: List<EngineEvidenceAtom>,
+        forcedTypes: List<EngineStatementType?> = emptyList()
+    ): EngineForensicReport {
         // Step 1: Extract claims
-        val claims = ClaimExtractor.extractClaims(atoms, caseConfig)
+        val extractedClaims = ClaimExtractor.extractClaims(atoms, caseConfig)
+        val claims = if (forcedTypes.isEmpty()) {
+            extractedClaims
+        } else {
+            extractedClaims.mapIndexed { i, claim ->
+                forcedTypes.getOrNull(i)?.let { claim.copy(sourceType = it) } ?: claim
+            }
+        }
 
         // Step 2: Detect all contradictions (28 detectors: 10 base + 6 DIGSIM + 12 ported)
         val contradictions = ContradictionDetectors.detectAll(claims)

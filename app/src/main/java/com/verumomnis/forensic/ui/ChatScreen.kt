@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,7 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.VoBlueBorder
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -62,6 +66,7 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(state.chat) { msg -> ChatBubble(msg) }
@@ -92,7 +97,16 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
                 value = input,
                 onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message Verum Omnis…") },
+                placeholder = { Text("Message Verum Omnis…", color = VoTextMuted, fontSize = 14.sp) },
+                textStyle = LocalTextStyle.current.copy(color = VoTextPrimary, fontSize = 14.sp),
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VoGold,
+                    unfocusedBorderColor = VoBlueBorder,
+                    focusedContainerColor = VoSurface,
+                    unfocusedContainerColor = VoSurface,
+                    cursorColor = VoGold
+                ),
                 maxLines = 4
             )
             Spacer(Modifier.width(8.dp))

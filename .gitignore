@@ -20,3 +20,8 @@ local.properties
 /*.PDF
 /*.png
 /*.txt
+
+# llama.cpp is fetched at CMake configure time (see app/src/main/cpp/CMakeLists.txt
+# FetchContent, pinned commit) — never vendored into this repo's git history.
+/app/src/main/cpp/llama.cpp/
+/app/.cxx/

@@ -12,7 +12,12 @@ import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.core.ConstitutionalPrompt
 import com.verumomnis.forensic.core.DeviceTier
 import com.verumomnis.forensic.core.Llm
+import com.verumomnis.forensic.core.LlmRole
 import com.verumomnis.forensic.core.ModelLoader
+import com.verumomnis.forensic.engine.llm.Gemma3NativeReportWriter
+import com.verumomnis.forensic.engine.llm.LlamaModel
+import com.verumomnis.forensic.engine.llm.ModelCatalog
+import com.verumomnis.forensic.engine.llm.ModelDownloadManager
 import com.verumomnis.forensic.crypto.EvidenceSealer
 import com.verumomnis.forensic.crypto.EvidenceSealer.VerificationResult
 import com.verumomnis.forensic.identity.IdentityService
@@ -27,6 +32,7 @@ import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.engine.ReportGenerator
 import com.verumomnis.forensic.engine.ScanResult
 import com.verumomnis.forensic.engine.TaxModule
+import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.GuardianAssessment
 import com.verumomnis.forensic.model.GpsRecord
@@ -38,8 +44,11 @@ import com.verumomnis.forensic.model.HarassmentVerdict
 import com.verumomnis.forensic.model.OtsAnchorResult
 import com.verumomnis.forensic.model.OtsStatus
 import com.verumomnis.forensic.model.SealedEmail
+import com.verumomnis.forensic.core.SettingsRepository
 import com.verumomnis.forensic.ojrs.DeepResearchEngine
+import com.verumomnis.forensic.ojrs.JudicialPairingService
 import com.verumomnis.forensic.ojrs.WebSearchService
+import com.verumomnis.forensic.model.Contradiction
 import com.verumomnis.forensic.trust.TrustEngine
 import com.verumomnis.forensic.trust.TrustScore
 import com.verumomnis.forensic.pdf.SealedPdfExporter
@@ -149,6 +158,9 @@ data class UiState(
     val deviceRamGb: Int = 6,
     val deviceTier: DeviceTier = DeviceTier.STANDARD,
     val models: List<Llm> = emptyList(),
+    /** 0f..1f per model name while downloading; 1f once verified + loaded. */
+    val modelDownloadProgress: Map<String, Float> = emptyMap(),
+    val modelsLoaded: Set<String> = emptySet(),
     val communicator: String = "",
     val reportWriter: String = "",
     val gps: GpsRecord? = null,
@@ -180,6 +192,8 @@ data class UiState(
     val sealPdfName: String = "",
     val sealPdfSize: Long = 0L,
     val sealType: String = "private",
+    /** Sealing mode mirroring the website: "seal-only" (default) or "forensic". */
+    val sealMode: String = "seal-only",
     val sealIdentity: SealIdentityInput = SealIdentityInput(),
     val passwordProtect: Boolean = false,
     val sealPassword: String = "",
@@ -244,6 +258,64 @@ class VerumViewModel(
     private val medias = mutableListOf<MediaEvidence>()
     private val harassmentMonitor = AntiHarassmentMonitor()
     private val silenceLedger = SilenceLedger(context = getApplication())
+    private val modelDownloadManager = ModelDownloadManager(getApplication())
+    private var reportWriterModel: LlamaModel? = null
+    private var communicatorModel: LlamaModel? = null
+
+    /**
+     * Downloads (if needed) and loads the on-device models for this device's tier
+     * (ON_DEVICE_LLM_ARCHITECTURE.md section 4). Opt-in and explicit — never triggered
+     * automatically — because these are multi-gigabyte downloads. Once loaded, real
+     * inference replaces the deterministic prompt-echo report writer and chat fallback.
+     */
+    fun downloadAndLoadModels() {
+        val models = _state.value.models.ifEmpty { ModelLoader.loadModels(_state.value.deviceRamGb) }
+        val communicatorName = ModelLoader.communicator(models).name
+        viewModelScope.launch(Dispatchers.IO) {
+            for (llm in models) {
+                if (llm.name in _state.value.modelsLoaded) continue
+                val spec = ModelCatalog.forName(llm.name) ?: continue
+                postAi("Downloading ${llm.name}…")
+                val file = modelDownloadManager.download(spec) { progress ->
+                    _state.update { it.copy(modelDownloadProgress = it.modelDownloadProgress + (llm.name to progress)) }
+                }
+                val loaded = file?.let { LlamaModel.load(it, llm.name) }
+                if (loaded == null) {
+                    postAi("${llm.name} failed to download or verify. Check your connection and try again from Settings.")
+                    continue
+                }
+                if (llm.role == LlmRole.REPORT_WRITER) reportWriterModel = loaded
+                if (llm.name == communicatorName) communicatorModel = loaded
+                _state.update {
+                    it.copy(
+                        modelsLoaded = it.modelsLoaded + llm.name,
+                        modelDownloadProgress = it.modelDownloadProgress + (llm.name to 1f)
+                    )
+                }
+                postAi("${llm.name} loaded and ready.")
+            }
+        }
+    }
+
+    private fun askCommunicatorModel(model: LlamaModel, query: String, findings: ForensicFindings) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val answer = model.complete(buildCommunicatorPrompt(query, findings), maxTokens = 512).trim()
+            postAi(answer.ifEmpty { "INSUFFICIENT: the on-device model produced no output for that question." })
+        }
+    }
+
+    /** Mirrors the PHR3/G4 system prompt (ON_DEVICE_LLM_ARCHITECTURE.md section 8). */
+    private fun buildCommunicatorPrompt(query: String, findings: ForensicFindings): String = buildString {
+        appendLine("You are the forensic evidence communicator for Verum Omnis.")
+        appendLine("Answer truthfully based only on the sealed evidence below. Cite anchors for every claim.")
+        appendLine("Flag legal interpretations as HYPOTHESIS. Do not invent findings not listed here.")
+        appendLine("JURISDICTION: ${findings.jurisdiction}")
+        appendLine("CONTRADICTIONS:")
+        findings.contradictions.take(10).forEach { c ->
+            appendLine("- [${c.severity}] ${c.contradictionId}: \"${c.claimA.text}\" vs \"${c.claimB.text}\"")
+        }
+        appendLine("QUESTION: $query")
+    }
 
     fun mediaCount(): Int = medias.size
 
@@ -378,6 +450,10 @@ class VerumViewModel(
      * incorporated into reports.
      */
     fun deepResearch(now: Instant = Instant.now()) {
+        if (!SettingsRepository(getApplication()).ojrsEnabled) {
+            postAi("Online Judicial Retrieval (OJRS) is disabled. Enable it in Settings to run deep research.")
+            return
+        }
         if (_state.value.scanResult == null) sealCase(now)
         val findings = _state.value.scanResult?.findings ?: return
         val caseRef = _state.value.scanResult?.seal?.documentReference ?: "Matter"
@@ -572,6 +648,10 @@ class VerumViewModel(
         _state.update { it.copy(sealType = type) }
     }
 
+    fun setSealMode(mode: String) {
+        _state.update { it.copy(sealMode = mode) }
+    }
+
     fun setIdentity(identity: SealIdentityInput) {
         _state.update { it.copy(sealIdentity = identity) }
     }
@@ -727,6 +807,36 @@ class VerumViewModel(
                     )
                 }
                 postEngine("Website-format seal complete: ${result.sealId} · ${result.verifyUrl}")
+
+                // Seal + Forensic Analysis mode (website parity): after the seal is
+                // applied, the same document goes through the Nine-Brain scan and a
+                // sealed forensic report is generated for human review.
+                if (_state.value.sealMode == "forensic") {
+                    val text = runCatching {
+                        com.verumomnis.forensic.engine.PdfBoxTextExtractor().extractText(bytes)
+                    }.getOrDefault("").trim()
+                    if (text.isNotBlank()) {
+                        setPendingFiles(
+                            listOf(
+                                PendingFilePreview(
+                                    fileName = name,
+                                    mimeType = "application/pdf",
+                                    sizeBytes = bytes.size.toLong(),
+                                    sha512 = sha512ForAnchor,
+                                    displayText = text.take(280) + if (text.length > 280) "…" else "",
+                                    isMedia = false,
+                                    documentText = text
+                                )
+                            )
+                        )
+                        confirmAndSeal(caseName = name.removeSuffix(".pdf"), now = now)
+                    } else {
+                        postEngine(
+                            "Forensic scan could not run — no extractable text in $name. " +
+                                "The scan did not complete; absence of findings is NOT a clean result."
+                        )
+                    }
+                }
             }.onFailure { e ->
                 _state.update { it.copy(sealBusy = false, sealError = "Seal failed: ${e.message}") }
                 postEngine("Seal failed: ${e.message}")
@@ -979,19 +1089,24 @@ class VerumViewModel(
         }
     }
 
-    fun generateReport(caseName: String = "Matter", now: Instant = Instant.now()) {
+    fun generateReport(
+        caseName: String = "Matter",
+        now: Instant = Instant.now(),
+        judicialFindings: List<Contradiction> = emptyList()
+    ) {
         val findings = _state.value.scanResult?.findings ?: run {
             runScan(now)
             _state.value.scanResult?.findings
         } ?: return
         val device = identityService.deviceIdentity()
 
-        // If research findings exist, use the Gemma3ReportWriter with research prompt
+        // Prefer a real loaded Gemma 3 model; else fall back to the prompt-echo/deterministic
+        // writers so the report body is never silently blank (see LlamaModel.kt doc comment).
         val research = _state.value.researchFindings
-        val narrativeWriter = if (research != null) {
-            com.verumomnis.forensic.engine.Gemma3ReportWriter
-        } else {
-            com.verumomnis.forensic.engine.DeterministicReportWriter
+        val narrativeWriter = when {
+            reportWriterModel != null -> Gemma3NativeReportWriter(reportWriterModel!!)
+            research != null -> com.verumomnis.forensic.engine.Gemma3ReportWriter
+            else -> com.verumomnis.forensic.engine.DeterministicReportWriter
         }
 
         val report = ReportGenerator.generate(
@@ -1001,7 +1116,8 @@ class VerumViewModel(
             deviceId = device?.deviceId ?: "",
             publicKeyFingerprint = device?.publicKeyFingerprint ?: "",
             findingsJsonPath = _state.value.findingsJsonPath,
-            narrativeWriter = narrativeWriter
+            narrativeWriter = narrativeWriter,
+            judicialFindings = judicialFindings
         )
 
         // If research exists, build the research prompt and store it alongside
@@ -1013,6 +1129,7 @@ class VerumViewModel(
         } else report
 
         val signedReport = reportWithResearch.copy(seal = signAndUpdateSeal(reportWithResearch.seal))
+        vault.storeReport(signedReport)
         _state.update {
             it.copy(
                 report = signedReport,
@@ -1028,6 +1145,28 @@ class VerumViewModel(
         computeTrustScore()
         anchorSealToBitcoin(auto = true)
     }
+
+    /**
+     * Pairs any OJRS judicial research against the sealed evidence before generating the
+     * report, so [Report.judicialFindings]/the judicial cross-reference section is actually
+     * populated. Falls back to a plain [generateReport] when there's no research yet.
+     */
+    fun generateReportWithResearch(caseName: String = "Matter", now: Instant = Instant.now()) {
+        val findings = _state.value.scanResult?.findings
+        val research = _state.value.researchFindings
+        if (findings == null || research == null) {
+            generateReport(caseName, now)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val judicialFindings = JudicialPairingService.pair(findings, research)
+            generateReport(caseName = caseName, now = now, judicialFindings = judicialFindings)
+        }
+    }
+
+    /** Previously generated reports (excluding the currently displayed one), most recent first. */
+    fun pastReports(): List<ForensicReport> =
+        vault.listReports().filter { it.reference != _state.value.report?.reference }
 
     fun draftAndSendEmail(
         recipient: String,
@@ -1170,7 +1309,7 @@ class VerumViewModel(
             }
             "generate report with research" in q -> {
                 if (research != null) {
-                    generateReport()
+                    generateReportWithResearch()
                     "Report generated with external research incorporated. Check the Reports tab."
                 } else {
                     "No research findings to include. Run 'deep research' first, then try again."
@@ -1221,8 +1360,16 @@ class VerumViewModel(
                 deepResearch()
                 "Deep research initiated…"
             }
-            else -> "Evidence set: ${findings.documentsAnalyzed} docs, jurisdiction ${findings.jurisdiction}. " +
-                "Ask about contradictions, timeline, legal framework, tax, the seal, or say 'deep research' for external case research."
+            else -> {
+                val communicator = communicatorModel
+                if (communicator != null) {
+                    askCommunicatorModel(communicator, query, findings)
+                    "Thinking…"
+                } else {
+                    "Evidence set: ${findings.documentsAnalyzed} docs, jurisdiction ${findings.jurisdiction}. " +
+                        "Ask about contradictions, timeline, legal framework, tax, the seal, or say 'deep research' for external case research."
+                }
+            }
         }
     }
 

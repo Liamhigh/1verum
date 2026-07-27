@@ -3,6 +3,7 @@ package com.verumomnis.forensic.engine
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.model.AppliedUpdateRecord
 import com.verumomnis.forensic.model.ContradictionPatternPatch
 import com.verumomnis.forensic.model.EngineUpdate
@@ -12,7 +13,11 @@ import com.verumomnis.forensic.model.UpdatePriority
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.security.KeyFactory
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
+import java.util.Base64
 
 /**
  * Engine Update Receiver for the Android app.
@@ -82,8 +87,9 @@ class EngineUpdateReceiver(private val context: Context) {
             )
         }
 
-        // 3. Verify signature (placeholder - would use real crypto verification)
-        if (update.signature.isNotBlank() && !verifySignature(update)) {
+        // 3. Verify signature. Mandatory — an update with a blank or invalid signature is
+        // rejected outright, since these patches modify the live fraud-detection engine.
+        if (!verifySignature(update)) {
             return UpdateResult.InvalidSignature(update.updateId)
         }
 
@@ -310,10 +316,34 @@ class EngineUpdateReceiver(private val context: Context) {
         return clean.padEnd(5, '0').take(5).toIntOrNull() ?: 0
     }
 
-    private fun verifySignature(update: EngineUpdate): Boolean {
-        // Placeholder: In production, this would verify a cryptographic signature
-        // using the Verum Omnis Foundation's public key
-        return update.signature.isNotBlank() && update.signature.length >= 64
+    /**
+     * Verifies [update]'s signature against the embedded Verum Omnis rules public key
+     * (RSA, SHA256withRSA over the canonical signing payload — see [canonicalSigningPayload]).
+     * [publicKeyDerB64] is exposed as a parameter (internal, not private) so tests can verify
+     * the crypto round-trip against a throwaway test key instead of the real production key.
+     */
+    internal fun verifySignature(
+        update: EngineUpdate,
+        publicKeyDerB64: String = Constitution.RULES_PUBLIC_KEY_DER_B64
+    ): Boolean {
+        if (update.signature.isBlank()) return false
+        return try {
+            val publicKey = KeyFactory.getInstance("RSA")
+                .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyDerB64)))
+            val signatureBytes = Base64.getDecoder().decode(update.signature)
+            Signature.getInstance("SHA256withRSA").apply {
+                initVerify(publicKey)
+                update(canonicalSigningPayload(update))
+            }.verify(signatureBytes)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Deterministic bytes the rules worker signs: identity fields + the patch payload JSON. */
+    internal fun canonicalSigningPayload(update: EngineUpdate): ByteArray {
+        val patchesJson = json.encodeToString(UpdatePatches.serializer(), update.patches)
+        return "${update.updateId}|${update.version}|${update.issuedAt}|$patchesJson".toByteArray(Charsets.UTF_8)
     }
 
     private fun recordUpdate(record: AppliedUpdateRecord) {

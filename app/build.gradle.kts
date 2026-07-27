@@ -1,3 +1,4 @@
+import java.time.Instant
 import java.util.Properties
 
 plugins {
@@ -21,6 +22,7 @@ val newsApiKey: String = (project.findProperty("NEWS_API_KEY") as? String)
 android {
     namespace = "com.verumomnis.forensic"
     compileSdk = 34
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.verumomnis.forensic"
@@ -36,6 +38,32 @@ android {
 
         // Injected into BuildConfig.NEWS_API_KEY for the research news search.
         buildConfigField("String", "NEWS_API_KEY", "\"$newsApiKey\"")
+
+        // Real build timestamp for the Settings > About screen (replaces a hardcoded date).
+        val buildTime = Instant.now().toString()
+        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
+
+        // On-device LLM inference bridge (voinference_jni.cpp -> llama.cpp). arm64-v8a only
+        // for now — covers essentially all Android 10+ (minSdk 29) devices in real use.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                // Static libc++: voinference is the only native library we ship, so there is
+                // nothing to share a runtime with. This also drops libc++_shared.so from the
+                // APK entirely — one fewer library needing 16 KB alignment (see CMakeLists).
+                arguments += "-DANDROID_STL=c++_static"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {

@@ -22,8 +22,23 @@ import java.time.Instant
  */
 object ContradictionToForensicAdapter {
 
-    fun toContradictions(report: EngineForensicReport, now: Instant = Instant.now()): List<Contradiction> =
-        report.contradictions.map { toContradiction(it, now) }
+    /**
+     * @param brainSource Attribution shown in the report. Judicial-pairing callers should
+     *   pass "B1-JudicialPairing" to distinguish externally-sourced findings from the
+     *   sealed-corpus "B1-HybridContradiction" default.
+     * @param idPrefix When set (e.g. "JX"), contradiction IDs are renumbered "PREFIX-0001…"
+     *   instead of using the engine's own "C-0001…" sequence. Judicial-pairing results run
+     *   through a fresh [VerumContradictionEngine] instance whose counter also starts at
+     *   C-0001, so without a distinct prefix these would collide with — and destabilise —
+     *   the sealed scan's own contradiction numbering.
+     */
+    fun toContradictions(
+        report: EngineForensicReport,
+        now: Instant = Instant.now(),
+        brainSource: String = "B1-HybridContradiction",
+        idPrefix: String? = null
+    ): List<Contradiction> =
+        report.contradictions.mapIndexed { i, c -> toContradiction(c, now, brainSource, idPrefix, i) }
 
     fun toExtractedPersons(report: EngineForensicReport): List<ExtractedPerson> =
         report.actorProfiles.map { toExtractedPerson(it) }
@@ -48,7 +63,13 @@ object ContradictionToForensicAdapter {
         brainVerdicts = mapOf("B1-Contradiction" to if (report.contradictions.isEmpty()) "CLEAR" else "${report.contradictions.size} FOUND")
     )
 
-    private fun toContradiction(c: EngineContradiction, now: Instant): Contradiction {
+    private fun toContradiction(
+        c: EngineContradiction,
+        now: Instant,
+        brainSource: String,
+        idPrefix: String?,
+        index: Int
+    ): Contradiction {
         val (sourceA, sourceB) = splitSources(c.detectedFact.sourceDocument)
         val claimA = ContradictionClaim(
             text = c.propositionAText.ifBlank { c.detectedFact.factText },
@@ -69,8 +90,8 @@ object ContradictionToForensicAdapter {
             statementType = StatementType.DENIAL
         )
         return Contradiction(
-            contradictionId = c.contradictionId,
-            brainSource = "B1-HybridContradiction",
+            contradictionId = idPrefix?.let { "$it-${(index + 1).toString().padStart(4, '0')}" } ?: c.contradictionId,
+            brainSource = brainSource,
             category = mapCategory(c.type, c.conflictDescription),
             type = mapType(c.type),
             respondent = c.propositionAActor.ifBlank { c.propositionBActor.ifBlank { "unknown" } },

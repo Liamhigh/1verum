@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,12 +24,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TravelExplore
 import androidx.compose.material.icons.filled.UploadFile
@@ -69,7 +76,10 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION }
+private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
+
+/** Verification is centralised on the website — all verify actions open it. */
+private const val WEBSITE_VERIFY_URL = "https://www.verumglobal.foundation/verify.html"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -219,7 +229,11 @@ fun VerumApp(
             } else {
                 Scaffold(
                     containerColor = Color.Transparent,
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    // Only the top inset is handled elsewhere: VerumTopBar consumes the
+                    // status-bar inset itself so its background paints behind the clock.
+                    // The bottom inset MUST be kept here, or screen content is clipped
+                    // underneath the system navigation bar.
+                    contentWindowInsets = WindowInsets.navigationBars,
                     topBar = {
                         VerumTopBar(
                             title = when (screen) {
@@ -230,20 +244,23 @@ fun VerumApp(
                                 Screen.TAX -> "Tax Return"
                                 Screen.VAULT -> "Evidence Vault"
                                 Screen.SEAL_DOCUMENT -> "Seal Document"
-                                Screen.VERIFY_DOCUMENT -> "Verify Document"
                                 Screen.SCAN_SEAL -> "Scan Seal QR"
                                 Screen.SCAN_SEAL_RESULT -> "Seal Verification"
                                 Screen.CONSTITUTION -> "Constitution"
+                                Screen.TIMELINE -> "Event Timeline"
+                                Screen.ACTOR_PROFILE -> "Actor Profiles"
+                                Screen.CONTRADICTION_DETAIL -> "Contradictions"
+                                Screen.REPORT_COMPARISON -> "Report Comparison"
+                                Screen.SETTINGS -> "Settings"
                                 Screen.STORY -> ""
                             },
                             onBack = if (screen == Screen.SCAN_HOME) null else ({ goBack() }),
                             trailing = {
+                                // The device tier / RAM readout used to live here, but on the
+                                // chat screen (back arrow + logo + 2 icons) it squeezed the
+                                // wordmark down to "V…". It is diagnostic information and is
+                                // already shown in Settings > About (Device / RAM rows).
                                 if (screen == Screen.CHAT) {
-                                    Text(
-                                        "${state.deviceTier.label}·${state.deviceRamGb}GB",
-                                        color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp
-                                    )
-                                    Spacer(Modifier.width(6.dp))
                                     IconButton(
                                         onClick = { navigate(Screen.REPORT) },
                                         enabled = state.report != null
@@ -254,7 +271,14 @@ fun VerumApp(
                         )
                     }
                 ) { padding ->
-                    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                    // imePadding here (rather than per-screen) keeps every text field in the
+                    // app — chat, case name, email, tax, seal — above the on-screen keyboard.
+                    Box(
+                        modifier = Modifier
+                            .padding(padding)
+                            .imePadding()
+                            .fillMaxSize()
+                    ) {
                         when (screen) {
                             Screen.SCAN_HOME -> ScanHomeScreen(
                                 state = state,
@@ -287,22 +311,15 @@ fun VerumApp(
                             Screen.TAX -> TaxScreen(viewModel)
                             Screen.VAULT -> VaultScreen(
                                 state = state,
-                                onVerify = { navigate(Screen.VERIFY_DOCUMENT) }
+                                onVerify = { openWebsiteVerify(context) }
                             )
                             Screen.STORY -> {}
                             Screen.SEAL_DOCUMENT -> SealDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
                                 onBack = { goBack() },
-                                onNavigateVerify = { navigate(Screen.VERIFY_DOCUMENT) },
+                                onNavigateReport = { navigate(Screen.REPORT) },
                                 onNavigateDocuments = { /* no-op — documents screen not implemented */ }
-                            )
-                            Screen.VERIFY_DOCUMENT -> VerifyDocumentScreen(
-                                state = state,
-                                viewModel = viewModel,
-                                onBack = { goBack() },
-                                onNavigateSeal = { navigate(Screen.SEAL_DOCUMENT) },
-                                onNavigateDocuments = { }
                             )
                             Screen.SCAN_SEAL -> ScanSealScreen(
                                 state = state,
@@ -319,6 +336,15 @@ fun VerumApp(
                                 }
                             )
                             Screen.CONSTITUTION -> ConstitutionScreen()
+                            Screen.TIMELINE -> TimelineVisualizationScreen(state = state)
+                            Screen.ACTOR_PROFILE -> ActorProfileScreen(state = state)
+                            Screen.CONTRADICTION_DETAIL -> ContradictionDetailScreen(state = state)
+                            Screen.REPORT_COMPARISON -> ReportComparisonScreen(state = state, viewModel = viewModel)
+                            Screen.SETTINGS -> SettingsScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onNavigateConstitution = { navigate(Screen.CONSTITUTION) }
+                            )
                         }
                     }
                 }
@@ -337,7 +363,7 @@ fun VerumApp(
                         shareWebsiteSealEnabled = state.websiteSealedFile != null,
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
-                        onVerifyScreen = { showMenu = false; navigate(Screen.VERIFY_DOCUMENT) },
+                        onVerifyWebsite = { showMenu = false; openWebsiteVerify(context) },
                         onScanSeal = { showMenu = false; navigate(Screen.SCAN_SEAL) },
                         onDeepResearch = { showMenu = false; viewModel.deepResearch() },
                         onDraftEmail = { showMenu = false; navigate(Screen.EMAIL) },
@@ -348,6 +374,11 @@ fun VerumApp(
                             else viewModel.postEngine("No sealed report yet. Start a forensic scan first.")
                         },
                         onVault = { showMenu = false; navigate(Screen.VAULT) },
+                        onTimeline = { showMenu = false; navigate(Screen.TIMELINE) },
+                        onActorProfile = { showMenu = false; navigate(Screen.ACTOR_PROFILE) },
+                        onContradictionDetail = { showMenu = false; navigate(Screen.CONTRADICTION_DETAIL) },
+                        onReportComparison = { showMenu = false; navigate(Screen.REPORT_COMPARISON) },
+                        onSettings = { showMenu = false; navigate(Screen.SETTINGS) },
                         onReadConstitution = { showMenu = false; navigate(Screen.CONSTITUTION) }
                     )
                 }
@@ -376,13 +407,18 @@ private fun ActionsSheet(
     shareWebsiteSealEnabled: Boolean,
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
-    onVerifyScreen: () -> Unit,
+    onVerifyWebsite: () -> Unit,
     onScanSeal: () -> Unit,
     onDeepResearch: () -> Unit,
     onDraftEmail: () -> Unit,
     onTax: () -> Unit,
     onReport: () -> Unit,
     onVault: () -> Unit,
+    onTimeline: () -> Unit,
+    onActorProfile: () -> Unit,
+    onContradictionDetail: () -> Unit,
+    onReportComparison: () -> Unit,
+    onSettings: () -> Unit,
     onReadConstitution: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -398,15 +434,28 @@ private fun ActionsSheet(
         }
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
-        ActionRow(Icons.Filled.TaskAlt, "Verify Document (screen)", "Open the verify page", onVerifyScreen)
+        ActionRow(Icons.Filled.TaskAlt, "Verify on verumglobal.foundation", "The website is the central verification hub", onVerifyWebsite)
         ActionRow(Icons.Filled.QrCodeScanner, "Scan Seal QR", "Point camera at a sealed document QR", onScanSeal)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)
         ActionRow(Icons.Filled.Calculate, "Tax return", "Company or individual · 50% of accountant fee", onTax)
         ActionRow(Icons.Filled.Description, "View sealed report", "Anchored contradictions, exhibits, seal", onReport)
+        ActionRow(Icons.Filled.AccessTime, "Event timeline", "Chronological reconstruction of evidence", onTimeline)
+        ActionRow(Icons.Filled.Person, "Actor profiles", "Per-person dishonesty scorecard", onActorProfile)
+        ActionRow(Icons.Filled.Difference, "Contradiction analysis", "Detailed contradiction breakdown", onContradictionDetail)
+        ActionRow(Icons.Filled.CompareArrows, "Report comparison", "Side-by-side report analysis", onReportComparison)
         ActionRow(Icons.Filled.Lock, "Open vault", "Sealed evidence, findings & seals", onVault)
+        ActionRow(Icons.Filled.Settings, "Settings", "App configuration, privacy, security", onSettings)
         ActionRow(Icons.Filled.AccountBalance, "Read Constitution", "Verum Omnis governing principles", onReadConstitution)
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+private fun openWebsiteVerify(context: android.content.Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(WEBSITE_VERIFY_URL))
+        )
     }
 }
 

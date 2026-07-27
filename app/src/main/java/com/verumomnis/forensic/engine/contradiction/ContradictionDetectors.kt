@@ -234,6 +234,17 @@ object ContradictionDetectors {
                     "Submission records", "Bounce/undelivered evidence", "Follow-up correspondence"
                 )
             )
+            EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED -> LegalHypothesis(
+                suggestedOffence = "Unlawful Termination / Misrepresentation of a Contractual Right",
+                legalBasis = "A termination or expiry was invoked under a clause whose precondition (party is the lessee under a head lease, not the owner) was not met, because the record shows the party had become the owner of the premises — the triggering event never occurred",
+                jurisdictionalNote = "Contract law; SA common law on effluxion, repudiation and misrepresentation — requires legal review",
+                requiredAdditionalEvidence = listOf(
+                    "Title deed / property transfer records establishing ownership and its date",
+                    "Any head lease agreement (or proof none existed)",
+                    "The exact clause relied upon for termination",
+                    "Cession / assignment records tracing the invoking party"
+                )
+            )
             else -> null
         }
         return EngineContradiction(
@@ -465,6 +476,75 @@ object ContradictionDetectors {
                         listOf(e.value, enf.value), 0.95
                     )
                 }
+            }
+        }
+        return results
+    }
+
+    // ==================== 2 v6.0 FRANCHISE/LEASE DETECTORS ====================
+
+    /**
+     * Conditional-clause trap (Caltex Franchise Agreement cl. 3.2.3). A
+     * termination/expiry rests on a clause whose precondition is that the party
+     * is the LESSEE (not the owner) under a head lease that ended — but the
+     * record shows that party had become the OWNER of the premises, so the
+     * clause's trigger never occurred and the termination may be void. This is
+     * the evidence the engine missed: the lease clause must be read against the
+     * ownership record.
+     */
+    fun detectConditionalClauseMisinvoked(claims: List<EngineClaim>): List<EngineContradiction> {
+        val clauseCondition = listOf("lessee", "head lease", "not the owner", "effluxion")
+        val ownership = listOf(
+            "is the owner", "became the owner", "purchased the property", "owner of the premises",
+            "transfer of the property", "registered owner", "acquired the property", "bought the site",
+            "took transfer", "ownership of the premises", "owns the premises", "owns the property"
+        )
+        val clauseClaims = claims.filter { c -> clauseCondition.any { c.value.contains(it, ignoreCase = true) } }
+        val ownershipFacts = claims.filter { c -> ownership.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (clause in clauseClaims) {
+            for (own in ownershipFacts) {
+                if (clause.sha512Hash.isNotEmpty() && clause.sha512Hash == own.sha512Hash) continue
+                results += createContradiction(clause, own,
+                    EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.VERY_HIGH,
+                    "TERMINATION_UNDER_LESSEE_CLAUSE_WHILE_OWNER",
+                    "A termination/expiry rests on a clause conditioned on the party being a lessee (not the owner), but contemporaneous evidence shows that party was the owner of the premises — the clause's precondition never occurred, so the invoked termination is void",
+                    listOf(clause.value, own.value), 0.95
+                )
+            }
+        }
+        return results
+    }
+
+    /**
+     * Goodwill / value of the business recognised or quantified in one document
+     * (e.g. the clawback table) but denied or said to have no compensable value
+     * elsewhere — "you only take away what exists". Mapped to ACKNOWLEDGE_THEN_DENY.
+     */
+    fun detectAssetValueDenial(claims: List<EngineClaim>): List<EngineContradiction> {
+        val asset = listOf("goodwill", "value of the business")
+        val recognitionMarkers = listOf("means", "value", "clawback", "percentage", "inure", "entitled", "recognis", "quantif", "compensat")
+        val denialMarkers = listOf("no goodwill", "no compensable", "has no value", "not entitled to any compensation", "without compensation", "no value", "not compensable")
+        val recognition = claims.filter { c ->
+            val t = c.value.lowercase()
+            asset.any { t.contains(it) } && recognitionMarkers.any { t.contains(it) } && denialMarkers.none { t.contains(it) }
+        }
+        val denial = claims.filter { c ->
+            val t = c.value.lowercase()
+            denialMarkers.any { t.contains(it) } && (asset.any { t.contains(it) } || t.contains("compensat") || t.contains("value"))
+        }
+        val results = mutableListOf<EngineContradiction>()
+        for (r in recognition) {
+            for (d in denial) {
+                if (r.sha512Hash.isNotEmpty() && r.sha512Hash == d.sha512Hash) continue
+                results += createContradiction(r, d,
+                    EngineContradictionType.ACKNOWLEDGE_THEN_DENY,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.VERY_HIGH,
+                    "ASSET_VALUE_RECOGNISED_THEN_DENIED",
+                    "An asset (goodwill / value of the business) is recognised or quantified in one document but its existence or compensable value is denied elsewhere — a forfeiture or clawback of the asset is itself an admission that it exists",
+                    listOf(r.value, d.value), 0.9
+                )
             }
         }
         return results
@@ -913,6 +993,9 @@ object ContradictionDetectors {
         ::detectDefamationThreat,
         ::detectTechnologyRefusal,
         ::detectConflictOfInterest,
+        // v6.0 franchise/lease detectors (AllFuels case)
+        ::detectConditionalClauseMisinvoked,
+        ::detectAssetValueDenial,
         // Additive signed rule-update detector (no-op until a verified package is downloaded)
         ::detectDownloadedFraudPairs
     )

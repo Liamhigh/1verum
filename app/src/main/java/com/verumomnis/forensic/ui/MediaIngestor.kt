@@ -9,7 +9,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.MediaEvidence
-import com.verumomnis.forensic.engine.PdfBoxTextExtractor
+import com.verumomnis.forensic.engine.PdfOcrExtractor
 import com.verumomnis.forensic.engine.PdfTextExtractor
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
@@ -25,10 +25,15 @@ import java.time.Instant
  */
 class MediaIngestor(
     private val context: Context,
-    private val pdfExtractor: PdfTextExtractor = PdfBoxTextExtractor()
+    // Default extractor OCRs image-only pages on-device (ML Kit) and falls back
+    // to the embedded text layer where present. Tests can inject a fake.
+    private val pdfExtractor: PdfTextExtractor = PdfOcrExtractor(context)
 ) {
 
     companion object {
+        // Kept at 50 MB: extractText holds the whole file as a ByteArray, PDFBox
+        // parses a second copy, and the OCR path writes a third to cache — so the
+        // peak is several times the file size. 150 MB overran the heap.
         const val MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
     }
 

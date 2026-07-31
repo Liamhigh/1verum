@@ -193,7 +193,8 @@ object ContradictionToForensicAdapter {
         EngineContradictionType.TECHNOLOGY_REFUSAL_LIABILITY -> ContradictionType.ROLE_INCONSISTENCY
         EngineContradictionType.STATEMENT_VS_STATEMENT,
         EngineContradictionType.OMISSION,
-        EngineContradictionType.NO_COUNTERSIGNATURE_TRAP -> ContradictionType.DIRECT_NEGATION
+        EngineContradictionType.NO_COUNTERSIGNATURE_TRAP,
+        EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED -> ContradictionType.DIRECT_NEGATION
         else -> ContradictionType.IMPLIED_CONTRADICTION
     }
 

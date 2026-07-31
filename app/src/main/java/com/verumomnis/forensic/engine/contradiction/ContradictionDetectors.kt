@@ -14,6 +14,23 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object ContradictionDetectors {
 
+    /**
+     * Upper bound on how many contradictions a single detector may emit for one
+     * evidence set.
+     *
+     * The pairwise detectors are O(n²) in claim count, and each contradiction
+     * embeds both claims' full text four times over (factText, propositionA/B,
+     * conflictDescription and the logical pattern's facts). A large scanned
+     * bundle therefore used to exhaust the heap inside the detector loop —
+     * `OutOfMemoryError` in createContradiction, taking the whole seal down.
+     *
+     * `detectAll` collapses each detector's output to one entry per
+     * (actorA, actorB, type, pattern) tuple, so a bound this high cannot change
+     * a real report: it only stops a pathological bundle from allocating
+     * millions of throwaway objects before the dedup ever runs.
+     */
+    const val MAX_CONTRADICTIONS_PER_DETECTOR: Int = 2000
+
     private val counter = AtomicInteger(0)
     fun resetCounter() { counter.set(0) }
     private fun nextId(): String = "C-${counter.incrementAndNext().toString().padStart(4, '0')}"
@@ -262,7 +279,9 @@ object ContradictionDetectors {
     fun detectStatementVsStatement(claims: List<EngineClaim>): List<EngineContradiction> {
         val results = mutableListOf<EngineContradiction>()
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && isOpposing(a, b)) {
                     val (isSem, semScore) = SemanticAnalyzer.detectSemanticContradiction(a, b)
@@ -310,7 +329,9 @@ object ContradictionDetectors {
         val financial = claims.filter { c -> keywords.any { c.value.lowercase().contains(it) } }
         val results = mutableListOf<EngineContradiction>()
         for (i in financial.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until financial.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = financial[i]; val b = financial[j]
                 if (a.actor == b.actor && a.subject == b.subject && a.value != b.value) {
                     val (isSem, semScore) = SemanticAnalyzer.detectSemanticContradiction(a, b)
@@ -356,7 +377,9 @@ object ContradictionDetectors {
         val results = mutableListOf<EngineContradiction>()
         val dayMs = 1000L * 60 * 60 * 24
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.subject == b.subject && a.date != null && b.date != null && a.date != b.date) {
                     if (isOpposing(a, b)) {
@@ -383,7 +406,9 @@ object ContradictionDetectors {
         val results = mutableListOf<EngineContradiction>()
         val dayMs = 1000L * 60 * 60 * 24
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.date != null && b.date != null) {
                     val gapDays = kotlin.math.abs(a.date - b.date) / dayMs
@@ -503,7 +528,9 @@ object ContradictionDetectors {
         val ownershipFacts = claims.filter { c -> ownership.any { c.value.contains(it, ignoreCase = true) } }
         val results = mutableListOf<EngineContradiction>()
         for (clause in clauseClaims) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (own in ownershipFacts) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 if (clause.sha512Hash.isNotEmpty() && clause.sha512Hash == own.sha512Hash) continue
                 results += createContradiction(clause, own,
                     EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED,
@@ -536,7 +563,9 @@ object ContradictionDetectors {
         }
         val results = mutableListOf<EngineContradiction>()
         for (r in recognition) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (d in denial) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 if (r.sha512Hash.isNotEmpty() && r.sha512Hash == d.sha512Hash) continue
                 results += createContradiction(r, d,
                     EngineContradictionType.ACKNOWLEDGE_THEN_DENY,
@@ -628,7 +657,9 @@ object ContradictionDetectors {
         val afterMarkers = listOf("after", "subsequent to", "followed by", "later than", "then")
         val results = mutableListOf<EngineContradiction>()
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.date != null && b.date != null) {
                     val lowerA = a.value.lowercase(); val lowerB = b.value.lowercase()
@@ -1006,14 +1037,22 @@ object ContradictionDetectors {
      * rules the output is identical to running the built-in detectors alone.
      */
     fun detectAll(claims: List<EngineClaim>): List<EngineContradiction> {
-        val all = ALL_DETECTORS.flatMap { it(claims) }
         val seen = mutableSetOf<String>()
         val unique = mutableListOf<EngineContradiction>()
-        for (c in all) {
-            val key = "${c.propositionAActor}:${c.propositionBActor}:${c.type}:${c.logicalPattern.patternType}"
-            if (key !in seen) {
-                seen += key
-                unique += c
+        // Deduplicate as each detector returns rather than concatenating all 29
+        // result lists first. Detectors run in the same order and contradictions
+        // are still created in the same order, so the output (and every
+        // contradictionId) is identical to the previous flatMap — but only one
+        // detector's results are held at a time, and the duplicates it sheds
+        // become collectable immediately instead of pinning the whole run in
+        // memory until the end.
+        for (detector in ALL_DETECTORS) {
+            for (c in detector(claims)) {
+                val key = "${c.propositionAActor}:${c.propositionBActor}:${c.type}:${c.logicalPattern.patternType}"
+                if (key !in seen) {
+                    seen += key
+                    unique += c
+                }
             }
         }
         return unique.sortedByDescending { EngineScores.severityScore(it.severity) }

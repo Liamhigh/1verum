@@ -9,7 +9,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.MediaEvidence
-import com.verumomnis.forensic.engine.PdfBoxTextExtractor
+import com.verumomnis.forensic.engine.PdfOcrExtractor
 import com.verumomnis.forensic.engine.PdfTextExtractor
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
@@ -31,7 +31,10 @@ class MediaIngestor(
 ) {
 
     companion object {
-        const val MAX_FILE_SIZE_BYTES = 150L * 1024 * 1024
+        // Kept at 50 MB: extractText holds the whole file as a ByteArray, PDFBox
+        // parses a second copy, and the OCR path writes a third to cache — so the
+        // peak is several times the file size. 150 MB overran the heap.
+        const val MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
     }
 
     private val vault = EvidenceVault(context)

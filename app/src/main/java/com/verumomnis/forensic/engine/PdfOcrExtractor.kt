@@ -30,10 +30,23 @@ import java.io.File
 class PdfOcrExtractor(
     private val context: Context,
     /** Per-page text-layer length below which a page is treated as image-only. */
-    private val thinPageChars: Int = 30,
+    private val thinPageChars: Int = DEFAULT_THIN_PAGE_CHARS,
     /** Cap on pages to OCR, to bound worst-case time on very large scans. */
-    private val maxOcrPages: Int = 200,
+    private val maxOcrPages: Int = DEFAULT_MAX_OCR_PAGES,
 ) : PdfTextExtractor {
+
+    companion object {
+        /** A page with fewer text-layer chars than this is treated as image-only. */
+        const val DEFAULT_THIN_PAGE_CHARS: Int = 30
+        /** Worst-case bound on how many image-only pages get OCR'd per document. */
+        const val DEFAULT_MAX_OCR_PAGES: Int = 200
+        /** Rasterisation resolution for OCR — 200 dpi balances accuracy and memory. */
+        private const val RENDER_DPI: Float = 200f
+        /** PDF user-space is 72 units/inch; scale = dpi / 72. */
+        private const val PDF_POINTS_PER_INCH: Float = 72f
+        /** Hard cap on either bitmap dimension so a huge page can't OOM the device. */
+        private const val MAX_RENDER_DIMENSION_PX: Int = 2600
+    }
 
     /** Number of image-only pages OCR'd and skipped in the last run (for notes). */
     var lastOcrPageCount: Int = 0
@@ -41,6 +54,13 @@ class PdfOcrExtractor(
     var lastSkippedPageCount: Int = 0
         private set
 
+    /**
+     * Extract text from a PDF, OCR'ing only image-only pages.
+     *
+     * BLOCKING: this waits on PDFBox parsing and (via `Tasks.await`) on ML Kit
+     * OCR, so it MUST be called off the main thread. All current callers invoke
+     * it inside `Dispatchers.IO` coroutines (VerumViewModel, MediaIngestor).
+     */
     override fun extractText(bytes: ByteArray): String {
         lastOcrPageCount = 0
         lastSkippedPageCount = 0
@@ -126,9 +146,11 @@ class PdfOcrExtractor(
     private fun renderPageAndRecognise(renderer: PdfRenderer, index: Int, recognizer: com.google.mlkit.vision.text.TextRecognizer): String {
         val page = renderer.openPage(index)
         try {
-            val scale = 2
-            val w = (page.width * scale).coerceIn(1, 4000)
-            val h = (page.height * scale).coerceIn(1, 4000)
+            // DPI-based rasterisation (page.width/height are PDF points = 1/72").
+            // Capped per side so an oversized page can't allocate an OOM bitmap.
+            val scale = RENDER_DPI / PDF_POINTS_PER_INCH
+            val w = (page.width * scale).toInt().coerceIn(1, MAX_RENDER_DIMENSION_PX)
+            val h = (page.height * scale).toInt().coerceIn(1, MAX_RENDER_DIMENSION_PX)
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             Canvas(bmp).drawColor(Color.WHITE) // white background: OCR needs dark-on-light
             page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)

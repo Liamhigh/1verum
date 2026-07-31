@@ -25,11 +25,13 @@ import java.time.Instant
  */
 class MediaIngestor(
     private val context: Context,
-    private val pdfExtractor: PdfTextExtractor = PdfBoxTextExtractor()
+    // Default extractor OCRs image-only pages on-device (ML Kit) and falls back
+    // to the embedded text layer where present. Tests can inject a fake.
+    private val pdfExtractor: PdfTextExtractor = PdfOcrExtractor(context)
 ) {
 
     companion object {
-        const val MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
+        const val MAX_FILE_SIZE_BYTES = 150L * 1024 * 1024
     }
 
     private val vault = EvidenceVault(context)

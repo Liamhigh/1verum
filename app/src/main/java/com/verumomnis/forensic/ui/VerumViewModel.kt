@@ -813,7 +813,10 @@ class VerumViewModel(
                 // sealed forensic report is generated for human review.
                 if (_state.value.sealMode == "forensic") {
                     val text = runCatching {
-                        com.verumomnis.forensic.engine.PdfBoxTextExtractor().extractText(bytes)
+                        // OCRs image-only pages on-device (ML Kit) so scanned
+                        // bundles are read, not just PDFs with a text layer.
+                        com.verumomnis.forensic.engine.PdfOcrExtractor(getApplication())
+                            .extractText(bytes)
                     }.getOrDefault("").trim()
                     if (text.isNotBlank()) {
                         setPendingFiles(

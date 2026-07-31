@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.pdfbox.android)
     implementation(libs.zxing.core)
     implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

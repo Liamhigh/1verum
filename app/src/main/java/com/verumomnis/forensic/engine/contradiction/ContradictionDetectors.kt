@@ -119,7 +119,9 @@ object ContradictionDetectors {
             extractionMethod = patternType,
             confidence = baseConfidence
         )
-        val pattern = LogicalPattern(patternType, description, facts, score, "v5.3.1c")
+        // No version literal here: LogicalPattern defaults to EngineVersion.TAGGED,
+        // so the stamp cannot drift from the engine that produced it.
+        val pattern = LogicalPattern(patternType, description, facts, score)
         val hypothesis = when (cType) {
             EngineContradictionType.JUDICIAL_VS_DOCUMENTARY,
             EngineContradictionType.PERJURY_BY_TIMELINE,

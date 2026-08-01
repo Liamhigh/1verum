@@ -45,7 +45,8 @@ class EngineUpdateReceiver(private val context: Context) {
         private const val KEY_APPLIED_UPDATES = "applied_updates"
         private const val KEY_ENGINE_PATCH_VERSION = "engine_patch_version"
         private const val UPDATE_DIR = "engine_updates"
-        private const val CURRENT_ENGINE_VERSION = "5.3.1c"
+        private const val CURRENT_ENGINE_VERSION =
+            com.verumomnis.forensic.engine.contradiction.EngineVersion.VALUE
     }
 
     private val prefs: SharedPreferences by lazy {

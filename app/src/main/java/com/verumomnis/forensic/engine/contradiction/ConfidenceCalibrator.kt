@@ -58,7 +58,7 @@ object ConfidenceCalibrator {
         "methodology" to "Per-detector false-positive rates from validation against 111 AllFuels + 47 DIGSIM contradictions",
         "lastCalibrated" to "2026-07-13",
         "validationCases" to "ALLFUELS-2026 (111 contradictions) + DIGSIM-2026 (47 contradictions)",
-        "engineVersion" to "v5.3.1c",
+        "engineVersion" to EngineVersion.TAGGED,
         "constitution" to "v6.0 Final",
         "detectorCount" to "16",
         "typeCount" to "43",

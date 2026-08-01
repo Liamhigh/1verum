@@ -24,7 +24,7 @@ import java.time.Instant
 object FindingsJsonEmitter {
 
     const val FINDINGS_JSON_VERSION = "1.0.0"
-    const val ENGINE_VERSION = "5.3.1c"
+    const val ENGINE_VERSION = com.verumomnis.forensic.engine.contradiction.EngineVersion.VALUE
 
     const val STATUS_ENGINE_VERIFIED = "ENGINE-VERIFIED"
     const val STATUS_G3_CANDIDATE = "G3-RAISED CANDIDATE - PENDING VERIFICATION"

@@ -3,6 +3,7 @@ package com.verumomnis.forensic.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,16 +11,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,9 +43,11 @@ import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import com.verumomnis.forensic.ui.theme.VoTextSecondary
 
 /**
  * The forensic scan initiation screen.
@@ -199,22 +204,11 @@ fun ScanHomeScreen(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    state.sealStage.label,
-                    color = VoTextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (isScanning) {
-                    Spacer(Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = { state.sealStage.progress },
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                        color = VoGold,
-                        trackColor = VoBackground
-                    )
-                }
+                Spacer(Modifier.height(14.dp))
+                // Stepped pipeline with "green lights", mirroring the website: each
+                // stage shows a spinner while active and a green check once done, so
+                // the user can see exactly what the engine is doing.
+                SealPipeline(currentStage = state.sealStage)
                 if (scanDone && state.report != null) {
                     Spacer(Modifier.height(14.dp))
                     VerumPrimaryButton(
@@ -278,5 +272,81 @@ private fun SecondaryButton(
     ) {
         Icon(icon, contentDescription = null, tint = VoGold, modifier = Modifier.padding(end = 6.dp))
         Text(label, color = VoTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** One row of the sealing pipeline shown in SCAN STATUS. */
+private data class VoStep(val stage: SealStage, val title: String, val subtitle: String)
+
+// The pipeline the user sees, in order. Mirrors the website's stepped view:
+// hash → scan → seal → anchor → report. Each maps to a SealStage the ViewModel
+// already advances through, so this is a presentation of existing state.
+private val VO_PIPELINE = listOf(
+    VoStep(SealStage.HASHING, "Hash & vault", "SHA-512 fingerprint; original preserved in the vault"),
+    VoStep(SealStage.SCANNING, "Nine-Brain forensic scan", "Flagging contradiction indicators for review"),
+    VoStep(SealStage.SEALING, "SHA-512 seal", "Applying the tamper-evident seal"),
+    VoStep(SealStage.ANCHORING, "OpenTimestamps", "Anchoring the hash to the Bitcoin blockchain"),
+    VoStep(SealStage.DONE, "Report ready", "Court-ready sealed report generated")
+)
+
+/**
+ * Stepped "green lights" status, mirroring the website's Sealing Pipeline: each
+ * step shows a hollow circle while pending, a gold spinner while active, and a
+ * green check once complete. Purely derived from [currentStage].
+ */
+@Composable
+private fun SealPipeline(currentStage: SealStage) {
+    val order = VO_PIPELINE.map { it.stage }
+    val currentIdx = order.indexOf(currentStage).let { if (it < 0) 0 else it }
+    val allDone = currentStage == SealStage.DONE
+    Column(modifier = Modifier.fillMaxWidth()) {
+        VO_PIPELINE.forEachIndexed { i, step ->
+            val done = allDone || i < currentIdx
+            val active = !allDone && i == currentIdx
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+                    when {
+                        done -> Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = "complete",
+                            tint = VoGreen,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        active -> CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = VoGold,
+                            strokeWidth = 2.dp
+                        )
+                        else -> Icon(
+                            Icons.Filled.RadioButtonUnchecked,
+                            contentDescription = "pending",
+                            tint = VoTextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        step.title,
+                        color = when {
+                            done -> VoTextPrimary
+                            active -> VoGold
+                            else -> VoTextMuted
+                        },
+                        fontSize = 14.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold
+                    )
+                    Text(
+                        step.subtitle,
+                        color = VoTextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
     }
 }

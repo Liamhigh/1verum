@@ -1,5 +1,6 @@
 package com.verumomnis.forensic.ui
 
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
 import android.net.Uri
@@ -287,13 +288,18 @@ class VerumViewModel(
             for (llm in models) {
                 if (llm.name in _state.value.modelsLoaded) continue
                 val spec = ModelCatalog.forName(llm.name) ?: continue
-                postAi("Downloading ${llm.name}…")
+                // Spec §1: never name the model to the user — it is "Verum Omnis".
+                postAi("Downloading the on-device forensic model…")
                 val file = modelDownloadManager.download(spec) { progress ->
                     _state.update { it.copy(modelDownloadProgress = it.modelDownloadProgress + (llm.name to progress)) }
                 }
                 val loaded = file?.let { LlamaModel.load(it, llm.name) }
                 if (loaded == null) {
-                    postAi("${llm.name} failed to download or verify. Check your connection and try again from Settings.")
+                    postAi(
+                        "The on-device forensic model failed to download or verify. " +
+                            "Check your connection and try again from Settings. " +
+                            "Reports still generate without it — only the AI narrative is unavailable."
+                    )
                     continue
                 }
                 if (llm.role == LlmRole.REPORT_WRITER) reportWriterModel = loaded
@@ -371,7 +377,7 @@ class VerumViewModel(
 
     init {
         initializeIdentity()
-        configureDevice(6)
+        configureDevice(detectDeviceRamGb())
         if (seedSampleCase) seedSampleCase()
         _state.update { s ->
             s.copy(
@@ -538,6 +544,27 @@ class VerumViewModel(
                     .format(accountant.estimatedFee, verum.estimatedFee)
         )
     }
+
+    /**
+     * Actual physical RAM in GB, for the device-tier logic in [ModelLoader].
+     *
+     * This used to be hard-coded to 6, so every device claimed the same tier: a
+     * 2 GB phone would try to load models it cannot hold, and a 16 GB flagship
+     * would never load Gemma 4 at all. DeviceTier/ModelLoader were correct all
+     * along — they were simply fed a constant.
+     *
+     * Rounds to nearest rather than truncating: `totalMem` reports slightly less
+     * than the nominal figure once the kernel and GPU take their reservation, so
+     * a nominal 8 GB device reports ~7.6 GB and would otherwise be demoted out
+     * of the flagship tier it belongs to.
+     */
+    private fun detectDeviceRamGb(): Int = runCatching {
+        val am = getApplication<Application>()
+            .getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val info = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+        val gb = info.totalMem.toDouble() / (1024.0 * 1024.0 * 1024.0)
+        Math.round(gb).toInt().coerceAtLeast(1)
+    }.getOrDefault(2) // Unknown device: assume the low tier, never over-claim.
 
     fun configureDevice(ramGb: Int) {
         val models = ModelLoader.loadModels(ramGb)
@@ -1144,11 +1171,10 @@ class VerumViewModel(
         // Prefer a real loaded Gemma 3 model; else fall back to the prompt-echo/deterministic
         // writers so the report body is never silently blank (see LlamaModel.kt doc comment).
         val research = _state.value.researchFindings
-        val narrativeWriter = when {
-            reportWriterModel != null -> Gemma3NativeReportWriter(reportWriterModel!!)
-            research != null -> com.verumomnis.forensic.engine.Gemma3ReportWriter
-            else -> com.verumomnis.forensic.engine.DeterministicReportWriter
-        }
+        val narrativeWriter = com.verumomnis.forensic.engine.NarrativeWriterSelector.select(
+            reportWriterModel = reportWriterModel,
+            hasResearch = research != null
+        )
 
         val report = ReportGenerator.generate(
             findings = findings,

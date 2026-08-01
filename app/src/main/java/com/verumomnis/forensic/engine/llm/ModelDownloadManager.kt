@@ -46,16 +46,31 @@ class ModelDownloadManager(
             val tmp = File(target.parentFile, "${target.name}.part")
             target.parentFile?.mkdirs()
 
-            val request = Request.Builder().url(spec.url).build()
+            // Resume from a previous partial rather than restarting. These files are
+            // ~2.5 GB: losing 90% of a download to one dropped connection is the
+            // difference between "retry" and "give up", especially on mobile data.
+            val already = if (tmp.exists()) tmp.length() else 0L
+            val builder = Request.Builder().url(spec.url)
+            if (already > 0) builder.header("Range", "bytes=$already-")
+
             try {
-                client.newCall(request).execute().use { response ->
+                client.newCall(builder.build()).execute().use { response ->
                     if (!response.isSuccessful) return@withContext null
                     val body = response.body ?: return@withContext null
-                    val total = body.contentLength().takeIf { it > 0 } ?: spec.sizeBytes
+
+                    // 206 means the server honoured the range and we append. Any 200
+                    // after requesting a range means it ignored us and is resending
+                    // from zero, so the partial must be discarded to avoid a corrupt
+                    // file that would only be caught later by the hash check.
+                    val resuming = already > 0 && response.code == HTTP_PARTIAL
+                    val startedAt = if (resuming) already else 0L
+                    val total = body.contentLength().takeIf { it > 0 }?.plus(startedAt)
+                        ?: spec.sizeBytes
+
                     body.byteStream().use { input ->
-                        tmp.outputStream().use { output ->
+                        java.io.FileOutputStream(tmp, resuming).use { output ->
                             val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
-                            var readTotal = 0L
+                            var readTotal = startedAt
                             while (true) {
                                 val read = input.read(buffer)
                                 if (read == -1) break
@@ -67,7 +82,9 @@ class ModelDownloadManager(
                     }
                 }
             } catch (_: Exception) {
-                tmp.delete()
+                // Keep the partial so the next attempt resumes instead of restarting.
+                // A truncated file is harmless: it is never renamed to the real path
+                // and never loaded until the SHA-256 check below passes.
                 return@withContext null
             }
 
@@ -97,6 +114,8 @@ class ModelDownloadManager(
     }
 
     private companion object {
+        /** HTTP 206 Partial Content — the server honoured our Range request. */
+        const val HTTP_PARTIAL = 206
         const val DOWNLOAD_BUFFER_BYTES = 1 shl 16
     }
 }

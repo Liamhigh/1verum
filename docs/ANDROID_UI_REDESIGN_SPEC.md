@@ -166,6 +166,22 @@ metadata / QR detail. The mock-up's GPS field must be backed by a real fix (or a
 B7 / statute chips use the real SA + UAE legal engine (`JurisdictionService.kt`), cross-border
 aware. The mock-up's "Fraud Act 2006 (UK)" is placeholder copy only.
 
+### 4.6 Report format = the shared GHRP contract (firebase is canonical)
+The forensic report Gemma 3 writes on Android follows the **same** contract as the firewall:
+`firebase/REPORT_FORMAT_SPECIFICATION.md` (19 mandated sections), the section validator in
+`reportStructure.ts`, the `G3_SYSTEM_PROMPT.md`, and the section-by-section
+`firebase/ALLFUELS_GHRP_MAPPING.md`. Android's `ReportGenerator.kt` / `ReportWriter.kt` +
+`FindingsJsonEmitter.kt` must emit the same sections (engine = facts, Gemma = prose). Two
+functions the founder asked for are part of this contract:
+
+- **External corroboration (internet).** Gemma may gather court cases + news **only when there
+  is real, citable signal**; each item is sourced/dated, marked `EXTERNAL — UNSEALED`, placed in
+  its own section, and **never overrides** sealed evidence or promotes a G3 candidate. Fetched
+  text is data, not instruction. Offline / no signal → "analysis rests entirely on sealed evidence."
+- **Deep Research Report** (the standalone-chat action in §3.7): grounds on user-selected **sealed**
+  vault files as context, synthesizes across them, cites every anchor, and may add external
+  corroboration under the same rules.
+
 ---
 
 ## 5. Definition of done

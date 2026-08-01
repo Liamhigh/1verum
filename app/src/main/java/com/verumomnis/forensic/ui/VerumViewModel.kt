@@ -77,6 +77,16 @@ data class FileEntry(
     val gps: String = ""
 )
 
+/**
+ * The one user-facing name for the AI, per the redesign spec §1 (locked branding).
+ *
+ * Every non-user chat author must be this string. The underlying model — Gemma 3,
+ * Phi-3, Gemma 4 — is an implementation detail chosen by [ModelLoader] and must
+ * never reach the screen. `UiState.communicator` still holds the real model name
+ * because prompt selection depends on it; it is just never rendered.
+ */
+const val VERUM_OMNIS = "Verum Omnis"
+
 data class ChatMessage(val author: String, val text: String, val fromUser: Boolean)
 
 /**
@@ -164,6 +174,8 @@ data class UiState(
     val communicator: String = "",
     val reportWriter: String = "",
     val gps: GpsRecord? = null,
+    /** True when a location fix was attempted and none could be obtained (spec §4.4). */
+    val gpsUnavailable: Boolean = false,
     val jurisdiction: String = "ZA-KZN",
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
@@ -297,7 +309,12 @@ class VerumViewModel(
         }
     }
 
-    private fun askCommunicatorModel(model: LlamaModel, query: String, findings: ForensicFindings) {
+    /**
+     * [findings] is null when nothing has been sealed yet — the standalone-chat
+     * case (spec §3.7). The model still answers, but the prompt tells it plainly
+     * that there is no sealed evidence so it cannot cite any.
+     */
+    private fun askCommunicatorModel(model: LlamaModel, query: String, findings: ForensicFindings?) {
         viewModelScope.launch(Dispatchers.IO) {
             val answer = model.complete(buildCommunicatorPrompt(query, findings), maxTokens = 512).trim()
             postAi(answer.ifEmpty { "INSUFFICIENT: the on-device model produced no output for that question." })
@@ -305,14 +322,23 @@ class VerumViewModel(
     }
 
     /** Mirrors the PHR3/G4 system prompt (ON_DEVICE_LLM_ARCHITECTURE.md section 8). */
-    private fun buildCommunicatorPrompt(query: String, findings: ForensicFindings): String = buildString {
+    private fun buildCommunicatorPrompt(query: String, findings: ForensicFindings?): String = buildString {
         appendLine("You are the forensic evidence communicator for Verum Omnis.")
         appendLine("Answer truthfully based only on the sealed evidence below. Cite anchors for every claim.")
         appendLine("Flag legal interpretations as HYPOTHESIS. Do not invent findings not listed here.")
-        appendLine("JURISDICTION: ${findings.jurisdiction}")
-        appendLine("CONTRADICTIONS:")
-        findings.contradictions.take(10).forEach { c ->
-            appendLine("- [${c.severity}] ${c.contradictionId}: \"${c.claimA.text}\" vs \"${c.claimB.text}\"")
+        if (findings == null) {
+            // Standalone chat: the vault is empty. The model must not imply it has
+            // read anything, but it may still answer general/legal questions.
+            appendLine("SEALED EVIDENCE: none — the vault is empty and no scan has been run.")
+            appendLine("You therefore have NO document findings to cite. Do not claim otherwise.")
+            appendLine("You may still answer general questions about the Constitution, the")
+            appendLine("forensic process, and the law, and may suggest sealing evidence first.")
+        } else {
+            appendLine("JURISDICTION: ${findings.jurisdiction}")
+            appendLine("CONTRADICTIONS:")
+            findings.contradictions.take(10).forEach { c ->
+                appendLine("- [${c.severity}] ${c.contradictionId}: \"${c.claimA.text}\" vs \"${c.claimB.text}\"")
+            }
         }
         appendLine("QUESTION: $query")
     }
@@ -351,8 +377,10 @@ class VerumViewModel(
             s.copy(
                 chat = listOf(
                     ChatMessage(
-                        author = "Verum Omnis",
-                        text = "Truth for All. I am ${s.communicator}, the Verum Omnis communicator (Constitution v${Constitution.VERSION}).\n\n" +
+                        author = VERUM_OMNIS,
+                        // Never name the underlying model here — spec §1 locks the
+                        // user-facing identity to "Verum Omnis" alone.
+                        text = "Truth for All. I am Verum Omnis, your on-device forensic AI (Constitution v${Constitution.VERSION}).\n\n" +
                             "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
                             "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
                             "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
@@ -365,11 +393,11 @@ class VerumViewModel(
     }
 
     fun postEngine(text: String) {
-        _state.update { it.copy(chat = it.chat + ChatMessage("Forensic Engine", text, fromUser = false)) }
+        _state.update { it.copy(chat = it.chat + ChatMessage(VERUM_OMNIS, text, fromUser = false)) }
     }
 
     private fun postAi(text: String) {
-        _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, text, fromUser = false)) }
+        _state.update { it.copy(chat = it.chat + ChatMessage(VERUM_OMNIS, text, fromUser = false)) }
     }
 
     /** A document picked from the + menu goes to the engine (not the chat AI). */
@@ -535,7 +563,17 @@ class VerumViewModel(
     }
 
     fun setGps(gps: GpsRecord) {
-        _state.update { it.copy(gps = gps) }
+        _state.update { it.copy(gps = gps, gpsUnavailable = false) }
+    }
+
+    /**
+     * No usable fix was obtained (spec §4.4). Recorded explicitly so the seal
+     * metadata and QR detail can show "location unavailable" instead of a stale
+     * or placeholder coordinate — a wrong location on forensic evidence is worse
+     * than none.
+     */
+    fun setGpsUnavailable() {
+        _state.update { it.copy(gps = null, gpsUnavailable = true) }
     }
 
     fun setSealStage(stage: SealStage) {
@@ -1081,7 +1119,7 @@ class VerumViewModel(
                     if (guardian?.hardStopRequired == true) append(" · GUARDIAN HARD STOP")
                 },
                 chat = s.chat + ChatMessage(
-                    author = "Forensic Scan",
+                    author = VERUM_OMNIS,
                     text = "Analyzed ${result.findings.documentsAnalyzed} documents. " +
                         "Detected ${result.findings.contradictions.size} contradiction(s) and " +
                         "${result.findings.legalMappings.size} legal mapping(s). " +
@@ -1137,7 +1175,7 @@ class VerumViewModel(
             it.copy(
                 report = signedReport,
                 chat = it.chat + ChatMessage(
-                    author = "Report Writer (Gemma 3)",
+                    author = VERUM_OMNIS,
                     text = "Generated sealed report ${signedReport.reference} with ${signedReport.contradictions.size} " +
                         "anchored contradiction(s)." + (if (research != null) " External research from ${research.sourceUrls.size} sources included." else "") +
                         " Seal: ${signedReport.seal.extendedFooter()}",
@@ -1271,7 +1309,7 @@ class VerumViewModel(
         }
         _state.update { it.copy(chat = it.chat + ChatMessage("You", text, fromUser = true)) }
         val reply = respond(text)
-        _state.update { it.copy(chat = it.chat + ChatMessage(_state.value.communicator, reply, fromUser = false)) }
+        _state.update { it.copy(chat = it.chat + ChatMessage(VERUM_OMNIS, reply, fromUser = false)) }
     }
 
     /**
@@ -1283,8 +1321,11 @@ class VerumViewModel(
      * 'company', 'statute' trigger responses about available deep research.
      */
     private fun respond(query: String): String {
+        // Spec §3.7: the chat is standalone. With an empty vault there are no
+        // findings to ground on, but the user can still talk to Verum Omnis —
+        // it just must not pretend to have read evidence it does not have.
         val findings = _state.value.scanResult?.findings
-            ?: return "INSUFFICIENT: no forensic scan has been run yet. Upload evidence and start a scan."
+            ?: return respondWithoutEvidence(query)
         val research = _state.value.researchFindings
         val q = query.lowercase()
 
@@ -1371,6 +1412,55 @@ class VerumViewModel(
                 } else {
                     "Evidence set: ${findings.documentsAnalyzed} docs, jurisdiction ${findings.jurisdiction}. " +
                         "Ask about contradictions, timeline, legal framework, tax, the seal, or say 'deep research' for external case research."
+                }
+            }
+        }
+    }
+
+    /**
+     * Reply when the vault is empty and no scan has run (spec §3.7 — the chat
+     * works standalone).
+     *
+     * Evidence-specific questions get an honest "nothing is sealed yet" rather
+     * than a fabricated answer, which keeps the Prime Directive intact. Everything
+     * else — research, the Constitution, how sealing works, general legal
+     * questions — is answered normally, routed to the communicator model when one
+     * is loaded.
+     */
+    private fun respondWithoutEvidence(query: String): String {
+        val q = query.lowercase()
+        val research = _state.value.researchFindings
+        return when {
+            "deep research" in q -> {
+                deepResearch()
+                "Deep research initiated…"
+            }
+            "research" in q || "precedent" in q || "case law" in q -> {
+                research?.let { DeepResearchEngine.buildChatSummary(it) }
+                    ?: "No research has been conducted yet. Say 'deep research' to search judicial " +
+                    "databases (SAFLII, CourtListener, BAILII) and the web. This works without any " +
+                    "sealed evidence — findings are external and clearly marked as such."
+            }
+            // Questions that can only be answered from sealed evidence.
+            "contradict" in q || "timeline" in q || "chronolog" in q ||
+                "tax" in q || "financ" in q || "seal" in q || "verify" in q ->
+                "Nothing is sealed in the vault yet, so there is no evidence for me to read. " +
+                    "Seal a document or run a forensic scan first, and I will answer with anchored " +
+                    "citations. In the meantime you can ask me about the Constitution, how sealing " +
+                    "and verification work, or say 'deep research' for external case research."
+            "constitution" in q -> "Constitution v${Constitution.VERSION} governs everything I do — " +
+                "it is readable in full inside the app. I operate under it at all times: I report " +
+                "indicators, never determinations, and I never overwrite sealed evidence."
+            else -> {
+                val communicator = communicatorModel
+                if (communicator != null) {
+                    askCommunicatorModel(communicator, query, findings = null)
+                    "Thinking…"
+                } else {
+                    "Your vault is empty, so I have no sealed evidence to cite yet — but you can " +
+                        "still talk to me. Ask about the Constitution, how sealing and verification " +
+                        "work, or say 'deep research' for external case research. Seal a document " +
+                        "when you're ready and I'll analyse it."
                 }
             }
         }

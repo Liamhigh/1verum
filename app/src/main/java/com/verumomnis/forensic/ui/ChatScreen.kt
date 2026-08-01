@@ -1,6 +1,8 @@
 package com.verumomnis.forensic.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,15 +43,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBlueBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoHeading
+import com.verumomnis.forensic.ui.theme.VoPanel
+import com.verumomnis.forensic.ui.theme.VoPanelBorder
 import com.verumomnis.forensic.ui.theme.VoSurface
+import com.verumomnis.forensic.ui.theme.VoTextBody
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 
@@ -190,21 +198,60 @@ private fun PendingPreviewCard(
     }
 }
 
+/**
+ * One chat row, matching the mock-up: the user speaks on the right in a blue
+ * bubble; Verum Omnis answers on the left behind the blue-circle badge.
+ *
+ * The avatar is the identity — there is no author label, because every non-user
+ * message is [VERUM_OMNIS] and the underlying model is never disclosed (spec §1).
+ * Corner radii are the mock-up's asymmetric bubbles: the corner nearest the
+ * speaker is squared off (3.dp).
+ */
 @Composable
 private fun ChatBubble(msg: ChatMessage) {
-    val alignment = if (msg.fromUser) Alignment.End else Alignment.Start
-    val bubble = if (msg.fromUser) VoAccentBlue else VoSurface
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .background(bubble, RoundedCornerShape(16.dp))
-                .padding(12.dp)
+    if (msg.fromUser) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .background(
+                        VoAccentBlue.copy(alpha = 0.18f),
+                        RoundedCornerShape(14.dp, 14.dp, 3.dp, 14.dp)
+                    )
+                    .border(
+                        1.dp,
+                        VoBlueBorder.copy(alpha = 0.6f),
+                        RoundedCornerShape(14.dp, 14.dp, 3.dp, 14.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(msg.text, color = VoHeading, fontSize = 13.sp)
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.Top
         ) {
-            Column {
-                Text(msg.author, color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
-                Text(msg.text, color = VoTextPrimary, fontSize = 13.sp)
+            Image(
+                painter = painterResource(R.drawable.vo_badge),
+                contentDescription = VERUM_OMNIS,
+                modifier = Modifier.size(26.dp).clip(CircleShape)
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .background(VoPanel, RoundedCornerShape(3.dp, 14.dp, 14.dp, 14.dp))
+                    .border(
+                        1.dp,
+                        VoPanelBorder,
+                        RoundedCornerShape(3.dp, 14.dp, 14.dp, 14.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Text(msg.text, color = VoTextBody, fontSize = 13.sp, lineHeight = 20.sp)
             }
         }
     }

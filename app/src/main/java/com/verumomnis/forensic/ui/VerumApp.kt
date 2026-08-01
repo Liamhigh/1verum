@@ -238,7 +238,8 @@ fun VerumApp(
                         VerumTopBar(
                             title = when (screen) {
                                 Screen.SCAN_HOME -> "New Forensic Scan"
-                                Screen.CHAT -> "Case Chat"
+                                // Spec §1/§3.7: the AI is "Verum Omnis" everywhere.
+                                Screen.CHAT -> "Verum Omnis"
                                 Screen.REPORT -> "Forensic Report"
                                 Screen.EMAIL -> "Sealed Email"
                                 Screen.TAX -> "Tax Return"

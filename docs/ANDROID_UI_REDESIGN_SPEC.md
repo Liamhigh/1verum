@@ -182,6 +182,17 @@ functions the founder asked for are part of this contract:
   vault files as context, synthesizes across them, cites every anchor, and may add external
   corroboration under the same rules.
 
+**Port target (reference implementation is now merged in firebase):** mirror
+`fraud-firewall/src/pipeline/externalCorroboration.ts` and `deepResearch.ts` in Kotlin. The
+rules are enforced in code there, not left to the model: the entitlement gate
+(`private`/`law_enforcement` free, `commercial` needs a valid licence — reuse the app's seal-type/
+licence state), the **signal-or-silence** filter (keep an item only if it has a resolvable URL or
+case number), **sanitise** fetched text (strip injection directives before Gemma sees it), and the
+**never-mutate / never-override / EXTERNAL-UNSEALED / contextual-only** invariants. The network
+fetcher is injected — reuse `WebSearchService.kt` / `OjrsClient.kt`; `DeepResearchEngine.kt` is the
+deep-research entry point. Keep the same unit tests (entitlement, signal gate, sanitisation,
+never-mutate, sealed-only context).
+
 ---
 
 ## 5. Definition of done

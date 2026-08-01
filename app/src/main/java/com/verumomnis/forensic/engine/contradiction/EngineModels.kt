@@ -50,7 +50,11 @@ data class LogicalPattern(
     val patternDescription: String,
     val supportingFacts: List<String>,
     val contradictionScore: Double,
-    val detectorVersion: String = "v5.2.9"
+    // MUST track the engine version in VerumContradictionEngine (v5.3.1c-kt).
+    // It sat at "v5.2.9" after the v5.3.1c port landed, so every emitted
+    // pattern stamped the superseded ruleset version — the same seal/ruleset
+    // bond breach (Constitution v6.0) as the web engine's stale "v2.0" stamp.
+    val detectorVersion: String = "v5.3.1c-kt"
 )
 
 /**

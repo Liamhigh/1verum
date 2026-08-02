@@ -28,7 +28,8 @@ object ReportGenerator {
         deviceId: String = "",
         publicKeyFingerprint: String = "",
         findingsJsonPath: String = "",
-        narrativeWriter: ReportWriter = DeterministicReportWriter
+        narrativeWriter: ReportWriter = DeterministicReportWriter,
+        judicialFindings: List<Contradiction> = emptyList()
     ): ForensicReport {
         val reference = "VO-${caseName.uppercase().take(6).replace(" ", "")}-${now.toString().take(10).replace("-", "")}-FOR"
         val title = "Forensic Analysis Report — $caseName"
@@ -38,6 +39,7 @@ object ReportGenerator {
         val executiveSummary = buildExecutiveSummary(findings)
         val body = renderBody(reference, title, classification, findings, offenceMatrix, now, deviceId, publicKeyFingerprint)
         val gemmaNarrative = narrativeWriter.writeNarrative(findings, caseName, findingsJsonPath)
+        val judicialCrossReferenceSection = renderJudicialCrossReferenceSection(judicialFindings)
 
         val seal = EvidenceSealer.seal(
             bytes = body.toByteArray(Charsets.UTF_8),
@@ -63,8 +65,41 @@ object ReportGenerator {
             jurisdictionSource = findings.jurisdictionSource,
             seal = seal,
             body = body,
-            gemmaNarrative = gemmaNarrative
+            gemmaNarrative = gemmaNarrative,
+            judicialFindings = judicialFindings,
+            judicialCrossReferenceSection = judicialCrossReferenceSection
         )
+    }
+
+    /**
+     * Renders the judicial-pairing findings as a distinct, clearly-labelled advisory
+     * block. Deliberately kept out of [renderBody] / the sealed hash: these findings
+     * depend on a live network fetch of external court records, so the same sealed
+     * evidence could otherwise produce a different-looking "sealed" body run to run.
+     */
+    private fun renderJudicialCrossReferenceSection(judicialFindings: List<Contradiction>): String {
+        if (judicialFindings.isEmpty()) return ""
+        return buildString {
+            appendLine()
+            appendLine("JUDICIAL CROSS-REFERENCE FINDINGS (ADVISORY — EXTERNAL SOURCES)")
+            appendLine("=".repeat(72))
+            appendLine("The following findings pair sworn statements or court records retrieved live")
+            appendLine("from public judicial databases against this case's sealed evidence. They are")
+            appendLine("ENGINE-VERIFIED (the same deterministic B1 detectors, given external input) but")
+            appendLine("externally sourced and NOT part of the cryptographic seal above.")
+            appendLine()
+            judicialFindings.forEach { c ->
+                appendLine("${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent}")
+                appendLine("   Claim A: \"${c.claimA.text}\"")
+                appendLine("            (${c.claimA.source})")
+                appendLine("   Claim B: \"${c.claimB.text}\"")
+                appendLine("            (${c.claimB.source})")
+                appendLine("   Legal significance: ${c.legalSignificance}")
+                appendLine("   Applicable law: ${c.applicableLaw.joinToString("; ")}")
+                appendLine("   Confidence: ${c.confidence}")
+                appendLine()
+            }
+        }
     }
 
     private fun Contradiction.toOffenceRow(): OffenceRow = OffenceRow(

@@ -68,7 +68,15 @@ enum class EngineContradictionType {
     SPOLIATION_OF_EVIDENCE,
     ATTORNEY_OBSTRUCTION,
     DEFAMATION_THREAT,
-    TECHNOLOGY_REFUSAL_LIABILITY
+    TECHNOLOGY_REFUSAL_LIABILITY,
+
+    // === v6.0 Franchise/Lease Expansion (1 type) ===
+    // A termination/expiry invoked under a clause whose precondition is
+    // contradicted by contemporaneous facts (Caltex Franchise Agreement
+    // cl. 3.2.3 "Lessee" trap: deemed terminated only if the franchisor is NOT
+    // the owner but a lessee under a head lease that ended — invoked while the
+    // franchisor had become the owner).
+    CONDITIONAL_CLAUSE_MISINVOKED
 }
 
 /** 17 serial fraud patterns detected by the engine. */

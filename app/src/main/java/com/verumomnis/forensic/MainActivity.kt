@@ -1,12 +1,18 @@
 package com.verumomnis.forensic
 
 import android.content.Intent
+import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.location.LocationManagerCompat
+import androidx.core.os.CancellationSignal
+import androidx.core.util.Consumer
 import androidx.lifecycle.ViewModelProvider
 import com.verumomnis.forensic.core.DeadManSwitch
 import com.verumomnis.forensic.engine.contradiction.ContradictionDetectors
@@ -73,28 +79,61 @@ class MainActivity : ComponentActivity() {
         deadManSwitch.recordActivity()
     }
 
+    /**
+     * Capture a real location fix for the seal (spec §4.4).
+     *
+     * A cached `getLastKnownLocation` can be hours old, and stamping stale
+     * coordinates onto sealed evidence is worse than recording none — so a
+     * cached fix is only accepted if it is younger than [MAX_FIX_AGE_MS].
+     * Otherwise a fresh single-shot fix is requested, and if that also fails the
+     * state is set explicitly to "unavailable" rather than left showing whatever
+     * was there before.
+     */
     fun captureLocation() {
+        val lm = getSystemService(LOCATION_SERVICE) as LocationManager
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+        if (providers.isEmpty()) {
+            viewModel.setGpsUnavailable()
+            return
+        }
         try {
-            val lm = getSystemService(LOCATION_SERVICE) as LocationManager
-            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            val last = providers.firstNotNullOfOrNull { p ->
-                runCatching { lm.getLastKnownLocation(p) }.getOrNull()
+            // 1. A recent cached fix is good enough and costs nothing.
+            val fresh = providers
+                .mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+                .filter { SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos < MAX_FIX_AGE_NANOS }
+                .maxByOrNull { it.time }
+            if (fresh != null) {
+                viewModel.setGps(fresh.toGpsRecord())
+                return
             }
-            if (last != null) {
-                viewModel.setGps(
-                    GpsRecord(
-                        latitude = last.latitude,
-                        longitude = last.longitude,
-                        accuracy = last.accuracy.toDouble(),
-                        altitude = last.altitude,
-                        timestamp = Instant.now().toString()
-                    )
-                )
-            }
+            // 2. Nothing recent — ask for a live fix.
+            // LocationManagerCompat, not LocationManager.getCurrentLocation —
+            // the platform method is API 30 and minSdk here is 29.
+            // The signal is typed explicitly: LocationManagerCompat overloads it on
+            // both androidx and platform CancellationSignal, so a bare null is ambiguous.
+            LocationManagerCompat.getCurrentLocation(
+                lm,
+                providers.first(),
+                null as CancellationSignal?,
+                ContextCompat.getMainExecutor(this),
+                Consumer<Location?> { loc ->
+                    if (loc != null) viewModel.setGps(loc.toGpsRecord()) else viewModel.setGpsUnavailable()
+                }
+            )
         } catch (_: SecurityException) {
-            // Permission revoked mid-flight; keep seeded coordinates.
+            // Permission revoked mid-flight — record the gap rather than guessing.
+            viewModel.setGpsUnavailable()
         }
     }
+
+    private fun Location.toGpsRecord() = GpsRecord(
+        latitude = latitude,
+        longitude = longitude,
+        accuracy = accuracy.toDouble(),
+        altitude = altitude,
+        timestamp = Instant.now().toString()
+    )
 
     /**
      * Copies the bundled Constitution PDF from assets to cache and opens it with
@@ -115,5 +154,14 @@ class MainActivity : ComponentActivity() {
             }
             startActivity(Intent.createChooser(intent, "Read Constitution").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+    }
+
+    private companion object {
+        /**
+         * Oldest cached fix accepted for a seal: 2 minutes. Anything older is
+         * discarded in favour of a live fix, so evidence is never stamped with a
+         * location the device happened to remember from somewhere else.
+         */
+        const val MAX_FIX_AGE_NANOS = 2L * 60 * 1_000_000_000
     }
 }

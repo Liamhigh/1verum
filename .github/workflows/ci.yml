@@ -1,11 +1,25 @@
-# GitHub Actions CI for Verum Omnis
+# GitHub Actions CI for Verum Omnis — PARKED, manual trigger only.
+#
+# Every automatic run since this workflow was added failed in ~4 seconds:
+# jobs are never assigned a runner because GitHub Actions is blocked at the
+# account level (billing/payment method — hard to resolve from South Africa).
+# Running it on push/PR therefore only stamped a false red ❌ on every healthy
+# commit while verifying nothing.
+#
+# Verification happens locally instead, and it is not optional:
+#   ./gradlew testDebugUnitTest assembleDebug   must be GREEN before merging.
+# (See PR #24 for what merging unbuilt code does.)
+#
+# If account billing is ever resolved, restore the triggers:
+#   on:
+#     push:
+#       branches: [ main, develop ]
+#     pull_request:
+#       branches: [ main ]
 name: Verum Omnis CI
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   build:

@@ -35,5 +35,14 @@ data class ForensicReport(
     val findingsJsonPath: String = "",
     val seal: SealRecord,
     val body: String,
-    val gemmaNarrative: String = ""
+    val gemmaNarrative: String = "",
+    /**
+     * Contradictions found by pairing live OJRS judicial research against the sealed
+     * evidence (see JudicialPairingService). Advisory, externally-sourced, and — like
+     * [gemmaNarrative] — deliberately NOT part of the seal: [seal] is computed over
+     * [body] alone, before this section is appended.
+     */
+    val judicialFindings: List<Contradiction> = emptyList(),
+    /** Rendered prose for [judicialFindings], ready to append after [body]. */
+    val judicialCrossReferenceSection: String = ""
 )

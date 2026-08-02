@@ -50,7 +50,8 @@ data class LogicalPattern(
     val patternDescription: String,
     val supportingFacts: List<String>,
     val contradictionScore: Double,
-    val detectorVersion: String = "v5.2.9"
+    /** Ruleset that produced this pattern. Defaults to the engine's own version. */
+    val detectorVersion: String = EngineVersion.TAGGED
 )
 
 /**

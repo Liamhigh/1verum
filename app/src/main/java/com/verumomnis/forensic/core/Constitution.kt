@@ -43,6 +43,25 @@ object Constitution {
     const val RULE_MANIFEST_URL = "https://verumglobal.foundation/api/v1/rules/manifest"
     const val RULES_PUBLIC_KEY_DER_B64 = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA9FQPTWCsFh1qMs/mrOOgZvdjCh8APmlsJlallCm3CmWgMoFAyRHRAauvXWFoBoiaUQGGx7OGtZ6eBCpBlOGLxSnVk0T2hBgd6kxZwj1vHEITw9KmXMjy5qmUY1hd3BO3y4aAfrPKu+6ENSJo7Ax77fvBnHPG1oL8m3724oqU913HYI7Miob+CdL0Oi36oCBKhlw5sCYH+evMPU1PmOqTrmz8zUkDk4osqX8INTIchmk2j3BguMw8sjmKRnrB//t6LPYme4motggMPVMNR3hLJHX+ehCYDUtJLshZq1MPLjTT7aK36gCIPg2ja6BxWfYdx7ZzSFVcL+gapy4pA7VnDrhQ7jb10ojGnofssEbQEi7k9FpswMFegmGNmKEH5TQcKlI4VJvQcZddbhZXYwpfgsL/raEFMChEuzR3A49oIXgBBmi9AdQtdEHpfb2i9/PimxsilhDxa8Pi+8cEQUMbHcPeodfX/IWf+wotnc3VKGoffVL/8+hSU/voPhxfXyOcnbRYkFGeOZhcrE/u4Nh6Vkq6y1+cpVUtrIzOnaeNbNF248ZS7f65IZci8MTeo4nAqkWGmXcZHrZLT7YIvHSyAryYzBNoofm2uTuiTxp8Oiwa2yfU2UMQfg0eGZa0LBHCLbG72pxiVd2TGvdHh3QguO1/zM5NNRtoUnqHfuLBOJECAwEAAQ=="
 
+    // On-device LLM downloads (ON_DEVICE_LLM_ARCHITECTURE.md section 6): URL + SHA-256 are
+    // hard-coded so ModelDownloadManager can verify integrity before ever loading a model.
+    // GGUF quantized re-uploads (bartowski) rather than Google/Microsoft's raw checkpoints,
+    // since llama.cpp inference requires GGUF format. Verified reachable + hashed 2026-07-26.
+    const val MODEL_GEMMA3_URL =
+        "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf"
+    const val MODEL_GEMMA3_SHA256 = "4996030242583a40aa151ff93f49ed787ac8c25e4120c3ae4588b2e2a7d1ae94"
+    const val MODEL_GEMMA3_SIZE_BYTES = 2489758112L
+
+    const val MODEL_PHI3_URL =
+        "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+    const val MODEL_PHI3_SHA256 = "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef"
+    const val MODEL_PHI3_SIZE_BYTES = 2393231072L
+
+    const val MODEL_GEMMA4_URL =
+        "https://huggingface.co/bartowski/gemma-4-12B-it-GGUF/resolve/main/gemma-4-12B-it-Q4_K_M.gguf"
+    const val MODEL_GEMMA4_SHA256 = "d333b368be6cd655563fce18aede26027e208fdb13816d35eb06983ce054044b"
+    const val MODEL_GEMMA4_SIZE_BYTES = 7662531872L
+
     const val NINE_BRAIN_VERSION = "v1.0"
     const val SEALING_PROTOCOL = "verum-omnis-seal v1.0"
     const val TAGLINE = "AI Forensics for Truth"

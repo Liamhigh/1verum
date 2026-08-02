@@ -121,7 +121,7 @@ object FindingsJsonEmitter {
     /** Build the complete Findings JSON document from an engine report. */
     fun fromReport(
         report: EngineForensicReport,
-        engineVersion: String = "5.3.1c",
+        engineVersion: String = EngineVersion.VALUE,
         sourceBundle: String = "",
         caseIds: List<String> = emptyList(),
         integrityFindings: List<String> = emptyList(),

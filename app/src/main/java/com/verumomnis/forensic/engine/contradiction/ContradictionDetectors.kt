@@ -14,6 +14,23 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object ContradictionDetectors {
 
+    /**
+     * Upper bound on how many contradictions a single detector may emit for one
+     * evidence set.
+     *
+     * The pairwise detectors are O(n²) in claim count, and each contradiction
+     * embeds both claims' full text four times over (factText, propositionA/B,
+     * conflictDescription and the logical pattern's facts). A large scanned
+     * bundle therefore used to exhaust the heap inside the detector loop —
+     * `OutOfMemoryError` in createContradiction, taking the whole seal down.
+     *
+     * `detectAll` collapses each detector's output to one entry per
+     * (actorA, actorB, type, pattern) tuple, so a bound this high cannot change
+     * a real report: it only stops a pathological bundle from allocating
+     * millions of throwaway objects before the dedup ever runs.
+     */
+    const val MAX_CONTRADICTIONS_PER_DETECTOR: Int = 2000
+
     private val counter = AtomicInteger(0)
     fun resetCounter() { counter.set(0) }
     private fun nextId(): String = "C-${counter.incrementAndNext().toString().padStart(4, '0')}"
@@ -102,7 +119,9 @@ object ContradictionDetectors {
             extractionMethod = patternType,
             confidence = baseConfidence
         )
-        val pattern = LogicalPattern(patternType, description, facts, score, "v5.3.1c")
+        // No version literal here: LogicalPattern defaults to EngineVersion.TAGGED,
+        // so the stamp cannot drift from the engine that produced it.
+        val pattern = LogicalPattern(patternType, description, facts, score)
         val hypothesis = when (cType) {
             EngineContradictionType.JUDICIAL_VS_DOCUMENTARY,
             EngineContradictionType.PERJURY_BY_TIMELINE,
@@ -234,6 +253,17 @@ object ContradictionDetectors {
                     "Submission records", "Bounce/undelivered evidence", "Follow-up correspondence"
                 )
             )
+            EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED -> LegalHypothesis(
+                suggestedOffence = "Unlawful Termination / Misrepresentation of a Contractual Right",
+                legalBasis = "A termination or expiry was invoked under a clause whose precondition (party is the lessee under a head lease, not the owner) was not met, because the record shows the party had become the owner of the premises — the triggering event never occurred",
+                jurisdictionalNote = "Contract law; SA common law on effluxion, repudiation and misrepresentation — requires legal review",
+                requiredAdditionalEvidence = listOf(
+                    "Title deed / property transfer records establishing ownership and its date",
+                    "Any head lease agreement (or proof none existed)",
+                    "The exact clause relied upon for termination",
+                    "Cession / assignment records tracing the invoking party"
+                )
+            )
             else -> null
         }
         return EngineContradiction(
@@ -251,7 +281,9 @@ object ContradictionDetectors {
     fun detectStatementVsStatement(claims: List<EngineClaim>): List<EngineContradiction> {
         val results = mutableListOf<EngineContradiction>()
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && isOpposing(a, b)) {
                     val (isSem, semScore) = SemanticAnalyzer.detectSemanticContradiction(a, b)
@@ -299,7 +331,9 @@ object ContradictionDetectors {
         val financial = claims.filter { c -> keywords.any { c.value.lowercase().contains(it) } }
         val results = mutableListOf<EngineContradiction>()
         for (i in financial.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until financial.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = financial[i]; val b = financial[j]
                 if (a.actor == b.actor && a.subject == b.subject && a.value != b.value) {
                     val (isSem, semScore) = SemanticAnalyzer.detectSemanticContradiction(a, b)
@@ -345,7 +379,9 @@ object ContradictionDetectors {
         val results = mutableListOf<EngineContradiction>()
         val dayMs = 1000L * 60 * 60 * 24
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.subject == b.subject && a.date != null && b.date != null && a.date != b.date) {
                     if (isOpposing(a, b)) {
@@ -372,7 +408,9 @@ object ContradictionDetectors {
         val results = mutableListOf<EngineContradiction>()
         val dayMs = 1000L * 60 * 60 * 24
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.date != null && b.date != null) {
                     val gapDays = kotlin.math.abs(a.date - b.date) / dayMs
@@ -470,6 +508,79 @@ object ContradictionDetectors {
         return results
     }
 
+    // ==================== 2 v6.0 FRANCHISE/LEASE DETECTORS ====================
+
+    /**
+     * Conditional-clause trap (Caltex Franchise Agreement cl. 3.2.3). A
+     * termination/expiry rests on a clause whose precondition is that the party
+     * is the LESSEE (not the owner) under a head lease that ended — but the
+     * record shows that party had become the OWNER of the premises, so the
+     * clause's trigger never occurred and the termination may be void. This is
+     * the evidence the engine missed: the lease clause must be read against the
+     * ownership record.
+     */
+    fun detectConditionalClauseMisinvoked(claims: List<EngineClaim>): List<EngineContradiction> {
+        val clauseCondition = listOf("lessee", "head lease", "not the owner", "effluxion")
+        val ownership = listOf(
+            "is the owner", "became the owner", "purchased the property", "owner of the premises",
+            "transfer of the property", "registered owner", "acquired the property", "bought the site",
+            "took transfer", "ownership of the premises", "owns the premises", "owns the property"
+        )
+        val clauseClaims = claims.filter { c -> clauseCondition.any { c.value.contains(it, ignoreCase = true) } }
+        val ownershipFacts = claims.filter { c -> ownership.any { c.value.contains(it, ignoreCase = true) } }
+        val results = mutableListOf<EngineContradiction>()
+        for (clause in clauseClaims) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
+            for (own in ownershipFacts) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
+                if (clause.sha512Hash.isNotEmpty() && clause.sha512Hash == own.sha512Hash) continue
+                results += createContradiction(clause, own,
+                    EngineContradictionType.CONDITIONAL_CLAUSE_MISINVOKED,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.VERY_HIGH,
+                    "TERMINATION_UNDER_LESSEE_CLAUSE_WHILE_OWNER",
+                    "A termination/expiry rests on a clause conditioned on the party being a lessee (not the owner), but contemporaneous evidence shows that party was the owner of the premises — the clause's precondition never occurred, so the invoked termination is void",
+                    listOf(clause.value, own.value), 0.95
+                )
+            }
+        }
+        return results
+    }
+
+    /**
+     * Goodwill / value of the business recognised or quantified in one document
+     * (e.g. the clawback table) but denied or said to have no compensable value
+     * elsewhere — "you only take away what exists". Mapped to ACKNOWLEDGE_THEN_DENY.
+     */
+    fun detectAssetValueDenial(claims: List<EngineClaim>): List<EngineContradiction> {
+        val asset = listOf("goodwill", "value of the business")
+        val recognitionMarkers = listOf("means", "value", "clawback", "percentage", "inure", "entitled", "recognis", "quantif", "compensat")
+        val denialMarkers = listOf("no goodwill", "no compensable", "has no value", "not entitled to any compensation", "without compensation", "no value", "not compensable")
+        val recognition = claims.filter { c ->
+            val t = c.value.lowercase()
+            asset.any { t.contains(it) } && recognitionMarkers.any { t.contains(it) } && denialMarkers.none { t.contains(it) }
+        }
+        val denial = claims.filter { c ->
+            val t = c.value.lowercase()
+            denialMarkers.any { t.contains(it) } && (asset.any { t.contains(it) } || t.contains("compensat") || t.contains("value"))
+        }
+        val results = mutableListOf<EngineContradiction>()
+        for (r in recognition) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
+            for (d in denial) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
+                if (r.sha512Hash.isNotEmpty() && r.sha512Hash == d.sha512Hash) continue
+                results += createContradiction(r, d,
+                    EngineContradictionType.ACKNOWLEDGE_THEN_DENY,
+                    EngineSeverity.VERY_HIGH, EngineConfidence.VERY_HIGH,
+                    "ASSET_VALUE_RECOGNISED_THEN_DENIED",
+                    "An asset (goodwill / value of the business) is recognised or quantified in one document but its existence or compensable value is denied elsewhere — a forfeiture or clawback of the asset is itself an admission that it exists",
+                    listOf(r.value, d.value), 0.9
+                )
+            }
+        }
+        return results
+    }
+
     // ==================== 6 v5.3.1c DIGSIM DETECTORS ====================
 
     /** Detector 11: DEFECTIVE_JURAT — Affidavit missing mandatory jurat elements. */
@@ -548,7 +659,9 @@ object ContradictionDetectors {
         val afterMarkers = listOf("after", "subsequent to", "followed by", "later than", "then")
         val results = mutableListOf<EngineContradiction>()
         for (i in claims.indices) {
+            if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
             for (j in i + 1 until claims.size) {
+                if (results.size >= MAX_CONTRADICTIONS_PER_DETECTOR) break
                 val a = claims[i]; val b = claims[j]
                 if (a.actor == b.actor && a.date != null && b.date != null) {
                     val lowerA = a.value.lowercase(); val lowerB = b.value.lowercase()
@@ -913,6 +1026,9 @@ object ContradictionDetectors {
         ::detectDefamationThreat,
         ::detectTechnologyRefusal,
         ::detectConflictOfInterest,
+        // v6.0 franchise/lease detectors (AllFuels case)
+        ::detectConditionalClauseMisinvoked,
+        ::detectAssetValueDenial,
         // Additive signed rule-update detector (no-op until a verified package is downloaded)
         ::detectDownloadedFraudPairs
     )
@@ -923,14 +1039,22 @@ object ContradictionDetectors {
      * rules the output is identical to running the built-in detectors alone.
      */
     fun detectAll(claims: List<EngineClaim>): List<EngineContradiction> {
-        val all = ALL_DETECTORS.flatMap { it(claims) }
         val seen = mutableSetOf<String>()
         val unique = mutableListOf<EngineContradiction>()
-        for (c in all) {
-            val key = "${c.propositionAActor}:${c.propositionBActor}:${c.type}:${c.logicalPattern.patternType}"
-            if (key !in seen) {
-                seen += key
-                unique += c
+        // Deduplicate as each detector returns rather than concatenating all 29
+        // result lists first. Detectors run in the same order and contradictions
+        // are still created in the same order, so the output (and every
+        // contradictionId) is identical to the previous flatMap — but only one
+        // detector's results are held at a time, and the duplicates it sheds
+        // become collectable immediately instead of pinning the whole run in
+        // memory until the end.
+        for (detector in ALL_DETECTORS) {
+            for (c in detector(claims)) {
+                val key = "${c.propositionAActor}:${c.propositionBActor}:${c.type}:${c.logicalPattern.patternType}"
+                if (key !in seen) {
+                    seen += key
+                    unique += c
+                }
             }
         }
         return unique.sortedByDescending { EngineScores.severityScore(it.severity) }

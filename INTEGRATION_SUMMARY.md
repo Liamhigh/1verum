@@ -65,4 +65,12 @@ Full `./gradlew testDebugUnitTest` passes.
 
 ## Next steps
 - Consider promoting the most useful `engine/v531c/` detectors into `engine/contradiction/` and removing the deprecated package once the new engine is fully validated.
-- The actual Gemma 3 on-device runtime is still deferred; the pipeline is structured but uses deterministic stubs.
+- The Gemma 3 hybrid pipeline is now wired end-to-end behind `llm/Gemma3Runtime`:
+  `ForensicService.scan` runs `G3ReviewPass` (second-pass contradiction catching into
+  `G3CandidateRegistry`, merged into the findings JSON with tier counts),
+  `Gemma3ReportWriter` performs real inference for the narrative appendix when a
+  runtime is installed, and promoted candidates become local engine rules via
+  `LocalRuleStore` (served through the same additive path as signed downloaded rules).
+  Only the native llama.cpp build (`libverum_llama.so`) and a provisioned
+  `files/models/gemma3-*.gguf` are still required to activate it (KNOWN_BUGS BUG-002);
+  without them every stage falls back to the deterministic pipeline.

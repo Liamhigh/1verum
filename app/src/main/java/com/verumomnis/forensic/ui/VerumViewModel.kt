@@ -190,6 +190,8 @@ data class UiState(
     val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
     val anchoring: Boolean = false,
     val findingsJsonPath: String = "",
+    /** G3-raised candidates for the current case (GHRP two-tier rule). */
+    val g3Candidates: List<com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter.FindingsContradictionRecord> = emptyList(),
     val trustScore: TrustScore? = null,
     val identityStatus: String = "Identity not initialized.",
     val identityFingerprint: String = "",
@@ -427,10 +429,10 @@ class VerumViewModel(
             return
         }
         _state.update { it.copy(sealStage = SealStage.SCANNING) }
-        runScan(now)
+        runScan(now, caseName)
         _state.update { it.copy(sealStage = SealStage.SEALING) }
         storeFindingsJson()
-        generateReport(caseName = caseName, now = now)
+        generateReportSync(caseName = caseName, now = now)
         signSealsAndAnchor()
         _state.update { it.copy(sealStage = SealStage.ANCHORING) }
         val r = _state.value.scanResult
@@ -456,14 +458,64 @@ class VerumViewModel(
         anchorSealToBitcoin(auto = true)
     }
 
-    /** Serialize and vault the current findings as a machine-readable JSON bundle. */
+    /**
+     * Serialize and vault the current findings as a raw machine-readable dump.
+     * This is a convenience artefact only — [UiState.findingsJsonPath] keeps
+     * pointing at the GHRP findings-JSON contract file written by [runScan],
+     * which is what the report writer and Gemma 3 narrate from. (Overwriting
+     * that path here previously made the G3 candidate tier unreadable.)
+     */
     private fun storeFindingsJson() {
         val findings = _state.value.scanResult?.findings ?: return
         val reference = _state.value.scanResult?.seal?.documentReference ?: "findings"
         val fileName = "${reference}_findings.json"
         val json = Json { prettyPrint = true }.encodeToString(findings)
         vault.storeFinding(fileName, json)
-        _state.update { it.copy(findingsJsonPath = File(vault.findings, fileName).absolutePath) }
+    }
+
+    /**
+     * Promote a G3-raised candidate after human sign-off (GHRP two-tier rule).
+     * The candidate's proposition pair becomes a local engine rule via
+     * [com.verumomnis.forensic.update.LocalRuleStore], so the deterministic
+     * engine itself detects the contradiction on the next scan — Gemma 3's
+     * catch is folded back into the engine.
+     */
+    fun promoteG3Candidate(candidateId: String, now: Instant = Instant.now()) {
+        val registry = _state.value.scanResult?.g3Registry ?: run {
+            postEngine("No G3 candidate registry for this case — run a scan first.")
+            return
+        }
+        runCatching {
+            val promoted = registry.promote(candidateId, method = "human_signoff", utc = now.toString())
+            com.verumomnis.forensic.update.LocalRuleStore.getInstance(getApplication())
+                .addPromotedCandidate(promoted)
+            vault.storeFinding(
+                "g3_promotion_${candidateId}_${now.toString().take(19).replace(":", "-")}.json",
+                "{\"action\":\"PROMOTED\",\"candidate_id\":\"$candidateId\",\"method\":\"human_signoff\",\"utc\":\"$now\"}"
+            )
+            _state.update { it.copy(g3Candidates = registry.allRecords()) }
+            postEngine(
+                "Candidate $candidateId PROMOTED — its proposition pair is now a local engine rule. " +
+                    "The deterministic engine will detect it directly on the next scan."
+            )
+        }.onFailure { postEngine("Cannot promote $candidateId: ${it.message}") }
+    }
+
+    /** Reject a G3-raised candidate. The reason is sealed with it — never deleted. */
+    fun rejectG3Candidate(candidateId: String, reason: String, now: Instant = Instant.now()) {
+        val registry = _state.value.scanResult?.g3Registry ?: run {
+            postEngine("No G3 candidate registry for this case — run a scan first.")
+            return
+        }
+        runCatching {
+            registry.reject(candidateId, reason, utc = now.toString())
+            vault.storeFinding(
+                "g3_rejection_${candidateId}_${now.toString().take(19).replace(":", "-")}.json",
+                "{\"action\":\"REJECTED\",\"candidate_id\":\"$candidateId\",\"reason\":${Json.encodeToString(reason)},\"utc\":\"$now\"}"
+            )
+            _state.update { it.copy(g3Candidates = registry.allRecords()) }
+            postEngine("Candidate $candidateId REJECTED — reason sealed with the record.")
+        }.onFailure { postEngine("Cannot reject $candidateId: ${it.message}") }
     }
 
     /** Verify an uploaded file's hash against the sealed vault. */
@@ -488,15 +540,22 @@ class VerumViewModel(
             postAi("Online Judicial Retrieval (OJRS) is disabled. Enable it in Settings to run deep research.")
             return
         }
-        if (_state.value.scanResult == null) sealCase(now)
-        val findings = _state.value.scanResult?.findings ?: return
-        val caseRef = _state.value.scanResult?.seal?.documentReference ?: "Matter"
-        val jurisdiction = _state.value.jurisdiction
-
+        // The seal/findings prep that used to sit here now runs inside the IO
+        // coroutine below: sealing triggers the G3 review pass, which is
+        // on-device LLM inference and must never block the caller's thread.
         _state.update { it.copy(researching = true) }
         postAi("Initiating deep research across judicial databases and the open web… This may take a moment.")
 
         viewModelScope.launch(Dispatchers.IO) {
+            // Sealing (and the G3 review pass inside it) can run on-device LLM
+            // inference — it must happen here, never on the caller's thread.
+            if (_state.value.scanResult == null) sealCase(now)
+            val findings = _state.value.scanResult?.findings ?: run {
+                _state.update { it.copy(researching = false) }
+                return@launch
+            }
+            val caseRef = _state.value.scanResult?.seal?.documentReference ?: "Matter"
+            val jurisdiction = _state.value.jurisdiction
             try {
                 val research = DeepResearchEngine.research(
                     findings = findings,
@@ -1136,6 +1195,7 @@ class VerumViewModel(
                 scanning = false,
                 scanResult = result,
                 findingsJsonPath = findingsJsonPath,
+                g3Candidates = result.g3Registry?.allRecords() ?: emptyList(),
                 jurisdiction = result.findings.jurisdiction,
                 files = s.files.map { it.copy(status = "scanned") },
                 scanLog = buildString {
@@ -1162,18 +1222,35 @@ class VerumViewModel(
         now: Instant = Instant.now(),
         judicialFindings: List<Contradiction> = emptyList()
     ) {
+        // On-device Gemma 3 narration is slow — never run it on the caller
+        // (UI) thread. Without a runtime the pipeline is fast and stays
+        // synchronous, which callers like sealCase and unit tests rely on.
+        if (com.verumomnis.forensic.llm.Gemma3RuntimeProvider.runtime.isAvailable()) {
+            viewModelScope.launch(Dispatchers.IO) { generateReportSync(caseName, now, judicialFindings) }
+        } else {
+            generateReportSync(caseName, now, judicialFindings)
+        }
+    }
+
+    private fun generateReportSync(
+        caseName: String = "Matter",
+        now: Instant = Instant.now(),
+        judicialFindings: List<Contradiction> = emptyList()
+    ) {
         val findings = _state.value.scanResult?.findings ?: run {
-            runScan(now)
+            runScan(now, caseName)
             _state.value.scanResult?.findings
         } ?: return
         val device = identityService.deviceIdentity()
 
-        // Prefer a real loaded Gemma 3 model; else fall back to the prompt-echo/deterministic
-        // writers so the report body is never silently blank (see LlamaModel.kt doc comment).
+        // Writer choice lives in NarrativeWriterSelector so it stays unit-testable
+        // without a device (PR #27). The G3 runtime seam this branch adds is folded
+        // in there too, rather than being re-inlined here.
         val research = _state.value.researchFindings
         val narrativeWriter = com.verumomnis.forensic.engine.NarrativeWriterSelector.select(
             reportWriterModel = reportWriterModel,
-            hasResearch = research != null
+            hasResearch = research != null,
+            gemma3RuntimeAvailable = com.verumomnis.forensic.llm.Gemma3RuntimeProvider.runtime.isAvailable()
         )
 
         val report = ReportGenerator.generate(
@@ -1187,11 +1264,13 @@ class VerumViewModel(
             judicialFindings = judicialFindings
         )
 
-        // If research exists, build the research prompt and store it alongside
+        // If research exists, append the human-readable research summary to the
+        // narrative appendix (never the raw model prompt — the appendix renders
+        // in the report UI and exported PDF).
         val reportWithResearch = if (research != null) {
-            val researchPrompt = DeepResearchEngine.buildResearchPrompt(research, findings)
+            val researchSummary = DeepResearchEngine.buildChatSummary(research)
             report.copy(
-                gemmaNarrative = report.gemmaNarrative + "\n\n" + researchPrompt
+                gemmaNarrative = (report.gemmaNarrative + "\n\nEXTERNAL RESEARCH SUMMARY (advisory only):\n" + researchSummary).trim()
             )
         } else report
 

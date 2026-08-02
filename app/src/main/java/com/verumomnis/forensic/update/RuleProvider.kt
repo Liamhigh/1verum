@@ -49,6 +49,25 @@ class DownloadedRules(
 
     companion object {
 
+        /**
+         * Merge the remote signed package with locally promoted G3 rules.
+         * Either side may be null; returns null only when both are, so the
+         * engine's "no rules -> unchanged behaviour" invariant holds.
+         */
+        fun merged(remote: DownloadedRules?, local: DownloadedRules?): DownloadedRules? {
+            if (remote == null) return local
+            if (local == null) return remote
+            return DownloadedRules(
+                version = "${remote.version}+${local.version}",
+                publishedAt = remote.publishedAt,
+                fraudPairs = remote.fraudPairs + local.fraudPairs,
+                fraudTerms = remote.fraudTerms + local.fraudTerms,
+                behavioralKeywords = remote.behavioralKeywords + local.behavioralKeywords,
+                contradictionPatternCount = remote.contradictionPatternCount + local.contradictionPatternCount,
+                serialPatternCount = remote.serialPatternCount + local.serialPatternCount
+            )
+        }
+
         /** Parses a persisted (already signature-verified) package JSON document. */
         fun fromPackageJson(packageJson: String): DownloadedRules =
             fromPackage(Json.parseToJsonElement(packageJson) as JsonObject)

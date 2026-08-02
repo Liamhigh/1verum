@@ -46,6 +46,28 @@ class NarrativeWriterSelectorTest {
     }
 
     @Test
+    fun `the G3 runtime seam narrates when no model is directly loaded`() {
+        // PR #22's runtime is a second narration path. With no directly loaded
+        // model it should still narrate rather than dropping to deterministic.
+        val writer = NarrativeWriterSelector.select(
+            reportWriterModel = null,
+            hasResearch = false,
+            gemma3RuntimeAvailable = true
+        )
+        assertSame(Gemma3ReportWriter, writer)
+    }
+
+    @Test
+    fun `no runtime and no model still yields the deterministic writer`() {
+        val writer = NarrativeWriterSelector.select(
+            reportWriterModel = null,
+            hasResearch = false,
+            gemma3RuntimeAvailable = false
+        )
+        assertSame(DeterministicReportWriter, writer)
+    }
+
+    @Test
     fun `fallback writers are recognised as non-native narratives`() {
         assertFalse(NarrativeWriterSelector.isNativeNarrative(DeterministicReportWriter))
         assertFalse(NarrativeWriterSelector.isNativeNarrative(Gemma3ReportWriter))

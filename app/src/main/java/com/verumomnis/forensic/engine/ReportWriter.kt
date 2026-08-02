@@ -66,16 +66,32 @@ object DeterministicReportWriter : ReportWriter {
 /**
  * Gemma 3 narrative writer.
  *
- * Builds the structured prompt that Gemma 3 would consume (per PROMPT.md
- * Section 7). When an on-device Gemma 3 inference runtime is integrated,
- * [writeNarrative] can call that runtime using [buildPrompt]. Until then the
- * prompt itself is returned as a deterministic narrative appendix so the data
- * pipeline remains visible and testable without breaking the seal.
+ * When an on-device Gemma 3 runtime is installed (see
+ * [com.verumomnis.forensic.llm.Gemma3RuntimeProvider]), [writeNarrative] runs
+ * real inference over the structured prompt from [buildPrompt] and returns the
+ * human-readable forensic narrative, with the deterministic G3 candidate tier
+ * appended so pending candidates stay visibly labelled. When no runtime is
+ * available it falls back to [DeterministicReportWriter] so the report never
+ * contains model-shaped placeholder text. The narrative is an appendix and is
+ * never part of the cryptographic seal.
  */
 object Gemma3ReportWriter : ReportWriter {
 
-    override fun writeNarrative(findings: ForensicFindings, caseName: String, findingsJsonPath: String): String =
-        buildPrompt(findings, caseName, findingsJsonPath)
+    override fun writeNarrative(findings: ForensicFindings, caseName: String, findingsJsonPath: String): String {
+        val deterministic = DeterministicReportWriter.writeNarrative(findings, caseName, findingsJsonPath)
+        val runtime = com.verumomnis.forensic.llm.Gemma3RuntimeProvider.runtime
+        if (!runtime.isAvailable()) return deterministic
+        val narrative = runtime.generate(buildPrompt(findings, caseName, findingsJsonPath), maxTokens = 4096)
+        if (narrative.isNullOrBlank()) return deterministic
+        return buildString {
+            appendLine("NARRATIVE ANALYSIS (Gemma 3 — unsealed appendix)")
+            appendLine(narrative.trim())
+            if (deterministic.isNotBlank()) {
+                appendLine()
+                append(deterministic)
+            }
+        }
+    }
 
     /** Construct the structured, bounded prompt described in PROMPT.md Section 7. */
     fun buildPrompt(findings: ForensicFindings, caseName: String, findingsJsonPath: String = ""): String = buildString {

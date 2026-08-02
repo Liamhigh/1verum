@@ -78,7 +78,11 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
 
         setProgress(progress("Report", "Generating sealed forensic report", 75))
         val findingsJsonPath = java.io.File(vault.findings, FindingsJsonEmitter.findingsFileName(caseName, now)).absolutePath
-        val report = ReportGenerator.generate(scanResult.findings, caseName, now, findingsJsonPath = findingsJsonPath)
+        val report = ReportGenerator.generate(
+            scanResult.findings, caseName, now,
+            findingsJsonPath = findingsJsonPath,
+            narrativeWriter = com.verumomnis.forensic.engine.Gemma3ReportWriter
+        )
 
         setProgress(progress("Vault", "Sealing findings and report", 95))
         vault.storeFinding("${report.reference}.json", Json.encodeToString(scanResult.findings))

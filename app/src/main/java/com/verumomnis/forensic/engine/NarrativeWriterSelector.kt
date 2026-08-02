@@ -25,9 +25,22 @@ object NarrativeWriterSelector {
      * @param reportWriterModel the loaded on-device writer, or null if the model
      *   was never downloaded, failed SHA-256 verification, or would not fit in RAM.
      * @param hasResearch whether external research findings exist.
+     * @param gemma3RuntimeAvailable whether the G3 runtime seam
+     *   (`Gemma3RuntimeProvider.runtime`) has a backend installed. This is a
+     *   second, independent narration path from [reportWriterModel]: the model is
+     *   loaded directly through `ModelDownloadManager`, whereas the runtime is
+     *   provisioned separately. A directly loaded model is preferred because it
+     *   is already verified and resident.
      */
-    fun select(reportWriterModel: LlamaModel?, hasResearch: Boolean): ReportWriter = when {
+    fun select(
+        reportWriterModel: LlamaModel?,
+        hasResearch: Boolean,
+        gemma3RuntimeAvailable: Boolean = false
+    ): ReportWriter = when {
         reportWriterModel != null -> Gemma3NativeReportWriter(reportWriterModel)
+        // Gemma3ReportWriter drives the runtime seam and degrades to the
+        // deterministic writer internally if generation returns nothing.
+        gemma3RuntimeAvailable -> Gemma3ReportWriter
         hasResearch -> Gemma3ReportWriter
         else -> DeterministicReportWriter
     }

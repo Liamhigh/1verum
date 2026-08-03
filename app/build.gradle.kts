@@ -107,7 +107,29 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // The in-app Constitution reads the generated copy of the repo's
+    // CONSTITUTION.md — see syncConstitution below.
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/constitution"))
 }
+
+/**
+ * Copies the repo's CONSTITUTION.md into the APK's assets on every build, so the
+ * governing document has exactly one source of truth.
+ *
+ * The app previously showed only `assets/constitution.pdf`, a separately sealed
+ * artifact that drifted from the repo: the markdown sat at v5.2.7 while the
+ * bundled PDF was v6.0. Generating the asset means the text a user reads in the
+ * app is the text in the repository, always.
+ */
+val syncConstitution by tasks.registering(Copy::class) {
+    description = "Copies CONSTITUTION.md into assets so the app and repo cannot drift."
+    from(rootProject.file("CONSTITUTION.md"))
+    into(layout.buildDirectory.dir("generated/constitution"))
+    rename { "constitution.md" }
+}
+
+tasks.named("preBuild") { dependsOn(syncConstitution) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)

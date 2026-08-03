@@ -222,9 +222,21 @@ fun VerumApp(
             ConstellationBackground(modifier = Modifier.fillMaxSize())
 
             if (screen == Screen.STORY) {
-                StoryScreen(
-                    onEnter = { navigate(Screen.SCAN_HOME) },
-                    onReadConstitution = { navigate(Screen.CONSTITUTION) }
+                // Landing per the Verum Vault mock-up (§3.1). Stat tiles are bound
+                // to real vault state rather than the mock-up's literals: a count
+                // that does not move when you seal something is worse than no count.
+                LandingScreen(
+                    sealedCount = state.vaultSealedCount,
+                    verifiedCount = state.vaultVerifiedCount,
+                    flaggedCount = state.vaultFlaggedCount,
+                    recent = state.recentActivity,
+                    onVerify = { navigate(Screen.SCAN_SEAL) },
+                    onSeal = { navigate(Screen.SCAN_HOME) },
+                    onAskVerum = { navigate(Screen.CHAT) },
+                    onViewAll = { navigate(Screen.VAULT) },
+                    onOpenRecent = { navigate(Screen.VAULT) },
+                    onConstitution = { navigate(Screen.CONSTITUTION) },
+                    onDocuments = { navigate(Screen.VAULT) }
                 )
             } else {
                 Scaffold(

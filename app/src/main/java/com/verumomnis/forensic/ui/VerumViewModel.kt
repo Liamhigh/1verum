@@ -181,6 +181,11 @@ data class UiState(
     val gps: GpsRecord? = null,
     /** True when a location fix was attempted and none could be obtained (spec §4.4). */
     val gpsUnavailable: Boolean = false,
+    // Landing stat tiles (spec §3.1) — real vault counts, never literals.
+    val vaultSealedCount: Int = 0,
+    val vaultVerifiedCount: Int = 0,
+    val vaultFlaggedCount: Int = 0,
+    val recentActivity: List<RecentActivity> = emptyList(),
     val jurisdiction: String = "ZA-KZN",
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
@@ -411,6 +416,8 @@ class VerumViewModel(
                 }
             )
         }
+
+        refreshVaultStats()
 
         // Persist every change to the transcript. Collected for the ViewModel's
         // lifetime so a turn is saved as soon as it lands: a forensic scan can
@@ -676,6 +683,45 @@ class VerumViewModel(
                 reportWriter = ModelLoader.reportWriter(models).name,
                 systemPrompt = prompt
             )
+        }
+    }
+
+    /**
+     * Recomputes the landing tiles from what is actually in the vault.
+     *
+     * Sealed counts vaulted artifacts; flagged counts reports carrying
+     * contradictions; verified is the remainder — a sealed report the engine
+     * found nothing adverse in. Reading the vault rather than tracking counters
+     * means the tiles cannot drift from reality.
+     */
+    fun refreshVaultStats() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val reports = runCatching { vault.listReports() }.getOrDefault(emptyList())
+            val sealed = runCatching { vault.documentCount() }.getOrDefault(0)
+            val flagged = reports.count { it.contradictions.isNotEmpty() }
+            val recent = reports
+                .sortedByDescending { it.createdAt }
+                .take(2)
+                .map { r ->
+                    RecentActivity(
+                        id = r.reference,
+                        name = r.title.ifBlank { r.reference },
+                        subtitle = if (r.contradictions.isEmpty()) {
+                            "Sealed · no contradictions detected"
+                        } else {
+                            "${r.contradictions.size} contradiction(s) flagged"
+                        },
+                        flagged = r.contradictions.isNotEmpty()
+                    )
+                }
+            _state.update {
+                it.copy(
+                    vaultSealedCount = sealed,
+                    vaultVerifiedCount = (reports.size - flagged).coerceAtLeast(0),
+                    vaultFlaggedCount = flagged,
+                    recentActivity = recent
+                )
+            }
         }
     }
 

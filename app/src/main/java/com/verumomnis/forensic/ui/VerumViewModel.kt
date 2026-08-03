@@ -58,13 +58,17 @@ import com.verumomnis.forensic.seal.DocumentSealer
 import com.verumomnis.forensic.seal.OpenTimestampsClient
 import com.verumomnis.forensic.seal.SealMetadataCodec
 import com.verumomnis.forensic.seal.SealVerifier
+import com.verumomnis.forensic.vault.CaseMemory
 import com.verumomnis.forensic.vault.EvidenceVault
 import com.verumomnis.forensic.work.ScanWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
@@ -381,22 +385,49 @@ class VerumViewModel(
         initializeIdentity()
         configureDevice(detectDeviceRamGb())
         if (seedSampleCase) seedSampleCase()
+
+        // The case record persists. A matter runs for months, so the thread of
+        // the conversation is restored from the vault rather than reset — the
+        // greeting is only shown to someone starting out.
+        val restored = CaseMemory.load(vault).map {
+            ChatMessage(author = it.author, text = it.text, fromUser = it.fromUser)
+        }
         _state.update { s ->
             s.copy(
-                chat = listOf(
-                    ChatMessage(
-                        author = VERUM_OMNIS,
-                        // Never name the underlying model here — spec §1 locks the
-                        // user-facing identity to "Verum Omnis" alone.
-                        text = "Truth for All. I am Verum Omnis, your on-device forensic AI (Constitution v${Constitution.VERSION}).\n\n" +
-                            "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
-                            "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
-                            "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
-                            "timeline and legal strategy. Nothing leaves here unsealed.",
-                        fromUser = false
+                chat = restored.ifEmpty {
+                    listOf(
+                        ChatMessage(
+                            author = VERUM_OMNIS,
+                            // Never name the underlying model here — spec §1 locks the
+                            // user-facing identity to "Verum Omnis" alone.
+                            text = "Truth for All. I am Verum Omnis, your on-device forensic AI (Constitution v${Constitution.VERSION}).\n\n" +
+                                "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
+                                "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
+                                "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
+                                "timeline and legal strategy. Nothing leaves here unsealed.",
+                            fromUser = false
+                        )
                     )
-                )
+                }
             )
+        }
+
+        // Persist every change to the transcript. Collected for the ViewModel's
+        // lifetime so a turn is saved as soon as it lands: a forensic scan can
+        // run for minutes and the user may leave the app at any point, so
+        // waiting for a clean shutdown would lose exactly the sessions that
+        // matter most.
+        viewModelScope.launch {
+            _state.map { it.chat }
+                .distinctUntilChanged()
+                .collect { chat ->
+                    withContext(Dispatchers.IO) {
+                        CaseMemory.save(
+                            vault,
+                            chat.map { CaseMemory.Turn(it.author, it.text, it.fromUser) }
+                        )
+                    }
+                }
         }
     }
 

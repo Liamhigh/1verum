@@ -81,4 +81,26 @@ class SafeguardsTest {
         val enc = VaultEncryption.encrypt("secret".toByteArray(), VaultEncryption.generateKey())
         VaultEncryption.decrypt(enc, VaultEncryption.generateKey()) // different key -> tag failure
     }
+
+    /**
+     * Every encryption under one key must use a fresh IV. Reusing an IV under the
+     * same GCM key breaks confidentiality and can leak the authentication key, so
+     * Android Keystore refuses a caller-provided IV entirely — which is what made
+     * the old implementation fail on hardware while passing in this suite.
+     */
+    @Test fun aesGcmUsesAFreshIvEachTime() {
+        val key = VaultEncryption.generateKey()
+        val plain = "same plaintext every time".toByteArray()
+        val ivs = (1..25).map { VaultEncryption.encrypt(plain, key).copyOfRange(0, 12).toList() }
+        assertEquals("IV reuse under one key", ivs.size, ivs.toSet().size)
+    }
+
+    /** Identical plaintext must never produce identical ciphertext. */
+    @Test fun aesGcmIsNonDeterministic() {
+        val key = VaultEncryption.generateKey()
+        val plain = "confidential case note".toByteArray()
+        assertFalse(
+            VaultEncryption.encrypt(plain, key).contentEquals(VaultEncryption.encrypt(plain, key))
+        )
+    }
 }

@@ -9,18 +9,41 @@ package com.verumomnis.forensic.engine
 interface PdfTextExtractor {
     /** @return extracted text, or an empty string if no text could be extracted. */
     fun extractText(bytes: ByteArray): String
+
+    /**
+     * Extracts from a file already on disk, without reading it into memory.
+     *
+     * This is the path large evidence takes. Loading a 150 MB PDF as a ByteArray
+     * and handing that to PDFBox costs several multiples of the file size in
+     * heap; loading from a [File] lets PDFBox use its own scratch handling and
+     * keeps the peak near constant.
+     *
+     * Defaults to the ByteArray overload so existing fakes stay valid.
+     */
+    fun extractText(file: java.io.File): String = extractText(file.readBytes())
 }
 
 /** Test/production fake that treats the bytes as UTF-8 text (useful for plain-text tests). */
 object PlainTextExtractor : PdfTextExtractor {
     override fun extractText(bytes: ByteArray): String =
         bytes.toString(Charsets.UTF_8)
+
+    override fun extractText(file: java.io.File): String = file.readText()
 }
 
 /** Production extractor backed by Apache PDFBox for Android. */
 class PdfBoxTextExtractor : PdfTextExtractor {
     override fun extractText(bytes: ByteArray): String = try {
         com.tom_roush.pdfbox.pdmodel.PDDocument.load(bytes).use { doc ->
+            val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
+            stripper.getText(doc) ?: ""
+        }
+    } catch (e: Exception) {
+        ""
+    }
+
+    override fun extractText(file: java.io.File): String = try {
+        com.tom_roush.pdfbox.pdmodel.PDDocument.load(file).use { doc ->
             val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
             stripper.getText(doc) ?: ""
         }

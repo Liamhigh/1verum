@@ -31,10 +31,22 @@ class MediaIngestor(
 ) {
 
     companion object {
-        // Kept at 50 MB: extractText holds the whole file as a ByteArray, PDFBox
-        // parses a second copy, and the OCR path writes a third to cache — so the
-        // peak is several times the file size. 150 MB overran the heap.
-        const val MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
+        /**
+         * 150 MB, matching verumglobal.foundation's "Max 150MB total".
+         *
+         * This was temporarily 50 MB because the old path held the file as a
+         * ByteArray, let PDFBox parse a second copy and let OCR spill a third —
+         * several multiples of the file size, which overran the heap. Documents
+         * now stream to the vault and are read from disk, so the peak is roughly
+         * one 64 KB buffer regardless of size and the site's limit is safe.
+         */
+        const val MAX_FILE_SIZE_BYTES = 150L * 1024 * 1024
+
+        /**
+         * Head bytes read for the EICAR probe. The marker is 68 bytes; 4 KB gives
+         * ample margin without pulling a large artifact into memory.
+         */
+        private const val EICAR_PROBE_BYTES = 4096
     }
 
     private val vault = EvidenceVault(context)
@@ -121,35 +133,49 @@ class MediaIngestor(
             return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
         }
 
-        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+        // Stream the ORIGINAL into the vault, hashing in the same pass. A case
+        // bundle can run to 150 MB; reading it into a ByteArray first is what put
+        // this path within reach of an OutOfMemoryError. Peak cost here is one
+        // 64 KB buffer, and the bytes stored are unaltered as custody requires.
+        val stream = resolver.openInputStream(uri)
             ?: return IngestResult.Error.ReadFailed("could not open input stream")
+        val (stored, hash) = runCatching { vault.storeEvidenceStreaming(fileName, stream) }
+            .getOrElse { return IngestResult.Error.ReadFailed(it.message ?: "could not store evidence") }
 
-        if (bytes.size > MAX_FILE_SIZE_BYTES) {
+        if (stored.length() > MAX_FILE_SIZE_BYTES) {
+            stored.delete()
             return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
         }
-        if (EicarScanner.isEicar(bytes)) {
+        // EICAR is a 68-byte marker at the start of the file, so only the head
+        // needs reading — the whole artifact never has to be resident.
+        if (EicarScanner.isEicar(stored.readHead(EICAR_PROBE_BYTES))) {
+            stored.delete()
             return IngestResult.Error.MalwareDetected()
         }
 
-        // Preserve the ORIGINAL unaltered in the vault (chain of custody).
-        vault.storeEvidence(fileName, bytes)
-
         val text = when {
-            mime.startsWith("text") -> String(bytes, Charsets.UTF_8)
+            mime.startsWith("text") -> stored.readText(Charsets.UTF_8)
             mime.startsWith("application/pdf") -> {
-                val extracted = pdfExtractor.extractText(bytes).trim()
+                val extracted = pdfExtractor.extractText(stored).trim()
                 if (extracted.isNotBlank()) extracted else "(PDF sealed and vaulted; no extractable text layer found.)"
             }
             else -> "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
         }
-        val hash = Sha512.hash(bytes)
-        return IngestResult.DocumentSuccess(fileName, mime, text, hash, bytes.size.toLong())
+        return IngestResult.DocumentSuccess(fileName, mime, text, hash, stored.length())
     }
 
-    /** Compute SHA-512 of a picked file for seal verification. */
+    /** Compute SHA-512 of a picked file for seal verification. Streams; never resident. */
     fun hashOf(uri: Uri): Pair<String, String> {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-        return (displayName(uri) ?: "document") to Sha512.hash(bytes)
+        val hash = context.contentResolver.openInputStream(uri)?.use { Sha512.hash(it) }
+            ?: Sha512.hash(ByteArray(0))
+        return (displayName(uri) ?: "document") to hash
+    }
+
+    /** Reads at most [max] bytes from the head of a file, for cheap signature probes. */
+    private fun java.io.File.readHead(max: Int): ByteArray = inputStream().use { input ->
+        val buffer = ByteArray(max)
+        val read = input.read(buffer)
+        if (read <= 0) ByteArray(0) else buffer.copyOf(read)
     }
 
     private fun displayName(uri: Uri): String? =

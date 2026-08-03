@@ -49,6 +49,29 @@ class EvidenceVault(private val root: File) {
         return hash
     }
 
+    /**
+     * Streams [input] into the vault, fingerprinting it in the same pass.
+     *
+     * The ByteArray overload above is fine for small artifacts but costs a full
+     * in-memory copy, which is untenable for the multi-hundred-megabyte case
+     * bundles this app is built for. Here the peak cost is one 64 KB buffer no
+     * matter how large the evidence is.
+     *
+     * The original bytes are preserved unaltered, as chain of custody requires —
+     * streaming changes only how they get to disk, never what is stored.
+     *
+     * @return the stored file and its SHA-512.
+     */
+    fun storeEvidenceStreaming(fileName: String, input: java.io.InputStream): Pair<File, String> {
+        initialize()
+        val target = File(evidenceRaw, fileName)
+        val (hash, _) = input.use { source ->
+            target.outputStream().use { sink -> Sha512.copyAndHash(source, sink) }
+        }
+        appendManifest(fileName, hash)
+        return target to hash
+    }
+
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)

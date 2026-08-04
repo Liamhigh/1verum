@@ -58,6 +58,7 @@ import com.verumomnis.forensic.seal.DocumentSealer
 import com.verumomnis.forensic.seal.OpenTimestampsClient
 import com.verumomnis.forensic.seal.SealMetadataCodec
 import com.verumomnis.forensic.seal.SealVerifier
+import com.verumomnis.forensic.seal.AnchorUpgrader
 import com.verumomnis.forensic.vault.CaseMemory
 import com.verumomnis.forensic.vault.EvidenceVault
 import com.verumomnis.forensic.work.ScanWorkScheduler
@@ -420,6 +421,7 @@ class VerumViewModel(
         }
 
         refreshVaultStats()
+        upgradePendingAnchors()
 
         // Persist every change to the transcript. Collected for the ViewModel's
         // lifetime so a turn is saved as soon as it lands: a forensic scan can
@@ -762,6 +764,32 @@ class VerumViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { vault.emptyVault() }
             refreshVaultStats()
+        }
+    }
+
+    /**
+     * Completes the Bitcoin anchor for any seal still awaiting attestation.
+     *
+     * OpenTimestamps returns a pending proof at seal time; confirmation arrives
+     * an hour or two later and requires a second call the app never made, so
+     * every seal stayed pending indefinitely. Run on launch and on demand, this
+     * closes that gap without the user needing to know an upgrade step exists.
+     *
+     * Network work, so failures are expected and silent — an offline attempt
+     * leaves the pending proof untouched.
+     */
+    fun upgradePendingAnchors() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val outcomes = runCatching { AnchorUpgrader(vault).upgradeAllPending() }
+                .getOrDefault(emptyList())
+            val confirmed = outcomes.count { it.newlyConfirmed }
+            if (confirmed > 0) {
+                postEngine(
+                    "Bitcoin attestation confirmed for $confirmed sealed document(s). " +
+                        "Their timestamps are now independently verifiable."
+                )
+                refreshVaultStats()
+            }
         }
     }
 

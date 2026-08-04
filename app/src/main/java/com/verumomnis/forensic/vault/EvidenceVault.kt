@@ -92,6 +92,18 @@ class EvidenceVault(private val root: File) {
         return if (file.exists()) file.readText() else null
     }
 
+    /**
+     * Shortcodes of every stored `.ots` proof.
+     *
+     * Lets the anchor upgrader find seals still awaiting Bitcoin confirmation
+     * without the caller having to remember what it sealed and when.
+     */
+    fun listOtsShortcodes(): List<String> =
+        seals.listFiles { f -> f.isFile && f.name.startsWith("seal_") && f.extension == "ots" }
+            ?.map { it.nameWithoutExtension.removePrefix("seal_") }
+            ?.sorted()
+            .orEmpty()
+
     /** Persists a generated report's JSON snapshot so it can later be loaded for comparison. */
     fun storeReport(report: ForensicReport) {
         initialize()

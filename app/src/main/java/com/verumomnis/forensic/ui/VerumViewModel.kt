@@ -186,6 +186,8 @@ data class UiState(
     val vaultVerifiedCount: Int = 0,
     val vaultFlaggedCount: Int = 0,
     val recentActivity: List<RecentActivity> = emptyList(),
+    /** Vault contents grouped into scan sets (spec §4.1). */
+    val scanSets: List<ScanSet> = emptyList(),
     val jurisdiction: String = "ZA-KZN",
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
@@ -714,14 +716,52 @@ class VerumViewModel(
                         flagged = r.contradictions.isNotEmpty()
                     )
                 }
+            // Contradiction counts keyed by the same base name the grouper uses,
+            // so a set shows the findings of the report that belongs to it.
+            val byRef = reports.associate {
+                VaultGrouping.baseName(it.reference) to it.contradictions.size
+            }
+            val sets = runCatching {
+                VaultGrouping.group(
+                    raw = vault.evidenceRaw.listFiles()?.toList().orEmpty(),
+                    processed = vault.evidenceProcessed.listFiles()?.toList().orEmpty(),
+                    sealed = vault.reportsSealed.listFiles()?.toList().orEmpty(),
+                    contradictionsByRef = byRef
+                )
+            }.getOrDefault(emptyList())
+
             _state.update {
                 it.copy(
                     vaultSealedCount = sealed,
                     vaultVerifiedCount = (reports.size - flagged).coerceAtLeast(0),
                     vaultFlaggedCount = flagged,
-                    recentActivity = recent
+                    recentActivity = recent,
+                    scanSets = sets
                 )
             }
+        }
+    }
+
+    /**
+     * Removes one scan set from this device, then refreshes the vault view.
+     *
+     * On-device copies only: an OpenTimestamps anchor already submitted stays on
+     * the blockchain, and the integrity manifest keeps its record that the
+     * artifact existed. Deleting reclaims privacy and space; it does not retract
+     * a seal, and it must not rewrite history.
+     */
+    fun deleteScanSet(set: ScanSet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            set.artifacts.forEach { runCatching { vault.deleteEvidence(it.fileName) } }
+            refreshVaultStats()
+        }
+    }
+
+    /** Clears every stored artifact from this device. See [EvidenceVault.emptyVault]. */
+    fun emptyVault() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { vault.emptyVault() }
+            refreshVaultStats()
         }
     }
 

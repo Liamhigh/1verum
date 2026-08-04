@@ -138,6 +138,53 @@ class EvidenceVault(private val root: File) {
         return String(VaultEncryption.decrypt(File(chatSessions, fileName).readBytes(), key))
     }
 
+    /**
+     * Deletes one artifact from the device by file name.
+     *
+     * Deliberately removes the on-device copy only. Any OpenTimestamps anchor
+     * already submitted for it stays on the Bitcoin blockchain and any sealed
+     * copy the user has shared elsewhere is untouched — deleting here reclaims
+     * privacy and space, it does not and cannot retract a seal.
+     *
+     * The integrity manifest entry is left in place on purpose: it records that
+     * an artifact with that hash was once vaulted, which is chain-of-custody
+     * history. Rewriting history to hide a deletion is precisely what a forensic
+     * tool must not do.
+     *
+     * @return true if a file was found and removed.
+     */
+    fun deleteEvidence(fileName: String): Boolean {
+        val candidates = listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, findings, seals)
+        var removed = false
+        for (dir in candidates) {
+            val f = File(dir, fileName)
+            if (f.exists() && f.isFile) removed = f.delete() || removed
+        }
+        return removed
+    }
+
+    /**
+     * Removes every stored artifact from this device.
+     *
+     * Clears evidence, reports, findings, seals and research. The integrity
+     * manifest and the encrypted case memory are preserved for the same reason
+     * as above: the record that evidence existed, and the conversation about it,
+     * are themselves part of the account of what happened.
+     *
+     * @return the number of files removed.
+     */
+    fun emptyVault(): Int {
+        var count = 0
+        listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, seals, research).forEach { dir ->
+            dir.listFiles()?.forEach { f -> if (f.isFile && f.delete()) count++ }
+        }
+        // findings holds the manifest alongside per-scan output; keep the manifest.
+        findings.listFiles()?.forEach { f ->
+            if (f.isFile && f.name != manifest.name && f.delete()) count++
+        }
+        return count
+    }
+
     fun documentCount(): Int =
         (evidenceRaw.listFiles()?.size ?: 0) + (reportsSealed.listFiles()?.size ?: 0)
 

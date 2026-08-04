@@ -37,7 +37,13 @@ object ReportGenerator {
 
         val offenceMatrix = findings.contradictions.map { it.toOffenceRow() }
         val executiveSummary = buildExecutiveSummary(findings)
-        val body = renderBody(reference, title, classification, findings, offenceMatrix, now, deviceId, publicKeyFingerprint)
+        // The declaration must reflect what actually ran. A deterministic writer
+        // means no language model touched this report, whatever is installed.
+        val aiNarrativeUsed = narrativeWriter !is DeterministicReportWriter
+        val body = renderBody(
+            reference, title, classification, findings, offenceMatrix, now,
+            deviceId, publicKeyFingerprint, aiNarrativeUsed
+        )
         val gemmaNarrative = narrativeWriter.writeNarrative(findings, caseName, findingsJsonPath)
         val judicialCrossReferenceSection = renderJudicialCrossReferenceSection(judicialFindings)
 
@@ -121,7 +127,14 @@ object ReportGenerator {
         if (findings.extractedPersons.isNotEmpty()) {
             append("${findings.extractedPersons.size} person(s) were extracted from the evidence. ")
         }
-        append("All findings survived Triple-AI consensus and are sealed under Constitution v${Constitution.VERSION}.")
+        // Claims the consensus that actually ran. "Triple-AI consensus" was
+        // asserted here on every report, including those produced with no
+        // language model present — the council's Gemma/communicator verdicts are
+        // derived from the deterministic brains, not from any model.
+        append(
+            "All findings survived the Nine-Brain council quorum and are sealed under " +
+                "Constitution v${Constitution.VERSION}."
+        )
     }
 
     private fun renderBody(
@@ -132,7 +145,9 @@ object ReportGenerator {
         offenceMatrix: List<OffenceRow>,
         now: Instant,
         deviceId: String,
-        publicKeyFingerprint: String
+        publicKeyFingerprint: String,
+        /** True only when a real on-device model produced the narrative appendix. */
+        aiNarrativeUsed: Boolean
     ): String = buildString {
         appendLine("VERUM OMNIS — ${Constitution.TAGLINE}")
         appendLine(title)
@@ -283,7 +298,20 @@ object ReportGenerator {
             }
         }
         appendLine("12. DECLARATION")
-        appendLine("   Triple-verified (Gemma 3 · communicator · Nine-Brain). Evidence before narrative.")
+        // States what actually ran, never what was hoped for. This previously read
+        // "Triple-verified (Gemma 3 · communicator · Nine-Brain)" on every report,
+        // including reports produced with no model loaded at all — the AI verdicts
+        // in BrainCouncil are derived from the nine-brain confirmation count, not
+        // from any language model. A sealed forensic document asserting a
+        // verification that did not occur is the single easiest thing for opposing
+        // counsel to attack, and it would taint the findings that are sound.
+        if (aiNarrativeUsed) {
+            appendLine("   Deterministic Nine-Brain analysis, with an on-device AI narrative appendix.")
+            appendLine("   The narrative is advisory and unsealed; the findings above are the sealed record.")
+        } else {
+            appendLine("   Deterministic Nine-Brain analysis. AI narrative not performed on this device.")
+            appendLine("   No language-model verification is claimed for these findings.")
+        }
         appendLine("   Ordinal confidence only. Same evidence yields the same result (determinism).")
         if (deviceId.isNotBlank() || publicKeyFingerprint.isNotBlank()) {
             appendLine()

@@ -38,9 +38,16 @@ object BrainCouncil {
             synthesis = synthesis,
             confirmingBrains = confirming,
             councilStatus = status,
+            // Only the nine-brain verdict is earned here: `status` comes from
+            // counting confirmations across the deterministic brains, and no
+            // language model is consulted at this point. Reporting "CONCURS" for
+            // Gemma 3 and the communicator meant a sealed report asserted an AI
+            // verification that never happened — indefensible in the forum this
+            // evidence is built for. They abstain unless a model has actually
+            // recorded a verdict, which happens later in the hybrid pipeline.
             tripleAiConsensus = TripleConsensus(
-                gemma3 = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
-                phi3 = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
+                gemma3 = "NOT RUN",
+                phi3 = "NOT RUN",
                 nineBrain = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
                 quorum = status == "ACCEPTED"
             )

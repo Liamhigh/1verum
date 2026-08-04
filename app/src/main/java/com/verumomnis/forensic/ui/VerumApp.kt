@@ -311,9 +311,12 @@ fun VerumApp(
                             )
                             Screen.EMAIL -> EmailScreen(state, viewModel, onExportEmail)
                             Screen.TAX -> TaxScreen(viewModel)
-                            Screen.VAULT -> VaultScreen(
-                                state = state,
-                                onVerify = { openWebsiteVerify(context) }
+                            Screen.VAULT -> VaultRedesignScreen(
+                                sets = state.scanSets,
+                                onOpenArtifact = { openVaultArtifact(context, it.file) },
+                                onDeleteSet = { viewModel.deleteScanSet(it) },
+                                onEmptyVault = { viewModel.emptyVault() },
+                                onNewDocument = { showMenu = true }
                             )
                             Screen.STORY -> {}
                             Screen.SEAL_DOCUMENT -> SealDocumentScreen(

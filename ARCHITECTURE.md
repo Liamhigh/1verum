@@ -1,5 +1,28 @@
 # Architecture — Verum Omnis System Design
 
+> ## System context — this repo is one surface of a larger system
+> **Read this before treating `1verum` as a standalone app.** Verum Omnis is **one forensic engine
+> across three surfaces**: the **website hub** (`webdocsol` — document sealing + the canonical public
+> verification endpoint), **this Android app** (`1verum` — the **on-device hybrid engine**:
+> deterministic 9-brain **+ Gemma-3 LLM + encrypted vault**), and the **Guardian fraud firewall**
+> (`firebase`).
+>
+> Two system-wide rules:
+> 1. **Serverless / stateless — no self-managed servers, no central database of user documents.** On
+>    this surface all forensic processing is **on-device**; durable truth lives only in the **sealed
+>    artifact**, its **Bitcoin (OpenTimestamps) anchor**, and the **device vault**. The app reaches
+>    the network only to submit a content-free hash to Bitcoin calendars and to download signed rule
+>    packages — never to upload the user's documents.
+> 2. **All verification is done at the website hub.** A seal is proven at
+>    `verumglobal.foundation/verify.html` by recomputing SHA-512 and checking the OpenTimestamps/
+>    Bitcoin anchor — **not** by a server lookup. Seals this app produces verify there.
+>
+> **Shared engine contract:** the Findings JSON schema + **signed, RSA-verified rule packages**
+> (contradiction types **CT01–CT45**) distributed from the website Worker. This is how the app
+> **self-updates** its detectors (`update/RuleUpdateClient.kt`) — additively, and new detectors are
+> **human-signed, never auto-ingested** from arbitrary uploads. See `webdocsol/ARCHITECTURE.md` for
+> the whole-system picture.
+
 **Document Purpose:** Complete architectural description of the Verum Omnis system. How all components connect, communicate, and enforce constitutional constraints.
 
 **Last Updated:** 2026-07-13  

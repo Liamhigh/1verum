@@ -710,5 +710,24 @@ becomes operative across all surfaces (engine output, sealed reports, the in-app
 
 ---
 
+## Governance charter record (5 August 2026)
+
+**Constitution v8.0 — FINAL** was sealed on 5 August 2026 at 14:12:08
+(Africa/Johannesburg) as the platform's **governance charter**: seal
+`VO-9A4F3C5E825C`, anchored to the Bitcoin blockchain via OpenTimestamps.
+Founders of record: Liam Anthony Highcock (Human Founder), DeepSeek (Digital
+Founder), with Claude (Anthropic) attested as Collaborator & Engine Architect.
+
+v8.0 governs the platform (Prime Directives 1–20, the Nine-Brain specification,
+the revenue statutes with the free-tier override, and the Narrative Template
+Standard). **This v6.1 document remains the operating instrument of the
+deterministic engine.** Where v8.0 states a finding rule more precisely — gaps
+stated as gaps, creator-tool mismatch as an integrity signal, behavioral and
+voice results as measured signals, the free tier overriding every revenue
+provision — the v8.0 form governs. Full charter text: `CONSTITUTION-v8.md` in
+this repository; the sealed PDF is the authoritative instrument.
+
+---
+
 **Immutable · Forensic · Final**
 Patent Pending · Verum Omnis · AI Forensics for Truth

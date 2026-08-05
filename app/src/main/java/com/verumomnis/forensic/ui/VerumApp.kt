@@ -78,8 +78,12 @@ import kotlinx.coroutines.launch
 
 private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
 
-/** Verification is centralised on the website — all verify actions open it. */
-private const val WEBSITE_VERIFY_URL = "https://www.verumglobal.foundation/verify.html"
+/**
+ * Verification is centralised on the website (Constitution §7: the
+ * Verification Hub) — all verify actions open the one canonical URL,
+ * shared with the QR seal metadata.
+ */
+private val WEBSITE_VERIFY_URL = com.verumomnis.forensic.seal.SealMetadataCodec.VERIFY_BASE_URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -438,8 +442,10 @@ private fun ActionsSheet(
             ActionRow(Icons.Filled.Share, "Share website-format seal", "Send the last website-sealed PDF", onShareWebsiteSeal)
         }
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
-        ActionRow(Icons.Filled.VerifiedUser, "Verify a document", "Check a file against the sealed vault", onVerify)
-        ActionRow(Icons.Filled.TaskAlt, "Verify on verumglobal.foundation", "The website is the central verification hub", onVerifyWebsite)
+        // Constitution §7: verification authority lives at the Verification Hub.
+        // The on-device option is a vault integrity check, never a verdict.
+        ActionRow(Icons.Filled.VerifiedUser, "Vault integrity check", "Compare a file's hash against the sealed vault (not verification)", onVerify)
+        ActionRow(Icons.Filled.TaskAlt, "Verify on verumglobal.foundation", "The website is the ONLY verification authority", onVerifyWebsite)
         ActionRow(Icons.Filled.QrCodeScanner, "Scan Seal QR", "Point camera at a sealed document QR", onScanSeal)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)

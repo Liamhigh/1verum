@@ -29,12 +29,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -191,7 +196,7 @@ fun SealDocumentScreen(
             }
             state.sealResult?.let { result ->
                 Spacer(Modifier.height(24.dp))
-                ResultsCard(result = result, viewModel = viewModel, context = context, onVerifyClick = { openWebsiteVerify(context) })
+                ResultsCard(result = result, documentName = state.sealPdfName, viewModel = viewModel, context = context, onVerifyClick = { openWebsiteVerify(context) })
             }
             Spacer(Modifier.height(32.dp))
             InfoSection()
@@ -221,23 +226,11 @@ private fun HeaderSection() {
             modifier = Modifier.fillMaxWidth(0.7f)
         )
         Spacer(Modifier.height(16.dp))
-        Text(
-            "AI FORENSICS FOR TRUTH — CLIENT-SIDE — NOTHING LEAVES YOUR DEVICE",
-            fontFamily = JetBrainsMono,
-            fontSize = 11.sp,
-            letterSpacing = 1.2.sp,
-            color = VoGold,
-            textAlign = TextAlign.Center
-        )
+        // Eyebrow kicker (§2.1): mono, uppercase, ls 0.15em, gold.
+        VoKicker("AI Forensics for Truth — Client-Side — Nothing Leaves Your Device", center = true)
         Spacer(Modifier.height(12.dp))
-        Text(
-            "Document Sealing Service",
-            fontFamily = Cormorant,
-            fontWeight = FontWeight.Light,
-            fontSize = 34.sp,
-            color = VoHeading,
-            textAlign = TextAlign.Center
-        )
+        // Page h1 (§2.2): serif light, tight tracking, off-white.
+        VoSerifHeading("Document Sealing Service", fontSize = 34, center = true)
         Spacer(Modifier.height(8.dp))
         Text(
             "Apply a forensic-grade cryptographic seal with A4 watermark, clean QR code, SHA-512 fingerprint, identity verification, GPS/device tracking, optional password protection, and Bitcoin blockchain anchoring via OpenTimestamps.",
@@ -305,26 +298,32 @@ private fun UploadZone(hasFile: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Website parity: prominent free-for-law-enforcement banner under the header. */
+/**
+ * LE banner (§3.9): 135° blue→gold wash gradient, 2dp solid blue border,
+ * 12dp radius, mono green uppercase title.
+ */
 @Composable
 private fun LawEnforcementBanner() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Website parity: blue-bordered panel with a green affirmation, not
-            // gold. Gold is the CTA colour on both surfaces — spending it on a
-            // notice competes with SEAL DOCUMENT for the eye.
-            .background(VoAccentBlue.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-            .border(1.dp, VoAccentBlue.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-            .padding(16.dp),
+            .background(
+                Brush.linearGradient(
+                    listOf(VoAccentBlue.copy(alpha = 0.15f), VoGold.copy(alpha = 0.10f))
+                ),
+                RoundedCornerShape(12.dp)
+            )
+            .border(2.dp, VoAccentBlue, RoundedCornerShape(12.dp))
+            .padding(horizontal = 24.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "✓ FREE FOR LAW ENFORCEMENT & PRIVATE CITIZENS",
+            "FREE FOR LAW ENFORCEMENT & PRIVATE CITIZENS",
             color = VoGreen,
+            fontFamily = JetBrainsMono,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 0.8.sp,
+            letterSpacing = 1.8.sp,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(6.dp))
@@ -347,15 +346,17 @@ private fun SealingModeSelector(selected: String, onSelect: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Label("Sealing Mode")
         ModeCard(
-            title = "🛡 Seal Only — Tamper Protection (default)",
+            icon = Icons.Filled.Shield,
+            title = "Seal Only — Tamper Protection (default)",
             body = "Cryptographic seal + blockchain timestamp only. No content is analysed and nothing leaves this device. You receive the sealed PDF and a Seal Certificate.",
             active = selected == "seal-only",
             onClick = { onSelect("seal-only") }
         )
         Spacer(Modifier.height(10.dp))
         ModeCard(
-            title = "🔍 Seal + Forensic Analysis",
-            body = "Everything in Seal Only, plus an on-device forensic scan by the Nine-Brain engine (indicator score + findings for human review) and a sealed forensic report.",
+            icon = Icons.Filled.Search,
+            title = "Seal + Forensic Analysis",
+            body = "Everything in Seal Only, plus an on-device forensic scan by the Nine-Brain engine (findings for human review) and a sealed forensic report.",
             active = selected == "forensic",
             onClick = { onSelect("forensic") }
         )
@@ -363,8 +364,8 @@ private fun SealingModeSelector(selected: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun ModeCard(title: String, body: String, active: Boolean, onClick: () -> Unit) {
-    Column(
+private fun ModeCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, body: String, active: Boolean, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -373,14 +374,18 @@ private fun ModeCard(title: String, body: String, active: Boolean, onClick: () -
             .clickable(onClick = onClick)
             .padding(16.dp)
     ) {
-        Text(
-            title,
-            color = if (active) VoGold else VoTextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(body, color = if (active) VoTextPrimary else VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
+        Icon(icon, contentDescription = null, tint = if (active) VoGold else VoAccentBlue, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                title,
+                color = if (active) VoGold else VoTextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(body, color = if (active) VoTextPrimary else VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
+        }
     }
 }
 
@@ -430,10 +435,13 @@ private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
     }
 }
 
-/** The website is the central verification hub — verify actions open it. */
+/**
+ * The website is the central verification hub (Constitution §7) — verify
+ * actions open the canonical URL embedded in every seal QR.
+ */
 private fun openWebsiteVerify(context: Context) {
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.verumglobal.foundation/verify.html")))
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SealMetadataCodec.VERIFY_BASE_URL)))
     }
 }
 
@@ -449,7 +457,7 @@ private fun FileInfoCard(name: String, size: String, onClear: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Text("📎", fontSize = 14.sp)
+            Icon(Icons.Filled.AttachFile, contentDescription = null, tint = VoGold, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text(name, color = VoTextPrimary, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
@@ -464,22 +472,33 @@ private fun FileInfoCard(name: String, size: String, onClear: () -> Unit) {
 @Composable
 private fun SealTypeSelector(selected: String, onSelect: (String) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-        SealTypeChip(label = "🏠 Private (Free)", active = selected == "private", onClick = { onSelect("private") })
-        SealTypeChip(label = "🏢 Commercial", active = selected == "commercial", onClick = { onSelect("commercial") })
+        SealTypeChip(icon = Icons.Filled.Home, label = "Private (Free)", active = selected == "private", onClick = { onSelect("private") })
+        SealTypeChip(icon = Icons.Filled.Business, label = "Commercial", active = selected == "commercial", onClick = { onSelect("commercial") })
     }
 }
 
+/** Seal-type chip (§3.9 pill): mono uppercase, gold when active. */
 @Composable
-private fun SealTypeChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
+private fun SealTypeChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
-            .border(1.dp, if (active) VoGold else VoBorder, RoundedCornerShape(10.dp))
-            .background(if (active) VoGold.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(10.dp))
-            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, if (active) VoGold.copy(alpha = 0.4f) else VoBorder, RoundedCornerShape(999.dp))
+            .background(if (active) VoGold.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(999.dp))
+            .clip(RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = if (active) VoGold else VoAccentBlue, fontSize = 15.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+        Icon(icon, contentDescription = null, tint = if (active) VoGold else VoAccentBlue, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label.uppercase(),
+            fontFamily = JetBrainsMono,
+            fontSize = 12.sp,
+            letterSpacing = 1.2.sp,
+            color = if (active) VoGold else VoAccentBlue,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
 
@@ -551,7 +570,9 @@ private fun PasswordSection(
                 colors = CheckboxDefaults.colors(checkedColor = VoGold, checkmarkColor = VoBackground, uncheckedColor = VoBorder)
             )
             Spacer(Modifier.width(6.dp))
-            Text("🔒 Password protect this document (delivery receipt mode)", fontSize = 14.sp, color = VoTextMuted)
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = VoGold, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Password protect this document (delivery receipt mode)", fontSize = 14.sp, color = VoTextMuted)
         }
         if (enabled) {
             Spacer(Modifier.height(12.dp))
@@ -625,7 +646,10 @@ private fun VoTextField(
     )
 }
 
-/** Gold gradient CTA per DESIGN_LOCK: #D4A843 → #b8942a, 12dp radius. */
+/**
+ * Seal CTA (§3.4): `linear-gradient(135deg, #D4A843, #b8942a)` fill, navy
+ * mono uppercase text (never white), 12dp radius, 0.4 opacity when disabled.
+ */
 @Composable
 private fun SealButton(label: String, enabled: Boolean, busy: Boolean, onClick: () -> Unit) {
     Button(
@@ -642,13 +666,20 @@ private fun SealButton(label: String, enabled: Boolean, busy: Boolean, onClick: 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(VoGold, VoGoldDark))),
+                .background(Brush.linearGradient(listOf(VoGold, VoGoldDark))),
             contentAlignment = Alignment.Center
         ) {
             if (busy) {
                 CircularProgressIndicator(color = VoBackground, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             } else {
-                Text(label.uppercase(), color = VoBackground, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
+                Text(
+                    label.uppercase(),
+                    color = VoBackground,
+                    fontFamily = JetBrainsMono,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 1.2.sp
+                )
             }
         }
     }
@@ -704,24 +735,46 @@ private fun PipelineStepRow(step: SealPipelineStep) {
 }
 
 @Composable
-private fun ResultsCard(result: SealResult, viewModel: VerumViewModel, context: Context, onVerifyClick: () -> Unit) {
+private fun ResultsCard(result: SealResult, documentName: String, viewModel: VerumViewModel, context: Context, onVerifyClick: () -> Unit) {
+    // Sealed-at display timestamp — the actual sealing time carried by the
+    // seal metadata (SealMetadata.t), never the time this card composes.
+    val sealedAt = remember(result.sealedAtMs) {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'UTC'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .format(java.util.Date(result.sealedAtMs))
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(VoSurfaceAlt.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-            .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .background(VoSurfaceAlt.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+            .border(1.dp, VoBorder, RoundedCornerShape(16.dp))
             .padding(20.dp)
     ) {
-        Text("Document Sealed", fontFamily = Cormorant, fontSize = 24.sp, color = VoGold)
+        VoKicker("Seal Applied")
+        Spacer(Modifier.height(6.dp))
+        Text("Document Sealed", fontFamily = Cormorant, fontWeight = FontWeight.Medium, fontSize = 24.sp, color = VoGold)
         Spacer(Modifier.height(14.dp))
-        Box(
+        VoHonestyNote(
+            title = "OpenTimestamps proof pending",
+            text = "The Bitcoin blockchain confirmation typically completes within 1–2 hours. " +
+                "The SHA-512 fingerprint already proves document integrity."
+        )
+        Spacer(Modifier.height(16.dp))
+        // Document metadata as .id-field label/value rows (§3.3).
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(VoGold.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
-                .border(1.dp, VoGold.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                .padding(14.dp)
+                .background(VoSurfaceAlt.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text("⏳ OpenTimestamps proof pending Bitcoin blockchain confirmation (typically 1-2 hours)", color = VoGold, fontSize = 13.sp)
+            VoIdField("Document", documentName.ifBlank { "Sealed document" })
+            VoIdField("SHA-512", result.sha512.take(16) + "…" + result.sha512.takeLast(16), valueColor = VoGreen)
+            VoIdField("Sealed", sealedAt)
+            VoIdField("Seal ID", result.sealId, valueColor = VoGold, lastRow = result.priorChain.isEmpty())
+            if (result.priorChain.isNotEmpty()) {
+                VoIdField("Chain of Custody", result.priorChain.joinToString(", "), valueColor = VoAccentBlue, lastRow = true)
+            }
         }
         Spacer(Modifier.height(16.dp))
         PreviewSection()
@@ -731,12 +784,6 @@ private fun ResultsCard(result: SealResult, viewModel: VerumViewModel, context: 
         HashRow("SHA-256 (OpenTimestamps)", result.sha256, VoGreen)
         Spacer(Modifier.height(12.dp))
         HashRow("SHA-512 (Verum Fingerprint)", result.sha512, VoGreen)
-        Spacer(Modifier.height(12.dp))
-        HashRow("Seal ID", result.sealId, VoGold)
-        if (result.priorChain.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            HashRow("Chain of Custody", result.priorChain.joinToString(", "), VoAccentBlue)
-        }
         Spacer(Modifier.height(16.dp))
         OutlinedButton(
             onClick = onVerifyClick,
@@ -869,8 +916,12 @@ private fun shareOtsProof(context: Context, result: SealResult) {
 @Composable
 private fun InfoSection() {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("How Document Sealing Works", fontFamily = Cormorant, fontSize = 26.sp, color = VoGold)
-        Spacer(Modifier.height(10.dp))
+        VoKicker("The Sealing Pipeline")
+        Spacer(Modifier.height(6.dp))
+        Text("How Document Sealing Works", fontFamily = Cormorant, fontWeight = FontWeight.Normal, fontSize = 26.sp, color = VoGold)
+        Spacer(Modifier.height(8.dp))
+        VoGoldRule()
+        Spacer(Modifier.height(12.dp))
         Text(
             "Every document sealed by Verum Omnis receives a forensic-grade cryptographic seal that makes it tamper-evident and court-admissible.",
             fontSize = 15.sp,
@@ -884,14 +935,14 @@ private fun InfoSection() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             maxItemsInEachRow = 2
         ) {
-            InfoItem("📄 A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
-            InfoItem("📱 Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
-            InfoItem("🔒 Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
-            InfoItem("⛓️ Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
-            InfoItem("👤 Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
-            InfoItem("📍 GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))
-            InfoItem("🔐 Password Protection", "Optional AES-256 password protection with delivery receipt cover page. Recipient must email sender for password — that email IS the read receipt.", Modifier.weight(1f))
-            InfoItem("🛡️ Tamper Detection", "Recipient uploads document to verify page. If SHA-512 doesn't match —> 'TAMPERED — DO NOT ACCEPT'. Cryptographically impossible to forge.", Modifier.weight(1f))
+            InfoItem("A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
+            InfoItem("Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
+            InfoItem("Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
+            InfoItem("Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
+            InfoItem("Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
+            InfoItem("GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))
+            InfoItem("Password Protection", "Optional AES-256 password protection with delivery receipt cover page. Recipient must email sender for password — that email IS the read receipt.", Modifier.weight(1f))
+            InfoItem("Tamper Detection", "Recipient uploads document to the Verification Hub. If SHA-512 doesn't match — 'TAMPERED — DO NOT ACCEPT'. Cryptographically impossible to forge.", Modifier.weight(1f))
         }
     }
 }
@@ -912,17 +963,8 @@ private fun InfoItem(title: String, body: String, modifier: Modifier = Modifier)
 
 @Composable
 private fun Footer() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp)
-            .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(0.dp))
-            .padding(top = 20.dp, bottom = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Verum Omnis Foundation — Patent Pending", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
-        Text("Constitution v${Constitution.VERSION} Final — Article X Non-Weaponization Doctrine", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
-    }
+    // Canonical seal footer bar (§3.7): top hairline + centered mono blue copy.
+    VoSealFooter()
 }
 
 private fun formatFileSize(size: Long): String {

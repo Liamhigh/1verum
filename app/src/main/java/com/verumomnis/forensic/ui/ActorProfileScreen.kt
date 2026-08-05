@@ -213,11 +213,6 @@ private fun buildDishonestyBadge(person: ExtractedPerson, report: ForensicReport
 }
 
 private fun buildDishonestyColor(person: ExtractedPerson, report: ForensicReport?): Color {
-    return when (buildDishonestyBadge(person, report)) {
-        "CRITICAL" -> VoRed
-        "HIGH" -> Color(0xFFE8733B)
-        "MODERATE" -> Color(0xFFF5A623)
-        "LOW" -> VoGold
-        else -> VoTextMuted
-    }
+    // Site palette only (PD16): red family / gold / blue — no off-palette oranges.
+    return com.verumomnis.forensic.ui.theme.severityColor(buildDishonestyBadge(person, report))
 }

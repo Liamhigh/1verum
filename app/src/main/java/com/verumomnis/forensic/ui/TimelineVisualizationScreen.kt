@@ -110,13 +110,8 @@ fun TimelineVisualizationScreen(state: UiState) {
 
 @Composable
 private fun TimelineEventCard(event: TimelineEvent) {
-    val severityColor = when (event.severity) {
-        Severity.CRITICAL -> VoRed
-        Severity.VERY_HIGH -> Color(0xFFE8733B)
-        Severity.HIGH -> Color(0xFFF5A623)
-        Severity.MODERATE -> Color(0xFFE8C567)
-        Severity.LOW -> VoGold
-    }
+    // Site palette only (PD16): red family / gold / blue — no off-palette oranges.
+    val severityColor = com.verumomnis.forensic.ui.theme.severityColor(event.severity)
 
     Column(
         modifier = Modifier
@@ -152,8 +147,9 @@ private fun TimelineEventCard(event: TimelineEvent) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    event.severity.name.take(4),
-                    color = severityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp
+                    event.severity.name.replace('_', ' '),
+                    color = severityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp, fontFamily = JetBrainsMono
                 )
             }
         }

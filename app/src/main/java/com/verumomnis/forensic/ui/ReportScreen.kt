@@ -20,11 +20,8 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,13 +36,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter
-import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.Cormorant
+import com.verumomnis.forensic.ui.theme.JetBrainsMono
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
+import com.verumomnis.forensic.ui.theme.VoBlueBorder
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoHeading
+import com.verumomnis.forensic.ui.theme.VoNavy2
+import com.verumomnis.forensic.ui.theme.VoPanelInput
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurfaceAlt
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import com.verumomnis.forensic.ui.theme.severityColor
 
 @Composable
 private fun TrustCard(state: UiState) {
@@ -54,7 +58,11 @@ private fun TrustCard(state: UiState) {
         InfoRow("Identity", state.identityStatus)
         state.trustScore?.let { score ->
             Spacer(Modifier.height(4.dp))
-            Text(score.summary(), color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            // PD16: ordinal confidence only — never a numeric score or percentage.
+            Text(
+                "Trust: ${score.confidence} · ${score.factors.size} factor(s)",
+                color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
+            )
             score.factors.forEach { factor ->
                 Text(
                     "${factor.type.name}: ${factor.confidence}",
@@ -96,10 +104,15 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                     .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                     .padding(12.dp)
             ) {
-                Text(
-                    "${c.contradictionId} · ${c.severity} · ${c.type}",
-                    color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(c.contradictionId, color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        c.severity.toString().replace('_', ' '),
+                        color = severityColor(c.severity.toString()),
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp
+                    )
+                    Text(c.type.toString(), color = VoTextMuted, fontSize = 12.sp)
+                }
                 Spacer(Modifier.height(4.dp))
                 Text("A (${c.propositionAActor}): \"${c.propositionAText}\"", color = VoTextPrimary, fontSize = 12.sp)
                 Text("B (${c.propositionBActor}): \"${c.propositionBText}\"", color = VoTextPrimary, fontSize = 12.sp)
@@ -111,14 +124,19 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                 Spacer(Modifier.height(6.dp))
                 if (c.verificationStatus == FindingsJsonEmitter.STATUS_G3_CANDIDATE) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
+                        VerumPrimaryButton(
+                            label = "Promote",
                             onClick = { viewModel.promoteG3Candidate(c.contradictionId) },
-                            colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-                        ) { Text("Promote", fontSize = 12.sp) }
-                        OutlinedButton(onClick = {
-                            rejectTarget = c.contradictionId
-                            rejectReason = ""
-                        }) { Text("Reject", fontSize = 12.sp) }
+                            modifier = Modifier.weight(1f)
+                        )
+                        VerumSecondaryButton(
+                            label = "Reject",
+                            onClick = {
+                                rejectTarget = c.contradictionId
+                                rejectReason = ""
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 } else {
                     val statusColor =
@@ -135,18 +153,41 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
     rejectTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { rejectTarget = null },
-            title = { Text("Reject $target") },
+            containerColor = VoNavy2,
+            titleContentColor = VoGold,
+            textContentColor = VoTextPrimary,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    "Reject $target",
+                    fontFamily = Cormorant,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 22.sp,
+                    color = VoGold
+                )
+            },
             text = {
                 Column {
                     Text(
                         "A rejection reason is required — it is sealed with the record and never deleted.",
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        color = VoTextMuted
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = rejectReason,
                         onValueChange = { rejectReason = it },
-                        label = { Text("Reason") }
+                        label = { Text("Reason", color = VoAccentBlue) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = VoGold,
+                            unfocusedBorderColor = VoBlueBorder,
+                            focusedTextColor = VoHeading,
+                            unfocusedTextColor = VoHeading,
+                            cursorColor = VoGold,
+                            focusedContainerColor = VoPanelInput,
+                            unfocusedContainerColor = VoPanelInput
+                        ),
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
             },
@@ -157,10 +198,12 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                         rejectTarget = null
                     },
                     enabled = rejectReason.isNotBlank()
-                ) { Text("Reject candidate") }
+                ) { Text("REJECT CANDIDATE", fontFamily = JetBrainsMono, fontSize = 12.sp, letterSpacing = 1.sp, color = if (rejectReason.isNotBlank()) VoGold else VoTextMuted) }
             },
             dismissButton = {
-                TextButton(onClick = { rejectTarget = null }) { Text("Cancel") }
+                TextButton(onClick = { rejectTarget = null }) {
+                    Text("CANCEL", fontFamily = JetBrainsMono, fontSize = 12.sp, letterSpacing = 1.sp, color = VoAccentBlue)
+                }
             }
         )
     }
@@ -180,18 +223,34 @@ fun ReportScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // §3.6 section heading: mono kicker over a serif title with gold rule.
+        Column {
+            VoKicker("Nine-Brain Engine — Sealed Output")
+            Spacer(Modifier.height(6.dp))
+            VoSerifHeading("Forensic Report", fontSize = 32)
+            Spacer(Modifier.height(10.dp))
+            VoGoldRule()
+        }
+
+        // Primary CTA: gold gradient (§3.4); siblings are blue outlines.
+        VerumPrimaryButton(
+            label = "Generate Sealed Report",
+            onClick = { viewModel.generateReport() },
+            modifier = Modifier.fillMaxWidth()
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { viewModel.generateReport() },
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-            ) { Text("Generate Sealed Report") }
             state.report?.let { rpt ->
-                OutlinedButton(onClick = { onExportReport(rpt) }) { Text("Export Sealed PDF") }
+                VerumSecondaryButton(
+                    label = "Export Sealed PDF",
+                    onClick = { onExportReport(rpt) },
+                    modifier = Modifier.weight(1f)
+                )
             }
-            OutlinedButton(onClick = onNewScan) {
-                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                Text("New Scan")
-            }
+            VerumSecondaryButton(
+                label = "New Scan",
+                onClick = onNewScan,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         // Candidates surface as soon as a scan has run — they must never wait
@@ -208,10 +267,7 @@ fun ReportScreen(
                     color = VoTextMuted, fontSize = 13.sp
                 )
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = onNewScan,
-                    colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-                ) { Text("Start New Scan") }
+                VerumPrimaryButton(label = "Start New Scan", onClick = onNewScan)
             }
             return@Column
         }
@@ -242,7 +298,17 @@ fun ReportScreen(
                         .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    Text("${c.contradictionId} · ${c.severity}", color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(c.contradictionId, color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        // Severity as TEXT in the site's accent palette (PD16 — no scores).
+                        Text(
+                            c.severity.name.replace('_', ' '),
+                            color = severityColor(c.severity),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                     Text("Person: ${c.respondent}", color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     Text("A: \"${c.claimA.text}\"", color = VoTextPrimary, fontSize = 12.sp)
@@ -324,11 +390,12 @@ fun ReportScreen(
                 Text("Proof: ${ots.otsProofFile}", color = VoTextMuted, fontSize = 10.sp)
             }
             Spacer(Modifier.height(8.dp))
-            Button(
+            VerumPrimaryButton(
+                label = if (state.anchoring) "Anchoring…" else "Anchor Seal to Bitcoin",
                 onClick = { viewModel.anchorSealToBitcoin() },
                 enabled = !state.anchoring,
-                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-            ) { Text(if (state.anchoring) "Anchoring…" else "Anchor Seal to Bitcoin") }
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

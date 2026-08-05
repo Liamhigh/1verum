@@ -233,13 +233,8 @@ private fun StatItem(label: String, value: String) {
 
 @Composable
 private fun ContradictionBreakdownRow(severity: Severity, count: Int) {
-    val color = when (severity) {
-        Severity.CRITICAL -> VoRed
-        Severity.VERY_HIGH -> Color(0xFFE8733B)
-        Severity.HIGH -> Color(0xFFF5A623)
-        Severity.MODERATE -> Color(0xFFE8C567)
-        Severity.LOW -> VoGold
-    }
+    // Site palette only (PD16): red family / gold / blue — no off-palette oranges.
+    val color = com.verumomnis.forensic.ui.theme.severityColor(severity)
 
     Row(
         modifier = Modifier

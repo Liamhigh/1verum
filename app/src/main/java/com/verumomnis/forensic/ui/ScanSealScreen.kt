@@ -104,6 +104,11 @@ fun ScanSealScreen(
     val online = remember { isOnline(context) }
 
     LaunchedEffect(Unit) {
+        // A payload left over from a previous visit (the ViewModel keeps it
+        // until "Scan again") must not survive screen entry — it would render
+        // a stale card next to the camera and, worse, auto-open the browser
+        // with an old URL even though no new scan occurred.
+        viewModel.clearScanSeal()
         if (!cameraPermission.status.isGranted) {
             cameraPermission.launchPermissionRequest()
         }
@@ -149,6 +154,20 @@ fun ScanSealScreen(
 
         val payload = state.scanSealQrPayload
         val raw = rawQr
+
+        // A scanned Verum Omnis verify-URL hands off to the Verification Hub
+        // immediately — the website is the only verification authority.
+        // Auto-open is strictly gated: only for a QR scanned in THIS screen
+        // session (raw != null — never a stale ViewModel payload) and only to
+        // the verumglobal.foundation host. Any other URL requires an explicit
+        // tap, per the QR safety requirement.
+        val autoOpens = payload != null && raw != null && online && isVerumUrl(payload.rawUrl)
+        LaunchedEffect(payload, raw, online) {
+            if (payload != null && raw != null && online && isVerumUrl(payload.rawUrl)) {
+                openUrl(context, payload.rawUrl)
+            }
+        }
+
         when {
             // VO-DSS-1.2 verify URL — the website verifier is canonical.
             payload != null -> {
@@ -156,6 +175,16 @@ fun ScanSealScreen(
                 QrPayloadCard(payload)
                 Spacer(Modifier.height(16.dp))
                 if (online) {
+                    if (autoOpens) {
+                        Text(
+                            "Opening the Verification Hub in your browser…",
+                            color = VoGreen,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
                     VerumPrimaryButton(
                         label = "Verify on verumglobal.foundation",
                         onClick = { openUrl(context, payload.rawUrl) },
@@ -190,7 +219,7 @@ fun ScanSealScreen(
                         onClick = {
                             copyToClipboard(context, raw)
                             copied = true
-                            openUrl(context, "https://verumglobal.foundation/verify.html")
+                            openUrl(context, com.verumomnis.forensic.seal.SealMetadataCodec.VERIFY_BASE_URL)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -221,10 +250,66 @@ fun ScanSealScreen(
                     copied = false
                 }
             }
-            // Anything else is not a Verum seal QR.
+            // A verumglobal.foundation URL that didn't parse as VO-DSS-1.2
+            // (e.g. a bare verify.html link) — still hand off to the hub.
+            raw != null && isVerumUrl(raw) -> {
+                LaunchedEffect(raw) { if (online) openUrl(context, raw) }
+                Spacer(Modifier.height(20.dp))
+                QrInfoCard(label = "VERUM OMNIS VERIFY LINK", body = raw.take(220))
+                Spacer(Modifier.height(16.dp))
+                if (online) {
+                    VerumPrimaryButton(
+                        label = "Open on verumglobal.foundation",
+                        onClick = { openUrl(context, raw) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    OfflineNote()
+                }
+                Spacer(Modifier.height(6.dp))
+                ScanAgainButton {
+                    rawQr = null
+                    copied = false
+                }
+            }
+            // Some other URL — never auto-opened; requires an explicit tap.
+            raw != null && isHttpUrl(raw) -> {
+                Spacer(Modifier.height(20.dp))
+                QrInfoCard(label = "QR LINK — NOT A VERUM SEAL", body = raw.take(220) + if (raw.length > 220) "…" else "")
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "This QR code points to a website that is not the Verum Omnis Verification Hub. " +
+                        "Open it only if you trust it.",
+                    color = VoTextMuted,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                VerumSecondaryButton(
+                    label = "Open link anyway",
+                    onClick = { openUrl(context, raw) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                ScanAgainButton {
+                    rawQr = null
+                    copied = false
+                }
+            }
+            // Not a URL at all — show the raw payload with a copy option.
             raw != null -> {
                 Spacer(Modifier.height(20.dp))
                 UnknownQrCard(raw)
+                Spacer(Modifier.height(12.dp))
+                VerumSecondaryButton(
+                    label = if (copied) "Copied" else "Copy payload",
+                    onClick = {
+                        copyToClipboard(context, raw)
+                        copied = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(6.dp))
                 ScanAgainButton {
                     rawQr = null
@@ -250,20 +335,17 @@ private fun ScanSealHeader() {
         Icon(
             Icons.Filled.QrCodeScanner,
             contentDescription = "Scan seal",
-            tint = VoAccentBlue,
+            tint = VoGold,
             modifier = Modifier.size(64.dp)
         )
         Spacer(Modifier.height(16.dp))
-        Text(
-            "Scan Seal QR",
-            fontFamily = Cormorant,
-            fontWeight = FontWeight.Light,
-            fontSize = 30.sp,
-            color = VoTextPrimary
-        )
+        VoKicker("Scan → Verification Hub", center = true)
+        Spacer(Modifier.height(10.dp))
+        VoSerifHeading("Scan Seal QR", fontSize = 30, center = true)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Scan the QR code printed on a sealed document to verify it.",
+            "Scan the QR code printed on a sealed document. A Verum Omnis seal QR opens the " +
+                "Verification Hub at verumglobal.foundation in your browser.",
             fontSize = 15.sp,
             color = VoTextMuted,
             lineHeight = 22.sp,
@@ -469,6 +551,17 @@ private class QrAnalyzer(private val onQr: (String) -> Unit) : ImageAnalysis.Ana
             }
             .addOnCompleteListener { imageProxy.close() }
     }
+}
+
+/** True for http(s) URLs on verumglobal.foundation (with or without www). */
+private fun isVerumUrl(raw: String): Boolean {
+    val host = runCatching { Uri.parse(raw.trim()).host?.lowercase() }.getOrNull() ?: return false
+    return isHttpUrl(raw) && (host == "verumglobal.foundation" || host == "www.verumglobal.foundation")
+}
+
+private fun isHttpUrl(raw: String): Boolean {
+    val t = raw.trim().lowercase()
+    return t.startsWith("https://") || t.startsWith("http://")
 }
 
 private fun isOnline(context: Context): Boolean {

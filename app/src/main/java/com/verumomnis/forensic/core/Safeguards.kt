@@ -38,5 +38,14 @@ object Safeguards {
         Constitution.ANTI_WAR_DOCTRINE && WEAPONIZATION.containsMatchIn(request)
 
     /** Immutable Constitution: any change invalidates seals (see Constitution.rulesetFingerprint). */
-    fun constitutionIsFinal(): Boolean = Constitution.FINAL && Constitution.VERSION == "6.0"
+    /**
+     * Whether the loaded Constitution is a ratified, final instrument.
+     *
+     * This pinned `VERSION == "6.0"`, which made the safeguard report "not final"
+     * for every version after 6.0 — ratifying v6.1 would have silently turned it
+     * false. Finality is what [Constitution.FINAL] records; the version is which
+     * instrument is loaded, not whether it is settled. A blank version means no
+     * Constitution is loaded at all, and that is the case worth failing on.
+     */
+    fun constitutionIsFinal(): Boolean = Constitution.FINAL && Constitution.VERSION.isNotBlank()
 }

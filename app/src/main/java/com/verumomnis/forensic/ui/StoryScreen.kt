@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.VoBorder
@@ -121,7 +122,7 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
                 lineHeight = 27.sp
             )
             Spacer(Modifier.height(8.dp))
-            Text("— Verum Omnis · Constitution v6.0 FINAL", color = VoGold, fontSize = 11.sp, letterSpacing = 1.sp)
+            Text("— Verum Omnis · Constitution v${Constitution.VERSION} FINAL", color = VoGold, fontSize = 11.sp, letterSpacing = 1.sp)
         }
 
         Spacer(Modifier.height(30.dp))

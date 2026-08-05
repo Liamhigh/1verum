@@ -1,7 +1,10 @@
 package com.verumomnis.forensic.core
 
 /**
- * Verum Omnis Constitution v6.0 — hard-coded, immutable governance constants.
+ * Verum Omnis Constitution — hard-coded, immutable governance constants.
+ *
+ * The version itself lives in [VERSION]; do not repeat it in prose here or it
+ * drifts from the constant the seals actually record.
  *
  * Per the specification these are COMPILE-TIME CONSTANTS: they are not stored in
  * config files or databases. Changing them requires recompiling from source, and
@@ -9,7 +12,7 @@ package com.verumomnis.forensic.core
  * the machine-readable ruleset embedded into every cryptographic seal.
  */
 object Constitution {
-    const val VERSION = "6.0"
+    const val VERSION = "6.1"
     const val FINAL = true
 
     const val PROFIT_TO_FOUNDATION = 99      // 99% to Verum Foundation
@@ -31,6 +34,19 @@ object Constitution {
     const val NON_OWNERSHIP = true
     const val ANTI_WAR_DOCTRINE = true               // Article X — supreme hierarchy
 
+    /**
+     * Prime Directive 16 (new in v6.1) — findings are stated as fact; verdicts
+     * belong to the court.
+     *
+     * A verified finding is a measurement, not an opinion: where Triple
+     * Verification confirms a contradiction, tampering or an impossibility, the
+     * output says so plainly and is never softened to "might", "possibly" or
+     * "appears to". A finding graded INSUFFICIENT is not asserted at all. The one
+     * determination reserved to the court is the criminal or civil verdict on a
+     * named person, which turns on intent that documents cannot measure.
+     */
+    const val FINDINGS_STATED_AS_FACT = true
+
     // Sealing
     const val HASH_ALGORITHM = "SHA-512"
     const val PDF_STANDARD = "PDF/A-3B"
@@ -51,6 +67,26 @@ object Constitution {
         "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf"
     const val MODEL_GEMMA3_SHA256 = "4996030242583a40aa151ff93f49ed787ac8c25e4120c3ae4588b2e2a7d1ae94"
     const val MODEL_GEMMA3_SIZE_BYTES = 2489758112L
+
+    // Gemma 3 1B — the report writer for devices that cannot hold the 4B.
+    //
+    // At 0.81 GB against the 4B's 2.49 GB this runs on a mid-range handset with
+    // room to spare, where the 4B is marginal: on a 5.2 GB device with ~2 GB free
+    // the larger file exceeds available memory outright, and llama.cpp only makes
+    // it viable at all by memory-mapping.
+    //
+    // Narration is the job here — the deterministic engine has already extracted
+    // the contradictions, so the model turns structured findings into prose
+    // rather than reasoning over raw evidence. A 1B is credible at that. It is
+    // materially weaker at spotting contradictions the engine missed, which is
+    // why G3 candidates stay labelled PENDING VERIFICATION and are never
+    // promoted without human sign-off.
+    //
+    // Downloaded and hashed 2026-08-05.
+    const val MODEL_GEMMA3_1B_URL =
+        "https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF/resolve/main/google_gemma-3-1b-it-Q4_K_M.gguf"
+    const val MODEL_GEMMA3_1B_SHA256 = "12bf0fff8815d5f73a3c9b586bd8fee8e7b248c935de70dec367679873d0f29d"
+    const val MODEL_GEMMA3_1B_SIZE_BYTES = 806058496L
 
     const val MODEL_PHI3_URL =
         "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
@@ -77,6 +113,7 @@ object Constitution {
         append("truthOverProb=$TRUTH_OVER_PROBABILITY|evidenceFirst=$EVIDENCE_BEFORE_NARRATIVE|")
         append("contradictionDisclosure=$MANDATORY_CONTRADICTION_DISCLOSURE|determinism=$DETERMINISM_REQUIRED|")
         append("chainOfCustody=$CHAIN_OF_CUSTODY_IS_LAW|antiCoercion=$ANTI_COERCION|antiWar=$ANTI_WAR_DOCTRINE|")
+        append("findingsAsFact=$FINDINGS_STATED_AS_FACT|")
         append("hash=$HASH_ALGORITHM|pdf=$PDF_STANDARD|enc=$ENCRYPTION|chain=$BLOCKCHAIN_NETWORK")
     }
 }

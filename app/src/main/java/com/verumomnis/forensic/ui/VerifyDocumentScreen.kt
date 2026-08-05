@@ -3,6 +3,7 @@ package com.verumomnis.forensic.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +65,7 @@ fun VerifyDocumentScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    var launchFailed by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -80,7 +86,7 @@ fun VerifyDocumentScreen(
         // The one action: open the Verification Hub.
         VerumPrimaryButton(
             label = "Open the Verification Hub",
-            onClick = { openVerificationHub(context) },
+            onClick = { openVerificationHub(context) { launchFailed = true } },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(10.dp))
@@ -90,8 +96,20 @@ fun VerifyDocumentScreen(
             fontSize = 12.sp,
             letterSpacing = 1.sp,
             color = VoAccentBlue,
-            modifier = Modifier.clickable { openVerificationHub(context) }
+            modifier = Modifier.clickable { openVerificationHub(context) { launchFailed = true } }
         )
+
+        if (launchFailed) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "No browser could be opened on this device. Enter the address above " +
+                    "on any device to verify a sealed document.",
+                color = VoGold,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
         VoHonestyNote(
@@ -185,9 +203,19 @@ private fun HubStep(no: String, title: String, body: String, last: Boolean = fal
     }
 }
 
-/** Constitution §7 — ALL verification opens the canonical hub URL. */
-private fun openVerificationHub(context: Context) {
-    runCatching {
+/**
+ * Constitution §7 — ALL verification opens the canonical hub URL.
+ *
+ * A silent failure would leave the user believing verification was under way
+ * when no browser opened at all, so [onFailure] reports it and the screen shows
+ * the address to open manually.
+ */
+private fun openVerificationHub(context: Context, onFailure: () -> Unit = {}) {
+    val result = runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SealMetadataCodec.VERIFY_BASE_URL)))
+    }
+    result.exceptionOrNull()?.let { error ->
+        Log.w("VerumVerify", "Could not open the Verification Hub in a browser", error)
+        onFailure()
     }
 }

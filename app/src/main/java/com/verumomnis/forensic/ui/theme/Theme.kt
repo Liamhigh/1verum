@@ -78,13 +78,16 @@ fun severityColor(severity: Severity): Color = when (severity) {
 }
 
 /** Same mapping keyed by the badge strings some screens compute. */
-fun severityColor(name: String): Color = when (name.uppercase()) {
-    "CRITICAL" -> VoRedText
-    "VERY_HIGH", "VERY HIGH" -> VoRed
-    "HIGH" -> VoGold
-    "MODERATE", "MEDIUM" -> VoGoldSoft
-    "LOW" -> VoAccentBlue
-    else -> VoTextMuted
+fun severityColor(name: String): Color {
+    // Delegates to the enum mapping above so the palette is defined once: a new
+    // severity can never end up coloured one way from the enum and another way
+    // from a badge string. Only the string-to-enum normalisation lives here.
+    val normalised = name.trim().uppercase().replace(' ', '_')
+    val severity = when (normalised) {
+        "MEDIUM" -> Severity.MODERATE
+        else -> runCatching { Severity.valueOf(normalised) }.getOrNull()
+    }
+    return severity?.let { severityColor(it) } ?: VoTextMuted
 }
 
 /** Gold CTA fill — `linear-gradient(135deg, #D4A843 0%, #b8942a 100%)`. */

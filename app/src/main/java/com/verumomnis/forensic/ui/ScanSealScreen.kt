@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.util.Log
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -101,6 +102,7 @@ fun ScanSealScreen(
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
     var rawQr by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf(false) }
+    var launchFailed by remember { mutableStateOf(false) }
     val online = remember { isOnline(context) }
 
     LaunchedEffect(Unit) {
@@ -161,10 +163,19 @@ fun ScanSealScreen(
         // session (raw != null — never a stale ViewModel payload) and only to
         // the verumglobal.foundation host. Any other URL requires an explicit
         // tap, per the QR safety requirement.
+        //
+        // The predicate is computed ONCE and reused by both the effect and the
+        // hint text, so the security gate and what the user is told can never
+        // drift apart. `openedUrl` makes the launch one-shot: recomposition or
+        // a configuration change re-runs the effect, and without it the browser
+        // would be launched again for a scan the user already handed off.
         val autoOpens = payload != null && raw != null && online && isVerumUrl(payload.rawUrl)
-        LaunchedEffect(payload, raw, online) {
-            if (payload != null && raw != null && online && isVerumUrl(payload.rawUrl)) {
-                openUrl(context, payload.rawUrl)
+        var openedUrl by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(autoOpens, payload?.rawUrl) {
+            val url = payload?.rawUrl
+            if (autoOpens && url != null && url != openedUrl) {
+                openedUrl = url
+                openUrl(context, url) { launchFailed = true }
             }
         }
 
@@ -175,7 +186,7 @@ fun ScanSealScreen(
                 QrPayloadCard(payload)
                 Spacer(Modifier.height(16.dp))
                 if (online) {
-                    if (autoOpens) {
+                    if (autoOpens && !launchFailed) {
                         Text(
                             "Opening the Verification Hub in your browser…",
                             color = VoGreen,
@@ -185,9 +196,13 @@ fun ScanSealScreen(
                         )
                         Spacer(Modifier.height(10.dp))
                     }
+                    if (launchFailed) {
+                        BrowserLaunchFailedNote(payload.rawUrl)
+                        Spacer(Modifier.height(10.dp))
+                    }
                     VerumPrimaryButton(
                         label = "Verify on verumglobal.foundation",
-                        onClick = { openUrl(context, payload.rawUrl) },
+                        onClick = { openUrl(context, payload.rawUrl) { launchFailed = true } },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(10.dp))
@@ -219,7 +234,7 @@ fun ScanSealScreen(
                         onClick = {
                             copyToClipboard(context, raw)
                             copied = true
-                            openUrl(context, com.verumomnis.forensic.seal.SealMetadataCodec.VERIFY_BASE_URL)
+                            openUrl(context, com.verumomnis.forensic.seal.SealMetadataCodec.VERIFY_BASE_URL) { launchFailed = true }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -253,14 +268,19 @@ fun ScanSealScreen(
             // A verumglobal.foundation URL that didn't parse as VO-DSS-1.2
             // (e.g. a bare verify.html link) — still hand off to the hub.
             raw != null && isVerumUrl(raw) -> {
-                LaunchedEffect(raw) { if (online) openUrl(context, raw) }
+                LaunchedEffect(raw) {
+                    if (online && raw != openedUrl) {
+                        openedUrl = raw
+                        openUrl(context, raw) { launchFailed = true }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
                 QrInfoCard(label = "VERUM OMNIS VERIFY LINK", body = raw.take(220))
                 Spacer(Modifier.height(16.dp))
                 if (online) {
                     VerumPrimaryButton(
                         label = "Open on verumglobal.foundation",
-                        onClick = { openUrl(context, raw) },
+                        onClick = { openUrl(context, raw) { launchFailed = true } },
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
@@ -288,7 +308,7 @@ fun ScanSealScreen(
                 Spacer(Modifier.height(12.dp))
                 VerumSecondaryButton(
                     label = "Open link anyway",
-                    onClick = { openUrl(context, raw) },
+                    onClick = { openUrl(context, raw) { launchFailed = true } },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(6.dp))
@@ -356,6 +376,34 @@ private fun ScanSealHeader() {
 }
 
 @Composable
+/**
+ * Shown when handing the URL to a browser failed. Silence here would read as
+ * "verification happened" when nothing opened at all, so the address is shown
+ * for the user to open manually.
+ */
+@Composable
+private fun BrowserLaunchFailedNote(url: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "No browser could be opened on this device.",
+            color = VoGold,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Open this address to verify: $url",
+            color = VoTextMuted,
+            fontFamily = JetBrainsMono,
+            fontSize = 10.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 private fun OfflineNote() {
     Text(
         "Offline — showing the decoded seal payload. Verify online for the full check.",
@@ -570,8 +618,18 @@ private fun isOnline(context: Context): Boolean {
     return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 
-private fun openUrl(context: Context, url: String) {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+/**
+ * Hands a URL to the browser. A silent failure here is indistinguishable from a
+ * verification that simply never happened, so the caller is told: [onFailure]
+ * runs when no activity can handle the intent (no browser installed, or a
+ * misconfigured intent), and the screen surfaces the address to open manually.
+ */
+private fun openUrl(context: Context, url: String, onFailure: () -> Unit = {}) {
+    val result = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    result.exceptionOrNull()?.let { error ->
+        Log.w("VerumScanSeal", "Could not open $url in a browser", error)
+        onFailure()
+    }
 }
 
 private fun copyToClipboard(context: Context, text: String) {

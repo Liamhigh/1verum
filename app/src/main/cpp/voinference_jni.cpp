@@ -85,7 +85,19 @@ Java_com_verumomnis_forensic_engine_llm_LlamaBridge_nativeLoadModel(
     llama_context_params ctxParams = llama_context_default_params();
     ctxParams.n_ctx = static_cast<uint32_t>(nCtx);
     ctxParams.n_batch = static_cast<uint32_t>(nCtx);
-    const auto nThreads = static_cast<int32_t>(std::max(1u, std::thread::hardware_concurrency()));
+    // Use the performance cluster only, not every core.
+    //
+    // hardware_concurrency() reports all cores, and on the big.LITTLE layout every
+    // Android phone uses, that mixes fast cores with slow ones. Token generation is
+    // memory-bandwidth bound and runs in lockstep, so each step waits on the
+    // slowest thread: adding little cores *lowers* throughput. Measured on an
+    // SM-A366B (8 cores), all-8 gave ~2 tok/s — a chat reply took six minutes and
+    // read to the user as a frozen app.
+    //
+    // Half the cores, capped at 4, targets the big cluster on the usual 4+4 and
+    // 2+6 arrangements without needing to probe the specific SoC.
+    const auto cores = std::max(1u, std::thread::hardware_concurrency());
+    const auto nThreads = static_cast<int32_t>(std::min(4u, std::max(1u, cores / 2)));
     ctxParams.n_threads = nThreads;
     ctxParams.n_threads_batch = nThreads;
 

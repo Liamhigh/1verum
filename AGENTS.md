@@ -7,6 +7,17 @@
 > Nine-Brain architecture, Triple Verification, the 16 Prime Directives, sealing).
 > The **legal chat interface is a required feature of this app**.
 
+**UI design (binding):** [`VERUM_UI_TOKENS.md`](./VERUM_UI_TOKENS.md) is the canonical
+design specification for EVERY Verum Omnis surface — website, Android app, Fraud
+Firewall and Windows Lite. It was extracted verbatim from the production site and it
+is not a suggestion: any new screen or page must use its palette (dark navy #040D1B,
+gold #D4A843, blue #4A7EC7), its type scale (Cormorant Garamond serif headings, mono
+uppercase kicker labels, sans body) and its component anatomy (cards with id-field
+rows, gold CTAs, honesty-note callouts, seal-footer strips). Web surfaces import
+[`verum-ui.css`](./verum-ui.css) directly; native surfaces port the same tokens.
+Document verification is ALWAYS a link to the Verification Hub
+(verumglobal.foundation/verify.html) — no surface verifies locally.
+
 Native Android app (Kotlin + Jetpack Compose) implementing the Verum Omnis
 forensic platform: SHA-512 evidence sealing, the deterministic Nine-Brain engine,
 GPS-anchored evidence, court-ready report generation, sealed-PDF email

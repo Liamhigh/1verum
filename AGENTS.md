@@ -1,5 +1,12 @@
 # Verum Omnis — Android Forensic AI
 
+> **System context (read first):** this repository is ONE SURFACE of the Verum Omnis
+> system. The cross-repo AI code-assistant system prompt —
+> [`VERUM_OMNIS_SYSTEM_PROMPT.md`](./VERUM_OMNIS_SYSTEM_PROMPT.md) — is identical in
+> every Verum Omnis repository and governs how all surfaces fit together (models,
+> Nine-Brain architecture, Triple Verification, the 16 Prime Directives, sealing).
+> The **legal chat interface is a required feature of this app**.
+
 Native Android app (Kotlin + Jetpack Compose) implementing the Verum Omnis
 forensic platform: SHA-512 evidence sealing, the deterministic Nine-Brain engine,
 GPS-anchored evidence, court-ready report generation, sealed-PDF email

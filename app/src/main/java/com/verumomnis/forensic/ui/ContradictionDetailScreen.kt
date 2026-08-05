@@ -64,7 +64,7 @@ fun ContradictionDetailScreen(state: UiState) {
                 color = VoTextMuted, fontSize = 12.sp, lineHeight = 16.sp
             )
             Text(
-                "brain council votes, legal significance, and confidence scores.",
+                "brain council votes, legal significance, and ordinal confidence.",
                 color = VoTextMuted, fontSize = 12.sp, lineHeight = 16.sp
             )
         }
@@ -92,13 +92,8 @@ fun ContradictionDetailScreen(state: UiState) {
 
 @Composable
 private fun ContradictionCard(contradiction: Contradiction, index: Int) {
-    val severityColor = when (contradiction.severity) {
-        Severity.CRITICAL -> VoRed
-        Severity.VERY_HIGH -> Color(0xFFE8733B)
-        Severity.HIGH -> Color(0xFFF5A623)
-        Severity.MODERATE -> Color(0xFFE8C567)
-        Severity.LOW -> VoGold
-    }
+    // Site palette only (PD16): red family / gold / blue — no off-palette oranges.
+    val severityColor = com.verumomnis.forensic.ui.theme.severityColor(contradiction.severity)
 
     Column(
         modifier = Modifier
@@ -131,8 +126,9 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
                     .padding(8.dp, 6.dp)
             ) {
                 Text(
-                    contradiction.severity.name.take(4),
-                    color = severityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp
+                    contradiction.severity.name.replace('_', ' '),
+                    color = severityColor, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp, fontFamily = JetBrainsMono
                 )
             }
         }

@@ -134,7 +134,9 @@ data class SealResult(
     val sha512: String,
     val verifyUrl: String,
     val priorChain: List<String>,
-    val pageCount: Int
+    val pageCount: Int,
+    /** Actual sealing time (epoch ms) — SealMetadata.t, as encoded in the QR. */
+    val sealedAtMs: Long
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -146,6 +148,7 @@ data class SealResult(
             verifyUrl == other.verifyUrl &&
             priorChain == other.priorChain &&
             pageCount == other.pageCount &&
+            sealedAtMs == other.sealedAtMs &&
             sealedPdf.contentEquals(other.sealedPdf) &&
             (otsProof == null && other.otsProof == null || otsProof != null && other.otsProof != null && otsProof.contentEquals(other.otsProof))
     }
@@ -156,6 +159,7 @@ data class SealResult(
         result = 31 * result + verifyUrl.hashCode()
         result = 31 * result + priorChain.hashCode()
         result = 31 * result + pageCount
+        result = 31 * result + sealedAtMs.hashCode()
         result = 31 * result + sealedPdf.contentHashCode()
         result = 31 * result + (otsProof?.contentHashCode() ?: 0)
         return result
@@ -1129,7 +1133,10 @@ class VerumViewModel(
                             sha512 = result.sha512,
                             verifyUrl = result.verifyUrl,
                             priorChain = result.priorChain,
-                            pageCount = result.pageCount
+                            pageCount = result.pageCount,
+                            // The true sealing time — SealMetadata.t as encoded
+                            // in the QR — not whenever a results card composes.
+                            sealedAtMs = result.metadata.t
                         ),
                         websiteSealedFile = outFile,
                         websiteSealStatus = "Sealed $name → ${result.sealId} (${result.pageCount} page(s)). Saved to vault/reports/sealed."

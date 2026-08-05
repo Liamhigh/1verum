@@ -48,6 +48,20 @@ class QrScanPayloadTest {
     }
 
     @Test
+    fun parseOrNullReturnsNullForForeignHostWithValidHashParam() {
+        // A malicious QR that merely contains /verify.html and a well-formed
+        // 32-hex h param must NOT parse as a Verum payload — a parsed payload
+        // is treated as trusted (the scanner hands it to the browser).
+        assertNull(QrScanPayload.parseOrNull("https://evil.example/verify.html?h=0123456789abcdef0123456789abcdef"))
+    }
+
+    @Test
+    fun parseAcceptsWwwHost() {
+        val url = "https://www.verumglobal.foundation/verify.html?h=${sha512.substring(0, 32)}"
+        assertNotNull(QrScanPayload.parseOrNull(url))
+    }
+
+    @Test
     fun parseOrNullReturnsNullForMissingHash() {
         assertNull(QrScanPayload.parseOrNull("https://verumglobal.foundation/verify.html?m=abc"))
     }

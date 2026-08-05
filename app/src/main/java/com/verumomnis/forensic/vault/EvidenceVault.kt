@@ -49,6 +49,29 @@ class EvidenceVault(private val root: File) {
         return hash
     }
 
+    /**
+     * Streams [input] into the vault, fingerprinting it in the same pass.
+     *
+     * The ByteArray overload above is fine for small artifacts but costs a full
+     * in-memory copy, which is untenable for the multi-hundred-megabyte case
+     * bundles this app is built for. Here the peak cost is one 64 KB buffer no
+     * matter how large the evidence is.
+     *
+     * The original bytes are preserved unaltered, as chain of custody requires —
+     * streaming changes only how they get to disk, never what is stored.
+     *
+     * @return the stored file and its SHA-512.
+     */
+    fun storeEvidenceStreaming(fileName: String, input: java.io.InputStream): Pair<File, String> {
+        initialize()
+        val target = File(evidenceRaw, fileName)
+        val (hash, _) = input.use { source ->
+            target.outputStream().use { sink -> Sha512.copyAndHash(source, sink) }
+        }
+        appendManifest(fileName, hash)
+        return target to hash
+    }
+
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)
@@ -68,6 +91,18 @@ class EvidenceVault(private val root: File) {
         val file = File(seals, "seal_$shortcode.ots")
         return if (file.exists()) file.readText() else null
     }
+
+    /**
+     * Shortcodes of every stored `.ots` proof.
+     *
+     * Lets the anchor upgrader find seals still awaiting Bitcoin confirmation
+     * without the caller having to remember what it sealed and when.
+     */
+    fun listOtsShortcodes(): List<String> =
+        seals.listFiles { f -> f.isFile && f.name.startsWith("seal_") && f.extension == "ots" }
+            ?.map { it.nameWithoutExtension.removePrefix("seal_") }
+            ?.sorted()
+            .orEmpty()
 
     /** Persists a generated report's JSON snapshot so it can later be loaded for comparison. */
     fun storeReport(report: ForensicReport) {
@@ -113,6 +148,53 @@ class EvidenceVault(private val root: File) {
     fun readChatSession(name: String, key: SecretKey): String {
         val fileName = if (name.endsWith(".enc")) name else "$name.enc"
         return String(VaultEncryption.decrypt(File(chatSessions, fileName).readBytes(), key))
+    }
+
+    /**
+     * Deletes one artifact from the device by file name.
+     *
+     * Deliberately removes the on-device copy only. Any OpenTimestamps anchor
+     * already submitted for it stays on the Bitcoin blockchain and any sealed
+     * copy the user has shared elsewhere is untouched — deleting here reclaims
+     * privacy and space, it does not and cannot retract a seal.
+     *
+     * The integrity manifest entry is left in place on purpose: it records that
+     * an artifact with that hash was once vaulted, which is chain-of-custody
+     * history. Rewriting history to hide a deletion is precisely what a forensic
+     * tool must not do.
+     *
+     * @return true if a file was found and removed.
+     */
+    fun deleteEvidence(fileName: String): Boolean {
+        val candidates = listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, findings, seals)
+        var removed = false
+        for (dir in candidates) {
+            val f = File(dir, fileName)
+            if (f.exists() && f.isFile) removed = f.delete() || removed
+        }
+        return removed
+    }
+
+    /**
+     * Removes every stored artifact from this device.
+     *
+     * Clears evidence, reports, findings, seals and research. The integrity
+     * manifest and the encrypted case memory are preserved for the same reason
+     * as above: the record that evidence existed, and the conversation about it,
+     * are themselves part of the account of what happened.
+     *
+     * @return the number of files removed.
+     */
+    fun emptyVault(): Int {
+        var count = 0
+        listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, seals, research).forEach { dir ->
+            dir.listFiles()?.forEach { f -> if (f.isFile && f.delete()) count++ }
+        }
+        // findings holds the manifest alongside per-scan output; keep the manifest.
+        findings.listFiles()?.forEach { f ->
+            if (f.isFile && f.name != manifest.name && f.delete()) count++
+        }
+        return count
     }
 
     fun documentCount(): Int =

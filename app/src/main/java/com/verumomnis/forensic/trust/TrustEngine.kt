@@ -49,7 +49,11 @@ object TrustEngine {
             TrustFactorType.CONSENSUS_QUORUM,
             consensusConfidence,
             0.20,
-            if (consensusOk) "All contradictions passed Triple-AI consensus" else "Some contradictions lack consensus"
+            // Shown on the report screen. The quorum measured here is the
+            // Nine-Brain council's; no language model votes, so naming it
+            // "Triple-AI" overstated what was checked.
+            if (consensusOk) "All contradictions passed the Nine-Brain council quorum"
+            else "Some contradictions lack council quorum"
         )
 
         // Identity attestation.

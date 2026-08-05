@@ -214,6 +214,12 @@ private fun listVaultSections(context: Context): List<Pair<String, List<VaultFil
 }
 
 /** Opens a vault file with an external app via FileProvider; falls back to share. */
+/**
+ * Opens (or shares) a vaulted artifact. Exposed for the redesigned vault screen
+ * so both share one launch path rather than drifting apart.
+ */
+internal fun openVaultArtifact(context: Context, file: File) = openVaultFile(context, file)
+
 private fun openVaultFile(context: Context, file: File) {
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

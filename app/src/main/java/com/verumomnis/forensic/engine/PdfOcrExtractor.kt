@@ -61,14 +61,30 @@ class PdfOcrExtractor(
      * OCR, so it MUST be called off the main thread. All current callers invoke
      * it inside `Dispatchers.IO` coroutines (VerumViewModel, MediaIngestor).
      */
-    override fun extractText(bytes: ByteArray): String {
+    /**
+     * File-based extraction — the path large evidence should take.
+     *
+     * Nothing is held in memory: PDFBox loads from the file, and [ocrPages]
+     * renders directly from it instead of writing a temporary copy. A 150 MB
+     * bundle costs roughly its own size on disk and near-constant heap, where
+     * the ByteArray path cost several multiples of it.
+     */
+    override fun extractText(file: File): String = extract(pdf = file, bytes = null)
+
+    override fun extractText(bytes: ByteArray): String = extract(pdf = null, bytes = bytes)
+
+    /**
+     * Exactly one of [pdf] / [bytes] is non-null. Kept as a single body so the
+     * page-merge logic cannot drift between the two entry points.
+     */
+    private fun extract(pdf: File?, bytes: ByteArray?): String {
         lastOcrPageCount = 0
         lastSkippedPageCount = 0
 
         // 1. Per-page text-layer extraction with PDFBox.
         val pageText: MutableList<String> = mutableListOf()
         try {
-            PDDocument.load(bytes).use { doc ->
+            (if (pdf != null) PDDocument.load(pdf) else PDDocument.load(bytes!!)).use { doc ->
                 val stripper = PDFTextStripper()
                 val n = doc.numberOfPages
                 for (i in 1..n) {
@@ -88,7 +104,7 @@ class PdfOcrExtractor(
         }
 
         // 2. OCR the image-only pages (or all pages if PDFBox found nothing).
-        val ocrByPage = ocrPages(bytes, if (pageText.isEmpty()) null else needsOcr.toSet())
+        val ocrByPage = ocrPages(pdf, bytes, if (pageText.isEmpty()) null else needsOcr.toSet())
 
         // 3. Merge: text layer where present, OCR where we have it.
         val out = StringBuilder()
@@ -110,15 +126,19 @@ class PdfOcrExtractor(
      * Render pages to bitmaps and run ML Kit OCR. If [only] is null, OCR every
      * page (whole document is image-only); otherwise OCR just those indices.
      */
-    private fun ocrPages(bytes: ByteArray, only: Set<Int>?): Map<Int, String> {
+    private fun ocrPages(pdf: File?, bytes: ByteArray?, only: Set<Int>?): Map<Int, String> {
         val result = HashMap<Int, String>()
-        val tmp = File.createTempFile("vo_ocr_", ".pdf", context.cacheDir)
+        // PdfRenderer needs a seekable file descriptor. When the caller already
+        // has the PDF on disk — the streaming path — render straight from it;
+        // only the in-memory path has to spill a temporary copy.
+        val tmp = if (pdf == null) File.createTempFile("vo_ocr_", ".pdf", context.cacheDir) else null
+        val source = pdf ?: tmp!!
         var pfd: ParcelFileDescriptor? = null
         var renderer: PdfRenderer? = null
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
-            tmp.writeBytes(bytes)
-            pfd = ParcelFileDescriptor.open(tmp, ParcelFileDescriptor.MODE_READ_ONLY)
+            if (tmp != null) tmp.writeBytes(bytes!!)
+            pfd = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
             renderer = PdfRenderer(pfd)
             var ocrd = 0
             for (i in 0 until renderer.pageCount) {
@@ -138,7 +158,8 @@ class PdfOcrExtractor(
             try { renderer?.close() } catch (e: Exception) {}
             try { pfd?.close() } catch (e: Exception) {}
             try { recognizer.close() } catch (e: Exception) {}
-            try { tmp.delete() } catch (e: Exception) {}
+            // Only the spilled copy is deleted — never the caller's vaulted file.
+            try { tmp?.delete() } catch (e: Exception) {}
         }
         return result
     }

@@ -58,13 +58,18 @@ import com.verumomnis.forensic.seal.DocumentSealer
 import com.verumomnis.forensic.seal.OpenTimestampsClient
 import com.verumomnis.forensic.seal.SealMetadataCodec
 import com.verumomnis.forensic.seal.SealVerifier
+import com.verumomnis.forensic.seal.AnchorUpgrader
+import com.verumomnis.forensic.vault.CaseMemory
 import com.verumomnis.forensic.vault.EvidenceVault
 import com.verumomnis.forensic.work.ScanWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
@@ -177,6 +182,13 @@ data class UiState(
     val gps: GpsRecord? = null,
     /** True when a location fix was attempted and none could be obtained (spec §4.4). */
     val gpsUnavailable: Boolean = false,
+    // Landing stat tiles (spec §3.1) — real vault counts, never literals.
+    val vaultSealedCount: Int = 0,
+    val vaultVerifiedCount: Int = 0,
+    val vaultFlaggedCount: Int = 0,
+    val recentActivity: List<RecentActivity> = emptyList(),
+    /** Vault contents grouped into scan sets (spec §4.1). */
+    val scanSets: List<ScanSet> = emptyList(),
     val jurisdiction: String = "ZA-KZN",
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
@@ -381,22 +393,52 @@ class VerumViewModel(
         initializeIdentity()
         configureDevice(detectDeviceRamGb())
         if (seedSampleCase) seedSampleCase()
+
+        // The case record persists. A matter runs for months, so the thread of
+        // the conversation is restored from the vault rather than reset — the
+        // greeting is only shown to someone starting out.
+        val restored = CaseMemory.load(vault).map {
+            ChatMessage(author = it.author, text = it.text, fromUser = it.fromUser)
+        }
         _state.update { s ->
             s.copy(
-                chat = listOf(
-                    ChatMessage(
-                        author = VERUM_OMNIS,
-                        // Never name the underlying model here — spec §1 locks the
-                        // user-facing identity to "Verum Omnis" alone.
-                        text = "Truth for All. I am Verum Omnis, your on-device forensic AI (Constitution v${Constitution.VERSION}).\n\n" +
-                            "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
-                            "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
-                            "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
-                            "timeline and legal strategy. Nothing leaves here unsealed.",
-                        fromUser = false
+                chat = restored.ifEmpty {
+                    listOf(
+                        ChatMessage(
+                            author = VERUM_OMNIS,
+                            // Never name the underlying model here — spec §1 locks the
+                            // user-facing identity to "Verum Omnis" alone.
+                            text = "Truth for All. I am Verum Omnis, your on-device forensic AI (Constitution v${Constitution.VERSION}).\n\n" +
+                                "Communication mode: UNRESTRICTED under the Constitution. I will answer directly and cite sealed evidence. " +
+                                "Anything you add with + goes straight to the forensic engine — SHA-512 sealed, GPS-anchored and stored " +
+                                "in the vault before I ever see it. I only read the SEALED case file, then help with the narrative, " +
+                                "timeline and legal strategy. Nothing leaves here unsealed.",
+                            fromUser = false
+                        )
                     )
-                )
+                }
             )
+        }
+
+        refreshVaultStats()
+        upgradePendingAnchors()
+
+        // Persist every change to the transcript. Collected for the ViewModel's
+        // lifetime so a turn is saved as soon as it lands: a forensic scan can
+        // run for minutes and the user may leave the app at any point, so
+        // waiting for a clean shutdown would lose exactly the sessions that
+        // matter most.
+        viewModelScope.launch {
+            _state.map { it.chat }
+                .distinctUntilChanged()
+                .collect { chat ->
+                    withContext(Dispatchers.IO) {
+                        CaseMemory.save(
+                            vault,
+                            chat.map { CaseMemory.Turn(it.author, it.text, it.fromUser) }
+                        )
+                    }
+                }
         }
     }
 
@@ -645,6 +687,109 @@ class VerumViewModel(
                 reportWriter = ModelLoader.reportWriter(models).name,
                 systemPrompt = prompt
             )
+        }
+    }
+
+    /**
+     * Recomputes the landing tiles from what is actually in the vault.
+     *
+     * Sealed counts vaulted artifacts; flagged counts reports carrying
+     * contradictions; verified is the remainder — a sealed report the engine
+     * found nothing adverse in. Reading the vault rather than tracking counters
+     * means the tiles cannot drift from reality.
+     */
+    fun refreshVaultStats() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val reports = runCatching { vault.listReports() }.getOrDefault(emptyList())
+            val sealed = runCatching { vault.documentCount() }.getOrDefault(0)
+            val flagged = reports.count { it.contradictions.isNotEmpty() }
+            val recent = reports
+                .sortedByDescending { it.createdAt }
+                .take(2)
+                .map { r ->
+                    RecentActivity(
+                        id = r.reference,
+                        name = r.title.ifBlank { r.reference },
+                        subtitle = if (r.contradictions.isEmpty()) {
+                            "Sealed · no contradictions detected"
+                        } else {
+                            "${r.contradictions.size} contradiction(s) flagged"
+                        },
+                        flagged = r.contradictions.isNotEmpty()
+                    )
+                }
+            // Contradiction counts keyed by the same base name the grouper uses,
+            // so a set shows the findings of the report that belongs to it.
+            val byRef = reports.associate {
+                VaultGrouping.baseName(it.reference) to it.contradictions.size
+            }
+            val sets = runCatching {
+                VaultGrouping.group(
+                    raw = vault.evidenceRaw.listFiles()?.toList().orEmpty(),
+                    processed = vault.evidenceProcessed.listFiles()?.toList().orEmpty(),
+                    sealed = vault.reportsSealed.listFiles()?.toList().orEmpty(),
+                    contradictionsByRef = byRef
+                )
+            }.getOrDefault(emptyList())
+
+            _state.update {
+                it.copy(
+                    vaultSealedCount = sealed,
+                    vaultVerifiedCount = (reports.size - flagged).coerceAtLeast(0),
+                    vaultFlaggedCount = flagged,
+                    recentActivity = recent,
+                    scanSets = sets
+                )
+            }
+        }
+    }
+
+    /**
+     * Removes one scan set from this device, then refreshes the vault view.
+     *
+     * On-device copies only: an OpenTimestamps anchor already submitted stays on
+     * the blockchain, and the integrity manifest keeps its record that the
+     * artifact existed. Deleting reclaims privacy and space; it does not retract
+     * a seal, and it must not rewrite history.
+     */
+    fun deleteScanSet(set: ScanSet) {
+        viewModelScope.launch(Dispatchers.IO) {
+            set.artifacts.forEach { runCatching { vault.deleteEvidence(it.fileName) } }
+            refreshVaultStats()
+        }
+    }
+
+    /** Clears every stored artifact from this device. See [EvidenceVault.emptyVault]. */
+    fun emptyVault() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { vault.emptyVault() }
+            refreshVaultStats()
+        }
+    }
+
+    /**
+     * Completes the Bitcoin anchor for any seal still awaiting attestation.
+     *
+     * OpenTimestamps returns a pending proof at seal time; confirmation arrives
+     * an hour or two later and requires a second call the app never made, so
+     * every seal stayed pending indefinitely. Run on launch and on demand, this
+     * closes that gap without the user needing to know an upgrade step exists.
+     *
+     * Network work, so failures are expected and silent — an offline attempt
+     * leaves the pending proof untouched.
+     */
+    fun upgradePendingAnchors() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val outcomes = runCatching { AnchorUpgrader(vault).upgradeAllPending() }
+                .getOrDefault(emptyList())
+            val confirmed = outcomes.count { it.newlyConfirmed }
+            if (confirmed > 0) {
+                postEngine(
+                    "Bitcoin attestation confirmed for $confirmed sealed document(s). " +
+                        "Their timestamps are now independently verifiable."
+                )
+                refreshVaultStats()
+            }
         }
     }
 

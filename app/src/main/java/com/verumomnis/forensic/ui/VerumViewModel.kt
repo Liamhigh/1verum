@@ -295,13 +295,58 @@ class VerumViewModel(
      * automatically — because these are multi-gigabyte downloads. Once loaded, real
      * inference replaces the deterministic prompt-echo report writer and chat fallback.
      */
+    /**
+     * Loads models that are already on disk, without downloading anything.
+     *
+     * Called on launch. Without it a model present and verified in storage stays
+     * unused until the user opens Settings and asks for a download it does not
+     * need — so a device that had a working narrative writer behaved exactly
+     * like one that had none.
+     */
+    fun loadInstalledModels() {
+        val models = _state.value.models.ifEmpty { ModelLoader.loadModels(_state.value.deviceRamGb) }
+        val communicatorName = ModelLoader.communicator(models).name
+        viewModelScope.launch(Dispatchers.IO) {
+            for (llm in models) {
+                if (llm.name in _state.value.modelsLoaded) continue
+                // Whichever variant is on disk — the slot may hold either size.
+                val spec = ModelCatalog.variantsForName(llm.name)
+                    .firstOrNull { modelDownloadManager.isVerified(it) } ?: continue
+                val loaded = LlamaModel.load(modelDownloadManager.modelFile(spec), llm.name) ?: continue
+                if (llm.role == LlmRole.REPORT_WRITER) reportWriterModel = loaded
+                if (llm.name == communicatorName) communicatorModel = loaded
+                _state.update {
+                    it.copy(
+                        modelsLoaded = it.modelsLoaded + llm.name,
+                        modelDownloadProgress = it.modelDownloadProgress + (llm.name to 1f)
+                    )
+                }
+            }
+            adoptFallbackCommunicator()
+        }
+    }
+
+    /**
+     * Lets a loaded model answer chat when the designated communicator is absent.
+     *
+     * [ModelLoader.communicator] chooses from the device's *catalogue*, not from
+     * what is installed, so on a mid-range handset it names Phi-3 whether or not
+     * Phi-3 was ever downloaded. When it was not, the communicator slot stayed
+     * null and chat fell through to canned text — while a perfectly capable
+     * report writer sat loaded in memory, unreachable. A model that is present
+     * should answer.
+     */
+    private fun adoptFallbackCommunicator() {
+        if (communicatorModel == null) communicatorModel = reportWriterModel
+    }
+
     fun downloadAndLoadModels() {
         val models = _state.value.models.ifEmpty { ModelLoader.loadModels(_state.value.deviceRamGb) }
         val communicatorName = ModelLoader.communicator(models).name
         viewModelScope.launch(Dispatchers.IO) {
             for (llm in models) {
                 if (llm.name in _state.value.modelsLoaded) continue
-                val spec = ModelCatalog.forName(llm.name) ?: continue
+                val spec = ModelCatalog.forName(llm.name, _state.value.deviceRamGb) ?: continue
                 // Spec §1: never name the model to the user — it is "Verum Omnis".
                 postAi("Downloading the on-device forensic model…")
                 val file = modelDownloadManager.download(spec) { progress ->
@@ -324,8 +369,10 @@ class VerumViewModel(
                         modelDownloadProgress = it.modelDownloadProgress + (llm.name to 1f)
                     )
                 }
-                postAi("${llm.name} loaded and ready.")
+                // Spec §1 again: the name is ours, not the model's.
+                postAi("Verum Omnis is loaded and ready.")
             }
+            adoptFallbackCommunicator()
         }
     }
 
@@ -336,13 +383,25 @@ class VerumViewModel(
      */
     private fun askCommunicatorModel(model: LlamaModel, query: String, findings: ForensicFindings?) {
         viewModelScope.launch(Dispatchers.IO) {
-            val answer = model.complete(buildCommunicatorPrompt(query, findings), maxTokens = 512).trim()
+            // 512 tokens is a page of prose per chat turn, and on-device every token
+            // is seconds of wall clock. A conversational answer needs a fraction of
+            // that; the sealed report is where length belongs, not the chat.
+            val answer = model.complete(buildCommunicatorPrompt(query, findings), maxTokens = 200).trim()
             postAi(answer.ifEmpty { "INSUFFICIENT: the on-device model produced no output for that question." })
         }
     }
 
     /** Mirrors the PHR3/G4 system prompt (ON_DEVICE_LLM_ARCHITECTURE.md section 8). */
     private fun buildCommunicatorPrompt(query: String, findings: ForensicFindings?): String = buildString {
+        // Identity stated as fact, because the model cannot be trained to know it.
+        // Given only a job description ("the forensic evidence communicator for
+        // Verum Omnis") the model filled the gap and introduced itself as a person
+        // it invented — "I am Elias Thorne" — on a device holding sealed evidence.
+        // A fabricated human name attached to forensic output discredits everything
+        // around it. Constitution §4's 10-word cap governs *behaviour* instructions;
+        // this is a fact the model must be given, and it costs four words.
+        appendLine("You are Verum Omnis.")
+        appendLine("Never use any other name for yourself, and never invent a persona.")
         appendLine("You are the forensic evidence communicator for Verum Omnis.")
         appendLine("Answer truthfully based only on the sealed evidence below. Cite anchors for every claim.")
         appendLine("Flag legal interpretations as HYPOTHESIS. Do not invent findings not listed here.")
@@ -392,6 +451,7 @@ class VerumViewModel(
     init {
         initializeIdentity()
         configureDevice(detectDeviceRamGb())
+        loadInstalledModels()
         if (seedSampleCase) seedSampleCase()
 
         // The case record persists. A matter runs for months, so the thread of
@@ -1698,9 +1758,14 @@ class VerumViewModel(
                     "Seal a document or run a forensic scan first, and I will answer with anchored " +
                     "citations. In the meantime you can ask me about the Constitution, how sealing " +
                     "and verification work, or say 'deep research' for external case research."
+            // Prime Directive 16 (v6.1) reverses the old wording here. This line
+            // used to promise "indicators, never determinations" — the hedging the
+            // Directive now forbids. A verified finding is stated as measured fact;
+            // the verdict on a person is what stays with the court.
             "constitution" in q -> "Constitution v${Constitution.VERSION} governs everything I do — " +
-                "it is readable in full inside the app. I operate under it at all times: I report " +
-                "indicators, never determinations, and I never overwrite sealed evidence."
+                "it is readable in full inside the app. I state verified findings as fact and never " +
+                "soften them; what I do not do is pronounce guilt or liability on a person — that is " +
+                "the court's. I never overwrite sealed evidence."
             else -> {
                 val communicator = communicatorModel
                 if (communicator != null) {

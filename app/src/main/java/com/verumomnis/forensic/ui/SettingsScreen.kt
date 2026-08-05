@@ -147,8 +147,12 @@ fun SettingsScreen(
         if (state.models.isNotEmpty()) {
             VoCard(title = "MODEL MANAGEMENT", icon = Icons.Filled.Settings) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Heading states the list, not its state: every catalogue entry
+                    // is shown here whether or not it exists on the device, so
+                    // "models loaded" asserted of the whole list was simply untrue —
+                    // each row carries its own real status below.
                     Text(
-                        "On-device LLM models loaded:",
+                        "On-device models for this device:",
                         color = VoTextMuted, fontSize = 11.sp
                     )
                     state.models.forEach { model ->

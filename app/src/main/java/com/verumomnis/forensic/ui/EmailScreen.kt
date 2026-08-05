@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.model.HarassmentVerdict
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
@@ -84,7 +85,7 @@ fun EmailScreen(
                             recipient, subject,
                             points = listOf(
                                 "Every contradiction is anchored to a person, page and statute.",
-                                "Evidence sealed with SHA-512 under Constitution v6.0 FINAL."
+                                "Evidence sealed with SHA-512 under Constitution v${Constitution.VERSION} FINAL."
                             )
                         )
                     },

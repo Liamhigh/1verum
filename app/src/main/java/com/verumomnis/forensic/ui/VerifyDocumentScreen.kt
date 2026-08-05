@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.seal.SealVerifier
 import com.verumomnis.forensic.ui.theme.Cormorant
@@ -250,7 +251,7 @@ private fun UploadVerifyZone(name: String, onClick: () -> Unit) {
         Spacer(Modifier.height(10.dp))
         Text(if (name.isNotBlank()) name else "Drop file here or click to browse", color = VoTextPrimary, fontSize = 15.sp)
         Spacer(Modifier.height(6.dp))
-        Text("PDF or encrypted .voice — Max 50MB", fontSize = 13.sp, color = VoAccentBlue)
+        Text("PDF or encrypted .voice — Max 150MB", fontSize = 13.sp, color = VoAccentBlue)
     }
 }
 
@@ -342,6 +343,6 @@ private fun VerifyFooter() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Verum Omnis Foundation — Patent Pending", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
-        Text("Constitution v6.0 Final — Article X Non-Weaponization Doctrine", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
+        Text("Constitution v${Constitution.VERSION} Final — Article X Non-Weaponization Doctrine", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
     }
 }

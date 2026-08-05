@@ -74,6 +74,24 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            // Build the native inference library optimised even in debug.
+            //
+            // AGP passes CMAKE_BUILD_TYPE=Debug for this variant, which compiles
+            // llama.cpp/ggml at -O0: no vectorisation, no inlining, scalar matmul.
+            // Measured on an SM-A366B, a Gemma-3 1B chat reply took ~4.8 minutes
+            // (~2 tok/s) — the app read as frozen. Inference is arithmetic in a
+            // tight loop, so the optimiser is not a nicety here, it is the feature.
+            //
+            // RelWithDebInfo rather than Release: -O2 with symbols retained, so
+            // native crashes still produce a usable stack trace. Kotlin/Java debug
+            // builds are unaffected — this governs the CMake targets only.
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+                }
+            }
+        }
     }
 
     compileOptions {

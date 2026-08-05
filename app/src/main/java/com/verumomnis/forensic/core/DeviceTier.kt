@@ -61,8 +61,11 @@ object ModelLoader {
      */
     fun loadModels(deviceRamGb: Int): List<Llm> {
         val models = mutableListOf<Llm>()
-        // ALWAYS present: Gemma 3 (bundled with APK) — writes forensic reports.
-        models += Llm("Gemma 3", LlmRole.REPORT_WRITER, bundled = true)
+        // The report writer. NOT bundled: no model ships inside the APK — this one
+        // is downloaded and hash-verified like the others, which is why it has a URL
+        // and a SHA-256 in Constitution. The old `bundled = true` here claimed the
+        // opposite and made the app describe a model it did not have.
+        models += Llm("Gemma 3", LlmRole.REPORT_WRITER, bundled = false)
         if (deviceRamGb >= 2) {
             // Standard communicator.
             models += Llm("Phi-3", LlmRole.COMMUNICATOR, bundled = false)

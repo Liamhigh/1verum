@@ -1,5 +1,7 @@
 package com.verumomnis.forensic.engine.contradiction
 
+import com.verumomnis.forensic.core.Constitution
+
 /**
  * Confidence Calibrator — v5.3.1c.
  * Per-detector false-positive rates from validation against
@@ -59,7 +61,9 @@ object ConfidenceCalibrator {
         "lastCalibrated" to "2026-07-13",
         "validationCases" to "ALLFUELS-2026 (111 contradictions) + DIGSIM-2026 (47 contradictions)",
         "engineVersion" to EngineVersion.TAGGED,
-        "constitution" to "v6.0 Final",
+        // Read from the constant: hardcoded here, calibration metadata would keep
+        // reporting the Constitution that governed a previous release.
+        "constitution" to "v${Constitution.VERSION} Final",
         "detectorCount" to "16",
         "typeCount" to "43",
         "semanticAgreementBoost" to SEMANTIC_AGREEMENT_BOOST.toString()

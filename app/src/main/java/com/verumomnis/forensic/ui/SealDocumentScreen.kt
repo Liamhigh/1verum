@@ -76,6 +76,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.pdf.QrCodeGenerator
 import com.verumomnis.forensic.seal.SealMetadataCodec
@@ -279,9 +280,28 @@ private fun UploadZone(hasFile: Boolean, onClick: () -> Unit) {
     ) {
         Icon(Icons.Filled.FileUpload, contentDescription = null, tint = if (hasFile) VoGold else VoAccentBlue, modifier = Modifier.size(48.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Upload PDF Document", fontFamily = Cormorant, fontSize = 22.sp, color = VoHeading)
+        Text(
+            "Upload PDF Document(s) — sealed as one",
+            fontFamily = Cormorant,
+            fontSize = 22.sp,
+            color = VoHeading,
+            textAlign = TextAlign.Center
+        )
         Spacer(Modifier.height(6.dp))
-        Text("Tap to browse. Max 50MB.", fontSize = 13.sp, color = VoAccentBlue)
+        // Website parity, and the engine's real limit. This read "Max 50MB" while
+        // MediaIngestor.MAX_FILE_SIZE_BYTES has been 150 MB — the screen turned
+        // away case bundles the app could already seal, and contradicted the
+        // figure verumglobal.foundation quotes for the same service.
+        Text(
+            "Tap to browse — up to 10 PDFs. Multiple documents are merged and " +
+                "sealed as ONE: a single sealed document and a single certificate, " +
+                "not one per file. Max 150MB total.",
+            fontSize = 13.sp,
+            color = VoAccentBlue,
+            lineHeight = 18.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(0.85f)
+        )
     }
 }
 
@@ -291,14 +311,17 @@ private fun LawEnforcementBanner() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(VoGold.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-            .border(1.dp, VoGold.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            // Website parity: blue-bordered panel with a green affirmation, not
+            // gold. Gold is the CTA colour on both surfaces — spending it on a
+            // notice competes with SEAL DOCUMENT for the eye.
+            .background(VoAccentBlue.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+            .border(1.dp, VoAccentBlue.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             "✓ FREE FOR LAW ENFORCEMENT & PRIVATE CITIZENS",
-            color = VoGold,
+            color = VoGreen,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.8.sp,
@@ -898,7 +921,7 @@ private fun Footer() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Verum Omnis Foundation — Patent Pending", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
-        Text("Constitution v6.0 Final — Article X Non-Weaponization Doctrine", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
+        Text("Constitution v${Constitution.VERSION} Final — Article X Non-Weaponization Doctrine", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 0.8.sp)
     }
 }
 

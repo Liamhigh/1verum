@@ -15,20 +15,38 @@ class LlamaModel private constructor(private var handle: Long, val name: String)
 
     private val closed = AtomicBoolean(false)
 
+    /**
+     * Serialises native generation. llama.cpp holds ONE context per model handle
+     * and is not re-entrant: two concurrent `nativeGenerate` calls on the same
+     * handle corrupt that context and the second caller hangs. This was reachable
+     * in normal use — `adoptFallbackCommunicator()` deliberately points the chat
+     * communicator at the report-writer model when only one model is installed,
+     * so asking a question while a report was being written put two generations
+     * on one handle and the conversation froze. Callers now queue instead.
+     */
+    private val generationLock = Any()
+
     /** Blocking, deterministic (greedy) text completion. Empty string if generation fails. */
     fun complete(prompt: String, maxTokens: Int = 768): String {
         if (closed.get()) return ""
-        return try {
-            LlamaBridge.nativeGenerate(handle, prompt, maxTokens)
-        } catch (_: Exception) {
-            ""
+        return synchronized(generationLock) {
+            if (closed.get()) return@synchronized ""
+            try {
+                LlamaBridge.nativeGenerate(handle, prompt, maxTokens)
+            } catch (_: Exception) {
+                ""
+            }
         }
     }
 
     override fun close() {
         if (closed.compareAndSet(false, true)) {
-            LlamaBridge.nativeFree(handle)
-            handle = 0
+            // Freeing while a generation is in flight would pull the context out
+            // from under the native call, so wait for it to finish first.
+            synchronized(generationLock) {
+                LlamaBridge.nativeFree(handle)
+                handle = 0
+            }
         }
     }
 

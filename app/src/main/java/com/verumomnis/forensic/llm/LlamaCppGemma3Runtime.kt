@@ -1,71 +1,63 @@
 package com.verumomnis.forensic.llm
 
+import com.verumomnis.forensic.engine.llm.LlamaModel
 import java.io.File
 
 /**
- * llama.cpp-backed Gemma 3 runtime (ARCHITECTURE.md: "LLM Runtime | llama.cpp
- * via JNI"). Loads a quantised Gemma 3 GGUF from the app's private storage
- * (`files/models/gemma3-*.gguf`) through the `verum_llama` JNI bridge.
+ * [Gemma3Runtime] backed by the app's real native inference bridge.
  *
- * Degrades gracefully: when the native library is not bundled or no model
- * file is installed, [isAvailable] is false and every consumer falls back to
- * the deterministic pipeline. This keeps the app fully functional on devices
- * without the model while allowing the hybrid pipeline to light up the moment
- * a model is provisioned.
+ * WHY THIS WAS REWRITTEN. The previous version declared its own JNI methods
+ * (`Java_com_verumomnis_forensic_llm_LlamaCppGemma3Runtime_native*`) and loaded
+ * a library named `verum_llama`. Neither existed: `CMakeLists.txt` builds
+ * `voinference`, and the only JNI symbols in `voinference_jni.cpp` are
+ * `LlamaBridge`'s. So `nativeLibraryPresent` was permanently false, `discover()`
+ * always returned null, [Gemma3RuntimeProvider] never left
+ * [UnavailableGemma3Runtime], and every consumer — `G3ReviewPass` (the hybrid
+ * engine's candidate-raising review) and `ReportWriter.writeNarrative` — took
+ * the deterministic fallback on every run. The hybrid engine had never executed
+ * on any device, while chat worked, because chat uses the other stack.
+ *
+ * It now delegates to [LlamaModel], which uses the bridge that actually ships.
+ * The degradation contract is unchanged: with no native library or no model,
+ * [Gemma3RuntimeProvider] stays unavailable and callers fall back deterministically.
  */
 class LlamaCppGemma3Runtime private constructor(
-    private val modelFile: File,
+    private val model: LlamaModel,
     override val modelName: String
 ) : Gemma3Runtime {
 
-    @Volatile
-    private var modelLoaded: Boolean? = null
+    override fun isAvailable(): Boolean = true
 
-    private fun ensureLoaded(): Boolean {
-        val loaded = modelLoaded
-        if (loaded != null) return loaded
-        synchronized(this) {
-            val again = modelLoaded
-            if (again != null) return again
-            val result = nativeLibraryPresent && modelFile.exists() &&
-                runCatching { nativeLoadModel(modelFile.absolutePath) }.getOrDefault(false)
-            modelLoaded = result
-            return result
-        }
-    }
-
-    override fun isAvailable(): Boolean = ensureLoaded()
-
-    override fun generate(prompt: String, maxTokens: Int): String? {
-        if (!ensureLoaded()) return null
-        return runCatching { nativeGenerate(prompt, maxTokens) }
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() }
-    }
-
-    private external fun nativeLoadModel(path: String): Boolean
-    private external fun nativeGenerate(prompt: String, maxTokens: Int): String?
+    override fun generate(prompt: String, maxTokens: Int): String? =
+        model.complete(prompt, maxTokens).takeIf { it.isNotBlank() }
 
     companion object {
 
-        /** True when the packaged JNI bridge could be loaded on this device. */
-        val nativeLibraryPresent: Boolean by lazy {
-            runCatching { System.loadLibrary("verum_llama") }.isSuccess
-        }
+        /**
+         * Wrap an already-loaded model. This is the path that matters in
+         * practice: `VerumViewModel` downloads and loads the model through
+         * `ModelDownloadManager`/`LlamaModel`, then hands it here so the hybrid
+         * engine uses the very same loaded instance instead of opening a second
+         * copy of the weights — which would double the memory footprint on
+         * exactly the low-RAM devices this app exists to serve.
+         */
+        fun wrap(model: LlamaModel, modelName: String = model.name): LlamaCppGemma3Runtime =
+            LlamaCppGemma3Runtime(model, modelName)
 
         /**
-         * Find an installed Gemma 3 model under `files/models/` and build a
-         * runtime for it. Returns null when the JNI bridge or model is absent,
-         * in which case [UnavailableGemma3Runtime] stays in effect.
+         * Find a side-loaded GGUF under `files/models/` and load it, for models
+         * placed on the device manually rather than downloaded through the
+         * catalogue. Returns null when the native library is absent or no model
+         * file is present, leaving [UnavailableGemma3Runtime] in effect.
          */
         fun discover(filesDir: File): LlamaCppGemma3Runtime? {
-            if (!nativeLibraryPresent) return null
             val modelsDir = File(filesDir, "models")
-            val model = modelsDir.listFiles { f ->
-                f.isFile && f.name.startsWith("gemma3") && f.name.endsWith(".gguf")
+            val file = modelsDir.listFiles { f ->
+                f.isFile && f.name.endsWith(".gguf") &&
+                    (f.name.startsWith("gemma3") || f.name.startsWith("gemma-3"))
             }?.minByOrNull { it.name } ?: return null
-            val name = "gemma-3-4b-it (${model.name})"
-            return LlamaCppGemma3Runtime(model, name)
+            val loaded = LlamaModel.load(file, "gemma-3-4b-it (${file.name})") ?: return null
+            return LlamaCppGemma3Runtime(loaded, loaded.name)
         }
     }
 }

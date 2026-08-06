@@ -19,6 +19,8 @@ import com.verumomnis.forensic.engine.llm.Gemma3NativeReportWriter
 import com.verumomnis.forensic.engine.llm.LlamaModel
 import com.verumomnis.forensic.engine.llm.ModelCatalog
 import com.verumomnis.forensic.engine.llm.ModelDownloadManager
+import com.verumomnis.forensic.llm.Gemma3RuntimeProvider
+import com.verumomnis.forensic.llm.LlamaCppGemma3Runtime
 import com.verumomnis.forensic.crypto.EvidenceSealer
 import com.verumomnis.forensic.crypto.EvidenceSealer.VerificationResult
 import com.verumomnis.forensic.identity.IdentityService
@@ -327,6 +329,7 @@ class VerumViewModel(
                 }
             }
             adoptFallbackCommunicator()
+            installHybridEngineRuntime()
         }
     }
 
@@ -342,6 +345,27 @@ class VerumViewModel(
      */
     private fun adoptFallbackCommunicator() {
         if (communicatorModel == null) communicatorModel = reportWriterModel
+    }
+
+    /**
+     * Hands the loaded model to the hybrid forensic engine.
+     *
+     * The engine's AI seam is [Gemma3RuntimeProvider]: `G3ReviewPass` (which
+     * raises candidate contradictions the deterministic detectors missed) and
+     * `ReportWriter.writeNarrative` both read through it. Until this call
+     * existed nothing ever wrote to that provider from a working code path, so
+     * the provider stayed [com.verumomnis.forensic.llm.UnavailableGemma3Runtime]
+     * and the hybrid engine never ran on any device — while chat worked,
+     * because chat talks to [communicatorModel] directly. Loading a model must
+     * light up the hybrid engine, not only the conversation.
+     *
+     * The report writer is preferred (it is the model chosen for long-form
+     * forensic work); the communicator is used when it is the only one loaded.
+     * The SAME loaded instance is wrapped — never a second copy of the weights.
+     */
+    private fun installHybridEngineRuntime() {
+        val model = reportWriterModel ?: communicatorModel ?: return
+        Gemma3RuntimeProvider.runtime = LlamaCppGemma3Runtime.wrap(model)
     }
 
     fun downloadAndLoadModels() {
@@ -377,6 +401,7 @@ class VerumViewModel(
                 postAi("Verum Omnis is loaded and ready.")
             }
             adoptFallbackCommunicator()
+            installHybridEngineRuntime()
         }
     }
 

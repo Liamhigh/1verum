@@ -1,37 +1,67 @@
-# GitHub Actions CI for Verum Omnis — PARKED, manual trigger only.
+# GitHub Actions CI for Verum Omnis
 #
-# Every automatic run since this workflow was added failed in ~4 seconds:
-# jobs are never assigned a runner because GitHub Actions is blocked at the
-# account level (billing/payment method — hard to resolve from South Africa).
-# Running it on push/PR therefore only stamped a false red ❌ on every healthy
-# commit while verifying nothing.
+# NOTE: If the workflow never gets assigned a runner, GitHub Actions may be
+# blocked at the account level (billing/payment method). In that case, trigger
+# runs manually via the GitHub UI (Actions tab → "Verum Omnis CI" → Run workflow)
+# once billing is resolved, or use a local build instead:
+#   ./gradlew testDebugUnitTest assembleDebug
 #
-# Verification happens locally instead, and it is not optional:
-#   ./gradlew testDebugUnitTest assembleDebug   must be GREEN before merging.
-# (See PR #24 for what merging unbuilt code does.)
-#
-# If account billing is ever resolved, restore the triggers:
-#   on:
-#     push:
-#       branches: [ main, develop ]
-#     pull_request:
-#       branches: [ main ]
+# Triggers:
+#   - Push to main or develop
+#   - Pull requests targeting main
+#   - Manual trigger from the Actions tab
+
 name: Verum Omnis CI
 
 on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch: {}
 
 jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-      - run: chmod +x gradlew
-      - run: ./gradlew testDebugUnitTest
-      - run: ./gradlew assembleDebug
+
+      - name: Set up Android SDK NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK 27.2.12479018
+        run: echo "y" | sdkmanager "ndk;27.2.12479018"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: verum-omnis-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.sha }}
+          path: app/build/reports/tests/
+          retention-days: 7

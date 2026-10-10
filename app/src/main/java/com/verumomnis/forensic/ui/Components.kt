@@ -3,6 +3,7 @@ package com.verumomnis.forensic.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,17 +18,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -188,7 +200,7 @@ fun VoGoldRule(modifier: Modifier = Modifier) {
                     listOf(VoGold, VoGold.copy(alpha = 0.1f))
                 )
             )
-    )
+    }
 }
 
 /**
@@ -307,6 +319,100 @@ fun VoSealFooter(modifier: Modifier = Modifier) {
                 "CONSTITUTION V${Constitution.VERSION} FINAL — ARTICLE X NON-WEAPONIZATION DOCTRINE",
                 style = MonoLabel, color = VoAccentBlue, textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+/**
+ * Shared navy/gold confirmation dialog for destructive actions
+ * (clear case, new scan, delete). Gold confirm, muted cancel.
+ */
+@Composable
+fun VoConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = VoSurface,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Text(title, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = VoGold)
+        },
+        text = {
+            Text(message, color = VoTextMuted, fontSize = 14.sp, lineHeight = 21.sp)
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(); onDismiss() },
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
+            ) {
+                Text(confirmLabel.uppercase(), fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = VoTextMuted, fontSize = 12.sp, letterSpacing = 1.sp)
+            }
+        }
+    )
+}
+
+/**
+ * "Details" expander that keeps raw hashes out of the novice view: the full
+ * SHA-512 is only revealed on tap, and tapping the revealed hash copies it.
+ */
+@Composable
+fun HashDetailsExpander(label: String, hash: String, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (expanded) "Hide details" else "Show details",
+                tint = VoGold,
+                modifier = Modifier.width(16.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "DETAILS · ${label.uppercase()}",
+                fontFamily = JetBrainsMono,
+                fontSize = 10.sp,
+                letterSpacing = 1.sp,
+                color = VoTextMuted
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(6.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(VoBackground.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .border(1.dp, VoBorder, RoundedCornerShape(8.dp))
+                    .clickable {
+                        clipboard.setText(AnnotatedString(hash))
+                        copied = true
+                    }
+                    .padding(10.dp)
+            ) {
+                Text(hash, fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoTextPrimary, lineHeight = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (copied) "Copied" else "Tap to copy",
+                    fontFamily = JetBrainsMono,
+                    fontSize = 9.sp,
+                    color = if (copied) VoGold else VoTextMuted
+                )
+            }
         }
     }
 }

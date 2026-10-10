@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Calculate
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -76,7 +78,7 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
+private enum class Screen { STORY, LANDING, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, SEAL_DOCUMENT, VERIFY_DOCUMENT, SCAN_SEAL, SCAN_SEAL_RESULT, CONSTITUTION, TIMELINE, ACTOR_PROFILE, CONTRADICTION_DETAIL, REPORT_COMPARISON, SETTINGS }
 
 /**
  * Verification is centralised on the website (Constitution §7: the
@@ -84,6 +86,9 @@ private enum class Screen { STORY, SCAN_HOME, CHAT, REPORT, EMAIL, TAX, VAULT, S
  * shared with the QR seal metadata.
  */
 private val WEBSITE_VERIFY_URL = com.verumomnis.forensic.seal.SealMetadataCodec.VERIFY_BASE_URL
+
+/** Debug-only: show the device-tier/RAM readout in the chat top bar. */
+private const val DEBUG_SHOW_DEVICE_TIER = false
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,12 +98,14 @@ fun VerumApp(
     onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
     onExportEmail: (com.verumomnis.forensic.model.SealedEmail) -> Unit = {},
     onReadConstitution: () -> Unit = {},
+    onStorySeen: () -> Unit = {},
     initialScreen: String = "STORY",
     initialMenuOpen: Boolean = false
 ) {
     val state by viewModel.state.collectAsState()
     var screen by remember { mutableStateOf(runCatching { Screen.valueOf(initialScreen) }.getOrDefault(Screen.SCAN_HOME)) }
     var showMenu by remember { mutableStateOf(initialMenuOpen) }
+    var confirmNewScan by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Simple in-app back stack: every screen switch pushes the previous screen,
@@ -205,9 +212,6 @@ fun VerumApp(
                 .onSuccess { (name, hash) -> viewModel.verifyUploaded(name, hash) }
         }
     }
-    val websiteSealPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { viewModel.sealDocumentWebsiteFormat(it, context) }
-    }
     val sealDocumentPdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             scope.launch(Dispatchers.IO) {
@@ -226,6 +230,11 @@ fun VerumApp(
             ConstellationBackground(modifier = Modifier.fillMaxSize())
 
             if (screen == Screen.STORY) {
+                StoryScreen(
+                    onEnter = { onStorySeen(); navigate(Screen.LANDING) },
+                    onReadConstitution = { onStorySeen(); navigate(Screen.CONSTITUTION) }
+                )
+            } else if (screen == Screen.LANDING) {
                 // Landing per the Verum Vault mock-up (§3.1). Stat tiles are bound
                 // to real vault state rather than the mock-up's literals: a count
                 // that does not move when you seal something is worse than no count.
@@ -261,6 +270,7 @@ fun VerumApp(
                                 Screen.TAX -> "Tax Return"
                                 Screen.VAULT -> "Evidence Vault"
                                 Screen.SEAL_DOCUMENT -> "Seal Document"
+                                Screen.VERIFY_DOCUMENT -> "Verify Document"
                                 Screen.SCAN_SEAL -> "Scan Seal QR"
                                 Screen.SCAN_SEAL_RESULT -> "Seal Verification"
                                 Screen.CONSTITUTION -> "Constitution"
@@ -270,8 +280,9 @@ fun VerumApp(
                                 Screen.REPORT_COMPARISON -> "Report Comparison"
                                 Screen.SETTINGS -> "Settings"
                                 Screen.STORY -> ""
+                                Screen.LANDING -> ""
                             },
-                            onBack = if (screen == Screen.SCAN_HOME) null else ({ goBack() }),
+                            onBack = if (screen == Screen.SCAN_HOME || screen == Screen.LANDING) null else ({ goBack() }),
                             trailing = {
                                 // The device tier / RAM readout used to live here, but on the
                                 // chat screen (back arrow + logo + 2 icons) it squeezed the
@@ -283,7 +294,7 @@ fun VerumApp(
                                         enabled = state.report != null
                                     ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
                                 }
-                                IconButton(onClick = { navigate(Screen.VAULT) }) { Icon(Icons.Filled.Lock, contentDescription = "Vault", tint = VoGold) }
+                                IconButton(onClick = { navigate(Screen.VAULT) }) { Icon(Icons.Filled.Folder, contentDescription = "Vault", tint = VoGold) }
                             }
                         )
                     }
@@ -304,14 +315,17 @@ fun VerumApp(
                                 onNewScan = { viewModel.clearCase(); resetToHome() },
                                 onOpenChat = { navigate(Screen.CHAT) },
                                 onOpenVault = { navigate(Screen.VAULT) },
-                                onOpenReport = { navigate(Screen.REPORT) }
+                                onOpenReport = { navigate(Screen.REPORT) },
+                                onSealDocument = { sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
+                                onVerifyDocument = { navigate(Screen.VERIFY_DOCUMENT) },
+                                onOpenConstitution = { navigate(Screen.CONSTITUTION) }
                             )
                             Screen.CHAT -> ChatScreen(state, viewModel, onPlus = { showMenu = true })
                             Screen.REPORT -> ReportScreen(
                                 state = state,
                                 viewModel = viewModel,
                                 onExportReport = onExportReport,
-                                onNewScan = { viewModel.clearCase(); resetToHome() }
+                                onNewScan = { confirmNewScan = true }
                             )
                             Screen.EMAIL -> EmailScreen(state, viewModel, onExportEmail)
                             Screen.TAX -> TaxScreen(viewModel)
@@ -323,6 +337,13 @@ fun VerumApp(
                                 onNewDocument = { showMenu = true }
                             )
                             Screen.STORY -> {}
+                            Screen.LANDING -> {}
+                            Screen.VERIFY_DOCUMENT -> VerifyDocumentScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                onBack = { goBack() },
+                                onNavigateSeal = { navigate(Screen.SEAL_DOCUMENT) }
+                            )
                             Screen.SEAL_DOCUMENT -> SealDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
@@ -366,10 +387,7 @@ fun VerumApp(
                     containerColor = VoBackground
                 ) {
                     ActionsSheet(
-                        onSealDocument = { showMenu = false; sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
-                        onSealDocumentScreen = { showMenu = false; sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
-                        onShareWebsiteSeal = { showMenu = false; viewModel.shareWebsiteSealedFile(context) },
-                        shareWebsiteSealEnabled = state.websiteSealedFile != null,
+                        onSealDocument = { showMenu = false; sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
                         onVerifyWebsite = { showMenu = false; openWebsiteVerify(context) },
@@ -393,6 +411,16 @@ fun VerumApp(
                 }
             }
 
+            if (confirmNewScan) {
+                VoConfirmDialog(
+                    title = "Start a new scan?",
+                    message = "This clears the current case from this session. Sealed files already in the vault are kept. This cannot be undone.",
+                    confirmLabel = "New scan",
+                    onConfirm = { viewModel.clearCase(); resetToHome() },
+                    onDismiss = { confirmNewScan = false }
+                )
+            }
+
             state.guardianBlock?.let { assessment ->
                 GuardianBlockScreen(
                     assessment = assessment,
@@ -408,12 +436,14 @@ fun VerumApp(
     }
 }
 
+/**
+ * The sealed-action sheet: seven entries, no duplicates. Format choices live
+ * inside the seal screen (private/commercial chips); verify lives on the
+ * verify screen.
+ */
 @Composable
 private fun ActionsSheet(
     onSealDocument: () -> Unit,
-    onSealDocumentScreen: () -> Unit,
-    onShareWebsiteSeal: () -> Unit,
-    shareWebsiteSealEnabled: Boolean,
     onAddMedia: () -> Unit,
     onVerify: () -> Unit,
     onVerifyWebsite: () -> Unit,
@@ -436,11 +466,7 @@ private fun ActionsSheet(
             "Everything you add is sealed by the forensic engine and stored in the vault before the AI can read it.",
             color = VoTextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
-        ActionRow(Icons.Filled.UploadFile, "Seal a document", "PDF / text → engine → vault", onSealDocument)
-        ActionRow(Icons.Filled.Verified, "Seal Document (website format)", "VO-DSS-1.2 website-compatible seal", onSealDocumentScreen)
-        if (shareWebsiteSealEnabled) {
-            ActionRow(Icons.Filled.Share, "Share website-format seal", "Send the last website-sealed PDF", onShareWebsiteSeal)
-        }
+        ActionRow(Icons.Filled.Verified, "Seal document", "PDF → forensic seal → vault", onSealDocument)
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         // Constitution §7: verification authority lives at the Verification Hub.
         // The on-device option is a vault integrity check, never a verdict.

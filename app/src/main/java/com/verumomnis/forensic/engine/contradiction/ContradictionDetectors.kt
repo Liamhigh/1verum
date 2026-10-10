@@ -48,12 +48,16 @@ object ContradictionDetectors {
      * What downloaded rules DO affect: [detectDownloadedFraudPairs] appends
      * BEHAVIORAL contradictions when two claims (same actor or same subject)
      * contain opposite sides of a downloaded fraud-keyword phrase pair
-     * (patternType "DOWNLOADED_RULE_<id>"). These can only ADD findings.
+     * (patternType "DOWNLOADED_RULE_<id>"), and
+     * [detectDownloadedBehavioralMarkers] appends one aggregated BEHAVIORAL
+     * finding per curated behavioural marker whose keyword set co-occurs in a
+     * claim (patternType "DOWNLOADED_MARKER_<id>"). These can only ADD
+     * findings.
      *
      * What they DO NOT affect: all built-in keyword lists below stay hardcoded
      * and unchanged — downloaded rules never remove, replace, or reweight
-     * built-in detection. Downloaded single keywords, behavioral markers,
-     * serial patterns and case configs are NOT executed by this engine.
+     * built-in detection. Downloaded single keywords, serial patterns and
+     * case configs are NOT executed by this engine.
      *
      * When this returns null (fresh install / no verified package yet),
      * [detectAll] behaves exactly as before this hook existed.
@@ -992,7 +996,58 @@ object ContradictionDetectors {
         return results
     }
 
-    // ==================== MASTER DETECT ALL (28 built-in + 1 additive) ====================
+    /**
+     * Additive detector driven by downloaded, signature-verified behavioural
+     * markers (curated `behavioral_markers` rules — the constitution's B4
+     * layer: gaslighting, deception, victim-stress and related conduct
+     * patterns the learning loop teaches between releases).
+     *
+     * A marker fires when enough of its DISTINCT keywords appear in one
+     * claim: `min_cooccur` when the rule sets it, else 2, or 1 for a
+     * single-keyword marker. One aggregated contradiction per marker, quoting
+     * up to three matching claims. Conservative severity/confidence
+     * (MODERATE, weight 0.5) — keyword co-occurrence is a candidate signal,
+     * not proof — and every description carries the doctrine: indicators for
+     * human review, not a determination.
+     */
+    fun detectDownloadedBehavioralMarkers(claims: List<EngineClaim>): List<EngineContradiction> {
+        val rules = runCatching { downloadedRulesProvider() }.getOrNull() ?: return emptyList()
+        if (rules.behavioralMarkers.isEmpty()) return emptyList()
+        val results = mutableListOf<EngineContradiction>()
+        for (marker in rules.behavioralMarkers) {
+            val keywords = marker.keywords.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
+            if (keywords.isEmpty()) continue
+            val min = (marker.minCooccur ?: if (keywords.size == 1) 1 else 2).coerceIn(1, keywords.size)
+            // Word-boundary matching, mirroring the website engine: "risk-free"
+            // must not match inside "risk-freedom".
+            val regexes = keywords.map { kw ->
+                Regex("(^|[^a-z0-9])" + Regex.escape(kw) + "($|[^a-z0-9])", RegexOption.IGNORE_CASE)
+            }
+            val matching = claims.filter { c -> regexes.count { it.containsMatchIn(c.value) } >= min }
+            if (matching.isEmpty()) continue
+            val hitKeywords = keywords.filterIndexed { i, _ ->
+                matching.any { c -> regexes[i].containsMatchIn(c.value) }
+            }.take(4)
+            val first = matching.first()
+            results += createContradiction(
+                first, first,
+                EngineContradictionType.BEHAVIORAL,
+                EngineSeverity.MODERATE,
+                EngineConfidence.MODERATE,
+                "DOWNLOADED_MARKER_${marker.ruleId}",
+                "Downloaded rule ${marker.ruleId} (rules v${rules.version}): behavioural marker " +
+                    "\"${marker.name.ifBlank { marker.ruleId }}\" matched ${hitKeywords.size} keyword(s): " +
+                    hitKeywords.joinToString(", ") { "\"$it\"" } +
+                    (marker.produces?.let { " (labels $it)" } ?: "") +
+                    ". Behavioural indicators are for human review, not a determination.",
+                matching.take(3).map { it.value },
+                0.5
+            )
+        }
+        return results
+    }
+
+    // ==================== MASTER DETECT ALL (28 built-in + 2 additive) ====================
 
     private val ALL_DETECTORS: List<(List<EngineClaim>) -> List<EngineContradiction>> = listOf(
         // v5.2.9 base detectors
@@ -1029,8 +1084,9 @@ object ContradictionDetectors {
         // v6.0 franchise/lease detectors (AllFuels case)
         ::detectConditionalClauseMisinvoked,
         ::detectAssetValueDenial,
-        // Additive signed rule-update detector (no-op until a verified package is downloaded)
-        ::detectDownloadedFraudPairs
+        // Additive signed rule-update detectors (no-op until a verified package is downloaded)
+        ::detectDownloadedFraudPairs,
+        ::detectDownloadedBehavioralMarkers
     )
 
     /**

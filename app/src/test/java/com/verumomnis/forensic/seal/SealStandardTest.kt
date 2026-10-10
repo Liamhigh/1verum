@@ -106,7 +106,7 @@ class SealStandardTest {
 
     @Test
     fun `subject round-trips with chain`() {
-        val subject = SealChain.buildSubject("a".repeat(128), "VO-NEW", listOf("VO-OLD1", "VO-OLD2"))
+        val subject = SealChain.buildSubject("a".repeat(128), "VO-NEW", listOf("VO-OLD1", "VO-OLD2"), scheme = "legacy")
         assertEquals("VO-SEAL|${"a".repeat(128)}|VO-NEW|CHAIN:VO-OLD1,VO-OLD2", subject)
         val parsed = SealChain.parseSubject(subject)
         assertNotNull(parsed)
@@ -116,8 +116,24 @@ class SealStandardTest {
     }
 
     @Test
+    fun `v2 subject round-trips with orig hash and chain`() {
+        // Default scheme is v2 (website-compatible VO-SEAL2).
+        val subject = SealChain.buildSubject(
+            "a".repeat(128), "VO-NEW", listOf("VO-OLD1"), origHash = "b".repeat(128)
+        )
+        assertEquals("VO-SEAL2|${"a".repeat(128)}|VO-NEW|ORIG:${"b".repeat(128)}|CHAIN:VO-OLD1", subject)
+        val parsed = SealChain.parseSubject(subject)
+        assertNotNull(parsed)
+        assertEquals("v2", parsed!!.scheme)
+        assertEquals("VO-NEW", parsed.sealId)
+        assertEquals("a".repeat(128), parsed.sha512)
+        assertEquals("b".repeat(128), parsed.origHash)
+        assertEquals(listOf("VO-OLD1"), parsed.chain)
+    }
+
+    @Test
     fun `subject parser handles plain and foreign subjects`() {
-        val parsed = SealChain.parseSubject(SealChain.buildSubject("b".repeat(128), "VO-SOLO", emptyList()))
+        val parsed = SealChain.parseSubject(SealChain.buildSubject("b".repeat(128), "VO-SOLO", emptyList(), scheme = "legacy"))
         assertEquals("VO-SOLO", parsed!!.sealId)
         assertTrue(parsed.chain.isEmpty())
         assertNull(SealChain.parseSubject("Some random subject"))

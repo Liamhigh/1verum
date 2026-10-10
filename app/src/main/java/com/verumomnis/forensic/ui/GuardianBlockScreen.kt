@@ -44,9 +44,11 @@ import com.verumomnis.forensic.ui.theme.VoTextPrimary
 /**
  * Full-screen B9 constitutional hard stop.
  *
- * Displayed when the Guardian Brain detects an Article X weaponization attempt,
- * severe coercion, or another non-negotiable constitutional violation. The user
- * cannot interact with the rest of the app until they acknowledge the block.
+ * Displayed only when the Guardian Brain detects an Article X anti-weaponization
+ * violation — the single non-negotiable hard stop in the Constitution. Lesser
+ * flags (for example coercion language) are reported in the assessment but never
+ * trigger this screen. The user cannot interact with the rest of the app until
+ * they acknowledge the block.
  */
 @Composable
 fun GuardianBlockScreen(
@@ -99,9 +101,12 @@ fun GuardianBlockScreen(
         Spacer(Modifier.height(16.dp))
 
         Text(
-            "The Guardian Brain has detected content that violates the Verum Omnis Constitution. " +
-                "This device cannot be used to plan, target, or coordinate harm. " +
-                "The attempt has been recorded in the immutable Silence Ledger.",
+            "What happened: the Guardian safety check found content linked to weaponization or " +
+                "planning harm (Article X of the Verum Omnis Constitution — the only rule that " +
+                "hard-stops the app). This app cannot be used to plan, target, or coordinate harm.\n\n" +
+                "What to do: clear the case below to remove this content and continue, or read the " +
+                "Constitution to understand the rule. The attempt has been recorded in the " +
+                "immutable Silence Ledger.",
             color = VoTextMuted,
             fontSize = 14.sp,
             lineHeight = 21.sp,

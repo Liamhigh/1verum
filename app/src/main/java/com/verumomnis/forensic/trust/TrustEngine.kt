@@ -36,7 +36,7 @@ object TrustEngine {
             "${findings.contradictions.size} contradiction(s), ${findings.documentsAnalyzed} document(s)"
         )
 
-        // Consensus quorum: all contradictions must have triple-AI consensus.
+        // Council concurrence: every contradiction must be ACCEPTED by the Nine-Brain council.
         val consensusOk = findings.contradictions.all { it.tripleAiConsensus.quorum }
         val consensusConfidence = if (findings.contradictions.isEmpty()) {
             Confidence.INSUFFICIENT
@@ -52,8 +52,8 @@ object TrustEngine {
             // Shown on the report screen. The quorum measured here is the
             // Nine-Brain council's; no language model votes, so naming it
             // "Triple-AI" overstated what was checked.
-            if (consensusOk) "All contradictions passed the Nine-Brain council quorum"
-            else "Some contradictions lack council quorum"
+            if (consensusOk) "All contradictions accepted by the Nine-Brain council"
+            else "Some contradictions lack council concurrence"
         )
 
         // Identity attestation.

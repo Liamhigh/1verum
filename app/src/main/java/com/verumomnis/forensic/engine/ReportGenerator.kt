@@ -24,7 +24,7 @@ object ReportGenerator {
     fun generate(
         findings: ForensicFindings,
         caseName: String,
-        now: Instant = Instant.now(),
+        now: Instant,
         deviceId: String = "",
         publicKeyFingerprint: String = "",
         findingsJsonPath: String = "",
@@ -35,13 +35,15 @@ object ReportGenerator {
         val title = "Forensic Analysis Report — $caseName"
         val classification = "CONFIDENTIAL — LAW ENFORCEMENT SENSITIVE"
 
-        val offenceMatrix = findings.contradictions.map { it.toOffenceRow() }
+        // Doctrine: only council-ACCEPTED contradictions may be sealed as findings.
+        val acceptedContradictions = findings.contradictions.filter { it.councilStatus == "ACCEPTED" }
+        val offenceMatrix = acceptedContradictions.map { it.toOffenceRow() }
         val executiveSummary = buildExecutiveSummary(findings)
         // The declaration must reflect what actually ran. A deterministic writer
         // means no language model touched this report, whatever is installed.
         val aiNarrativeUsed = narrativeWriter !is DeterministicReportWriter
         val body = renderBody(
-            reference, title, classification, findings, offenceMatrix, now,
+            reference, title, classification, findings, acceptedContradictions, offenceMatrix, now,
             deviceId, publicKeyFingerprint, aiNarrativeUsed
         )
         val gemmaNarrative = narrativeWriter.writeNarrative(findings, caseName, findingsJsonPath)
@@ -127,14 +129,9 @@ object ReportGenerator {
         if (findings.extractedPersons.isNotEmpty()) {
             append("${findings.extractedPersons.size} person(s) were extracted from the evidence. ")
         }
-        // Claims the consensus that actually ran. "Triple-AI consensus" was
-        // asserted here on every report, including those produced with no
-        // language model present — the council's Gemma/communicator verdicts are
-        // derived from the deterministic brains, not from any model.
-        append(
-            "All findings survived the Nine-Brain council quorum and are sealed under " +
-                "Constitution v${Constitution.VERSION}."
-        )
+        append("Every reported finding was accepted by the Nine-Brain council (B1 plus at least two corroborating brains). ")
+        append("Unconfirmed indicators are excluded from the findings and listed separately for transparency. ")
+        append("Sealed under Constitution v${Constitution.VERSION}.")
     }
 
     private fun renderBody(
@@ -142,6 +139,7 @@ object ReportGenerator {
         title: String,
         classification: String,
         findings: ForensicFindings,
+        acceptedContradictions: List<Contradiction>,
         offenceMatrix: List<OffenceRow>,
         now: Instant,
         deviceId: String,
@@ -186,15 +184,15 @@ object ReportGenerator {
             appendLine("   No actor profiles available.")
         } else {
             actorProfiles.forEach { (person, score, flags) ->
-                appendLine("   - $person · Dishonesty score ${"%.1f" .format(score)}/10 · Flags: ${flags.joinToString(", ")}")
+                appendLine("   - $person · Severity indicator (heuristic): ${"%.1f" .format(score)}/10 · Flags: ${flags.joinToString(", ")}")
             }
         }
         appendLine()
-        appendLine("3. CONTRADICTION MATRIX (person · page · statute)")
-        if (findings.contradictions.isEmpty()) {
-            appendLine("   No material contradictions detected.")
+        appendLine("3. CONTRADICTION MATRIX (person · page · statute) — council-ACCEPTED findings only")
+        if (acceptedContradictions.isEmpty()) {
+            appendLine("   No council-confirmed contradictions detected.")
         } else {
-            findings.contradictions.forEach { c ->
+            acceptedContradictions.forEach { c ->
                 appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent}")
                 appendLine("      Claim A: \"${c.claimA.text}\"")
                 appendLine("               (${c.claimA.source}, p${c.claimA.page}, ln${c.claimA.line}, SHA-512 ${c.claimA.sha512.take(12)}…)")
@@ -202,12 +200,12 @@ object ReportGenerator {
                 appendLine("               (${c.claimB.source}, p${c.claimB.page}, ln${c.claimB.line}, SHA-512 ${c.claimB.sha512.take(12)}…)")
                 appendLine("      Legal significance: ${c.legalSignificance}")
                 appendLine("      Applicable law: ${c.applicableLaw.joinToString("; ")}")
-                appendLine("      Confidence: ${c.confidence} · Consensus quorum: ${c.tripleAiConsensus.quorum}")
+                appendLine("      Confidence: ${c.confidence} · Council: ACCEPTED (${c.confirmingBrains.joinToString(", ").ifEmpty { "B1 only" }})")
                 appendLine()
             }
         }
-        appendLine("3a. 7-CATEGORY CONTRADICTION TABLE")
-        val categoryTable = buildCategoryTable(findings.contradictions)
+        appendLine("3a. 7-CATEGORY CONTRADICTION TABLE (council-ACCEPTED only)")
+        val categoryTable = buildCategoryTable(acceptedContradictions)
         if (categoryTable.isEmpty()) {
             appendLine("   No contradictions to summarise.")
         } else {
@@ -216,6 +214,16 @@ object ReportGenerator {
             }
         }
         appendLine()
+        val notConfirmed = findings.contradictions.filter { it.councilStatus != "ACCEPTED" }
+        if (notConfirmed.isNotEmpty()) {
+            appendLine("3b. NOT CONFIRMED — EXCLUDED FROM FINDINGS")
+            appendLine("   The following indicator(s) did NOT reach council concurrence (B1 plus two corroborating brains).")
+            appendLine("   They are recorded for transparency only and are NOT findings of this report.")
+            notConfirmed.forEach { c ->
+                appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent} — Council status: ${c.councilStatus}")
+            }
+            appendLine()
+        }
         appendLine("4. CHRONOLOGY")
         if (findings.timeline.isEmpty()) appendLine("   No dated events extracted.")
         else findings.timeline.forEach { appendLine("   ${it.dateTime} — ${it.description} (${it.evidenceId})") }
@@ -298,6 +306,7 @@ object ReportGenerator {
             }
         }
         appendLine("12. DECLARATION")
+        appendLine("   Reviewed by the Nine-Brain council: each finding above was proposed by B1 and corroborated by at least two other brains (B2–B8); B9 validates after the vote. No external AI model forms part of this determination. Evidence before narrative.")
         // States what actually ran, never what was hoped for. This previously read
         // "Triple-verified (Gemma 3 · communicator · Nine-Brain)" on every report,
         // including reports produced with no model loaded at all — the AI verdicts

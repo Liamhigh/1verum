@@ -7,7 +7,6 @@ import com.verumomnis.forensic.model.ContradictionClaim
 import com.verumomnis.forensic.model.ContradictionType
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.model.StatementType
-import com.verumomnis.forensic.model.TripleConsensus
 import java.time.Instant
 import java.util.Locale
 
@@ -94,7 +93,6 @@ object ContradictionExtractor {
                 applicableLaw = rule.applicableLaw,
                 confidence = Confidence.VERY_HIGH,
                 patternIndicator = false,
-                tripleAiConsensus = TripleConsensus("CONCURS", "CONCURS", "CONCURS", true),
                 timestamp = now.toString()
             )
         }
@@ -148,7 +146,6 @@ object ContradictionExtractor {
                         applicableLaw = lawsFor(subject),
                         confidence = if (severity == Severity.CRITICAL) Confidence.VERY_HIGH else Confidence.HIGH,
                         patternIndicator = supportsRacketeering(neg, pos),
-                        tripleAiConsensus = TripleConsensus("CONCURS", "CONCURS", "CONCURS", true),
                         timestamp = now.toString()
                     )
                 }

@@ -41,12 +41,21 @@ data class GpsRecord(
     val timestamp: String
 )
 
+/**
+ * Legacy consensus record retained for schema compatibility.
+ *
+ * The on-device build runs NO external LLMs, so the gemma3/phi3 lanes must
+ * always read "NOT_RUN". Only the Nine-Brain council vote is real
+ * ("COUNCIL_ACCEPTED" / "COUNCIL_NOT_CONFIRMED"). Never write model names or
+ * "CONCURS"/"VERIFIED" here — that would fabricate an AI review that did not
+ * happen.
+ */
 @Serializable
 data class TripleConsensus(
-    val gemma3: String = "VERIFIED",
-    val phi3: String = "VERIFIED",
-    val nineBrain: String = "VERIFIED",
-    val quorum: Boolean = true
+    val gemma3: String = "NOT_RUN",
+    val phi3: String = "NOT_RUN",
+    val nineBrain: String = "NOT_RUN",
+    val quorum: Boolean = false
 )
 
 /** Evidence Atom Model (spec 12.1). */

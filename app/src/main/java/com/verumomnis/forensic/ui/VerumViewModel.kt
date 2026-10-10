@@ -3,7 +3,9 @@ package com.verumomnis.forensic.ui
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -203,7 +205,7 @@ data class UiState(
     val chat: List<ChatMessage> = emptyList(),
     val report: ForensicReport? = null,
     val emails: List<SealedEmail> = emptyList(),
-    val emailStatus: String = "Draft a sealed forensic email. Every draft is delivered as a sealed PDF and logged.",
+    val emailStatus: String = "Draft a sealed forensic email. The sealed PDF is generated into the vault and handed to your mail app — you choose the recipient and press send yourself.",
     val otsResult: OtsAnchorResult? = null,
     val otsStatus: String = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
     val anchoring: Boolean = false,
@@ -475,6 +477,11 @@ class VerumViewModel(
             ?: _state.value.scanResult?.seal?.identityProof
         val score = TrustEngine.compute(findings, identityProof, _state.value.otsResult)
         _state.update { it.copy(trustScore = score) }
+    }
+
+    companion object {
+        /** Retired hard-coded recipient — must never be used as a default again. */
+        private const val LEGACY_DEFAULT_RECIPIENT = "admin@verumglobal.foundation"
     }
 
     init {
@@ -1557,19 +1564,53 @@ class VerumViewModel(
         points: List<String> = emptyList(),
         now: Instant = Instant.now()
     ) {
-        if (recipient.isBlank()) {
-            _state.update { it.copy(emailStatus = "Recipient required.") }
+        // Never default to a hard-coded internal address — the user chooses the recipient.
+        if (recipient.isBlank() || recipient.equals(LEGACY_DEFAULT_RECIPIENT, ignoreCase = true)) {
+            _state.update { it.copy(emailStatus = "Enter a recipient email address first — Verum Omnis never picks one for you.") }
             return
         }
         val draft = EmailModule.draft(recipient, subject, points, _state.value.report?.reference)
         val sealed = EmailModule.sealAndSend(draft, harassmentMonitor, now)
         val verdict = sealed.assessment.verdict
         val status = when (verdict) {
-            HarassmentVerdict.ALLOW -> "Sent sealed PDF ${sealed.sealedPdfFile} to $recipient."
-            HarassmentVerdict.WARN -> "Sent with WARNING: ${sealed.assessment.reasons.joinToString("; ")}"
-            HarassmentVerdict.BLOCK -> "BLOCKED (not delivered): ${sealed.assessment.reasons.joinToString("; ")}. Sealed for audit."
+            HarassmentVerdict.ALLOW -> {
+                openEmailDraft(sealed)
+                "Draft ready — choose your mail app. Sealed PDF ${sealed.sealedPdfFile} attached for $recipient."
+            }
+            HarassmentVerdict.WARN -> {
+                openEmailDraft(sealed)
+                "Draft ready with WARNING (${sealed.assessment.reasons.joinToString("; ")}) — choose your mail app."
+            }
+            HarassmentVerdict.BLOCK -> "BLOCKED (not shared): ${sealed.assessment.reasons.joinToString("; ")}. Sealed for audit."
         }
         _state.update { it.copy(emails = it.emails + sealed, emailStatus = status) }
+    }
+
+    /**
+     * Render the sealed email PDF into the vault and hand it to the user's own
+     * mail app via ACTION_SEND with a FileProvider attachment. The app never
+     * sends mail itself, so no "sent" claim is ever made.
+     */
+    private fun openEmailDraft(sealed: com.verumomnis.forensic.model.SealedEmail) {
+        runCatching {
+            val context = getApplication<Application>()
+            val file = SealedPdfExporter(context).exportEmail(sealed)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(sealed.draft.recipient))
+                putExtra(Intent.EXTRA_SUBJECT, sealed.draft.subject)
+                putExtra(Intent.EXTRA_TEXT, sealed.draft.body)
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(
+                Intent.createChooser(intent, "Draft ready — choose your mail app")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.onFailure { e ->
+            _state.update { it.copy(emailStatus = "Draft sealed but could not open a mail app: ${e.message}") }
+        }
     }
 
     fun verifyCurrentSeal(): VerificationResult? {

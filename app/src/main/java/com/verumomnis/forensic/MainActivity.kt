@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
         // provider stays on the unavailable default and every consumer falls
         // back to the deterministic pipeline.
         LlamaCppGemma3Runtime.discover(filesDir)?.let { Gemma3RuntimeProvider.runtime = it }
+        // The story intro is shown on first run only.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val storySeen = prefs.getBoolean(KEY_STORY_SEEN, false)
 
         setContent {
             VerumOmnisTheme {
@@ -67,7 +70,9 @@ class MainActivity : ComponentActivity() {
                     onCaptureLocation = ::captureLocation,
                     onExportReport = { report -> runCatching { pdfExporter.share(pdfExporter.exportReport(report)) } },
                     onExportEmail = { email -> runCatching { pdfExporter.share(pdfExporter.exportEmail(email)) } },
-                    onReadConstitution = ::openConstitution
+                    onReadConstitution = ::openConstitution,
+                    onStorySeen = { prefs.edit().putBoolean(KEY_STORY_SEEN, true).apply() },
+                    initialScreen = if (storySeen) "LANDING" else "STORY"
                 )
             }
         }
@@ -163,5 +168,7 @@ class MainActivity : ComponentActivity() {
          * location the device happened to remember from somewhere else.
          */
         const val MAX_FIX_AGE_NANOS = 2L * 60 * 1_000_000_000
+        const val PREFS_NAME = "verum_prefs"
+        const val KEY_STORY_SEEN = "story_seen"
     }
 }

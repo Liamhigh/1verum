@@ -3,7 +3,8 @@ package com.verumomnis.forensic.seal
 /**
  * VO-DSS-1.2 §8 — Seal Chain of Custody.
  * A sealed PDF carries the seal in its Subject metadata:
- *   VO-SEAL|<SHA512_128_HEX>|<SEAL_ID>[|CHAIN:VO-OLD1,VO-OLD2]
+ *   legacy: VO-SEAL|<ORIGINAL_SHA512_128_HEX>|<SEAL_ID>[|CHAIN:VO-OLD1,VO-OLD2]
+ *   v2:     VO-SEAL2|<SEALED-FILE_SHA512_128_HEX>|<SEAL_ID>|ORIG:<ORIGINAL_SHA512>[|CHAIN:...]
  * Re-sealing a previously sealed document preserves the prior seal IDs so
  * the full investigation timeline stays independently verifiable.
  */
@@ -52,12 +53,27 @@ object SealChain {
         )
     }
 
-    /** Build the subject string for a new seal, preserving the prior chain. */
-    fun buildSubject(sha512: String, sealId: String, previousChain: List<String>, scheme: String = "legacy"): String {
+    /**
+     * Build the subject string for a new seal, preserving the prior chain.
+     * For scheme "v2" (default, matching the website) [sha512] is the sealed-file
+     * hash (or its placeholder at seal time) and [origHash] carries the original
+     * pre-seal content hash: VO-SEAL2|<sealed-hash>|<sealId>|ORIG:<orig-hash>.
+     */
+    fun buildSubject(
+        sha512: String,
+        sealId: String,
+        previousChain: List<String>,
+        scheme: String = "v2",
+        origHash: String? = null
+    ): String {
         val prior = previousChain.filter { it.isNotEmpty() && it != sealId }
         val chainStr = if (prior.isNotEmpty()) "|CHAIN:" + prior.joinToString(",") else ""
-        val magic = if (scheme == "v2") SUBJECT_MAGIC_V2 else SUBJECT_MAGIC
-        return "$magic$sha512|$sealId$chainStr"
+        return if (scheme == "v2") {
+            val origStr = origHash?.let { "|ORIG:$it" } ?: ""
+            "$SUBJECT_MAGIC_V2$sha512|$sealId$origStr$chainStr"
+        } else {
+            "$SUBJECT_MAGIC$sha512|$sealId$chainStr"
+        }
     }
 
     /** Keywords string, matching the web sealer. */

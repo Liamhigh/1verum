@@ -11,9 +11,10 @@ import com.verumomnis.forensic.model.TripleConsensus
  * A contradiction is accepted only when B1 + at least two other brains agree.
  * B9 never votes; it validates afterwards.
  *
- * The council also materialises the Thesis/Antithesis/Synthesis triple-
- * verification block for every finding so the sealed report can show how the
- * verdict was reached.
+ * The council also records a plain-language Thesis/Antithesis/Synthesis
+ * narrative for every finding so the sealed report can show how the council
+ * reached its status. No external AI model takes part in this vote; the
+ * record must never claim otherwise.
  */
 object BrainCouncil {
 
@@ -38,17 +39,13 @@ object BrainCouncil {
             synthesis = synthesis,
             confirmingBrains = confirming,
             councilStatus = status,
-            // Only the nine-brain verdict is earned here: `status` comes from
-            // counting confirmations across the deterministic brains, and no
-            // language model is consulted at this point. Reporting "CONCURS" for
-            // Gemma 3 and the communicator meant a sealed report asserted an AI
-            // verification that never happened — indefensible in the forum this
-            // evidence is built for. They abstain unless a model has actually
-            // recorded a verdict, which happens later in the hybrid pipeline.
+            // Honest single-council record: no external LLM (gemma3/phi3) ever
+            // runs on device, so those lanes are explicitly NOT_RUN. Only the
+            // Nine-Brain council vote is real.
             tripleAiConsensus = TripleConsensus(
-                gemma3 = "NOT RUN",
-                phi3 = "NOT RUN",
-                nineBrain = if (status == "ACCEPTED") "CONCURS" else "ABSTAINS",
+                gemma3 = "NOT_RUN",
+                phi3 = "NOT_RUN",
+                nineBrain = if (status == "ACCEPTED") "COUNCIL_ACCEPTED" else "COUNCIL_NOT_CONFIRMED",
                 quorum = status == "ACCEPTED"
             )
         )

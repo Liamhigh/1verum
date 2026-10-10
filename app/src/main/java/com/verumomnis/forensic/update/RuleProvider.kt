@@ -18,18 +18,32 @@ import kotlinx.serialization.json.contentOrNull
  *    (patternType `DOWNLOADED_RULE_<id>`). Downloaded entries only ever ADD
  *    candidate contradictions; built-in detectors and their keyword lists are
  *    never modified or removed.
+ *  - [behavioralMarkers] are consumed by
+ *    `ContradictionDetectors.detectDownloadedBehavioralMarkers`: a curated
+ *    marker (keyword set) fires when enough of its distinct keywords appear
+ *    in one claim (`min_cooccur`, else 2, else 1 for a single-keyword
+ *    marker), producing one aggregated BEHAVIORAL finding per marker
+ *    (patternType `DOWNLOADED_MARKER_<id>`) whose description carries the
+ *    doctrine: indicators for human review, not a determination.
  *
  * What downloaded rules DO NOT affect today (exposed for future wiring only):
  *  - [fraudTerms] (single keyword groups from `fraud_keywords[].terms`) and
- *    [behavioralKeywords] (from `behavioral_markers[].keywords`) are parsed
- *    and exposed but are NOT injected into any detector — single keywords are
- *    not contradictions by themselves in the claim-based engine model.
+ *    [behavioralKeywords] (the raw flat view of `behavioral_markers[].keywords`)
+ *    are parsed and exposed but are NOT injected into any detector — single
+ *    keywords are not contradictions by themselves in the claim-based engine
+ *    model. The executable marker path is [behavioralMarkers].
  *  - `contradiction_patterns`, `serial_patterns` (multi-stage schemes) and
  *    `case_configs` from the package are not executed by the on-device engine;
  *    only their counts are retained for observability.
  *  - `fraud_keywords[].items` (structured role/requirement records) and
  *    `fraud_keywords[].groups` (mutually-exclusive status sets) are not flat
  *    keyword lists; they are intentionally skipped.
+ *
+ * The seed package's own behavioural markers (BM01-BM10) are the built-in
+ * detectors' exported vocabulary (SP01, D07, D08, D28, D29, SP16); they are
+ * skipped here exactly as the website engine skips them, so nothing
+ * double-fires beside the airtight built-in detectors. Only CURATED markers
+ * (BM11+, the learning loop's output) are applied.
  *
  * When no verified package has been downloaded, [RuleRegistry.currentRules]
  * returns null and engine behaviour is identical to a fresh install.
@@ -41,13 +55,37 @@ class DownloadedRules(
     val fraudTerms: List<String>,
     val behavioralKeywords: List<String>,
     val contradictionPatternCount: Int,
-    val serialPatternCount: Int
+    val serialPatternCount: Int,
+    val behavioralMarkers: List<BehavioralMarker> = emptyList()
 ) {
 
     /** One opposing phrase pair from a `fraud_keywords[].pairs` group (e.g. "paid" / "not paid"). */
     data class FraudPair(val ruleId: String, val first: String, val second: String)
 
+    /**
+     * One curated behavioural marker: a keyword set that fires when enough
+     * distinct keywords co-occur in one claim. [produces] optionally names
+     * the behavioural type it labels (e.g. "CT47"); [minCooccur] overrides
+     * the default co-occurrence threshold (2, or 1 for single-keyword rules).
+     */
+    data class BehavioralMarker(
+        val ruleId: String,
+        val name: String,
+        val keywords: List<String>,
+        val produces: String? = null,
+        val minCooccur: Int? = null
+    )
+
     companion object {
+
+        /**
+         * The seed package's own behavioural markers — the built-in
+         * detectors' exported vocabulary. Mirrors the website engine's
+         * VO_ENGINE_OWN_MARKERS: skipped so curated markers only ever ADD.
+         */
+        private val ENGINE_OWN_MARKERS = setOf(
+            "BM01", "BM02", "BM03", "BM04", "BM05", "BM06", "BM07", "BM08", "BM09", "BM10"
+        )
 
         /**
          * Merge the remote signed package with locally promoted G3 rules.
@@ -64,7 +102,8 @@ class DownloadedRules(
                 fraudTerms = remote.fraudTerms + local.fraudTerms,
                 behavioralKeywords = remote.behavioralKeywords + local.behavioralKeywords,
                 contradictionPatternCount = remote.contradictionPatternCount + local.contradictionPatternCount,
-                serialPatternCount = remote.serialPatternCount + local.serialPatternCount
+                serialPatternCount = remote.serialPatternCount + local.serialPatternCount,
+                behavioralMarkers = remote.behavioralMarkers + local.behavioralMarkers
             )
         }
 
@@ -102,13 +141,33 @@ class DownloadedRules(
             }
 
             val behavioralKeywords = mutableListOf<String>()
+            val curatedMarkers = mutableListOf<BehavioralMarker>()
             val behavioralMarkers = rules?.get("behavioral_markers") as? JsonArray
             behavioralMarkers?.forEach { entry ->
                 val obj = entry as? JsonObject ?: return@forEach
+                val keywords = mutableListOf<String>()
                 (obj["keywords"] as? JsonArray)?.forEach { kwEl ->
                     val kw = (kwEl as? JsonPrimitive)?.contentOrNull
-                    if (!kw.isNullOrBlank()) behavioralKeywords += kw
+                    if (!kw.isNullOrBlank()) {
+                        behavioralKeywords += kw
+                        keywords += kw.trim().lowercase()
+                    }
                 }
+                // The seed's own BM01-BM10 are the built-in detectors'
+                // vocabulary exported; only curated markers are applied.
+                val markerId = (obj["id"] as? JsonPrimitive)?.contentOrNull ?: "BM??"
+                if (markerId in ENGINE_OWN_MARKERS) return@forEach
+                if (keywords.isEmpty()) return@forEach
+                val produces = (obj["produces"] as? JsonPrimitive)?.contentOrNull
+                    ?.takeIf { Regex("CT\\d{2}").matches(it) }
+                val minCooccur = (obj["min_cooccur"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+                curatedMarkers += BehavioralMarker(
+                    ruleId = markerId.take(32),
+                    name = ((obj["name"] as? JsonPrimitive)?.contentOrNull ?: "").take(80),
+                    keywords = keywords.distinct(),
+                    produces = produces,
+                    minCooccur = minCooccur
+                )
             }
 
             return DownloadedRules(
@@ -118,7 +177,8 @@ class DownloadedRules(
                 fraudTerms = fraudTerms,
                 behavioralKeywords = behavioralKeywords,
                 contradictionPatternCount = (rules?.get("contradiction_patterns") as? JsonArray)?.size ?: 0,
-                serialPatternCount = (rules?.get("serial_patterns") as? JsonArray)?.size ?: 0
+                serialPatternCount = (rules?.get("serial_patterns") as? JsonArray)?.size ?: 0,
+                behavioralMarkers = curatedMarkers
             )
         }
     }

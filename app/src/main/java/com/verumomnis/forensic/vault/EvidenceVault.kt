@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
  * this implementation lays out the vault structure and integrity manifest that
  * those layers wrap.
  */
-class EvidenceVault(private val root: File) {
+class EvidenceVault(private val root: File, private val clock: () -> Instant = { Instant.now() }) {
 
     constructor(context: Context) : this(File(context.filesDir, "vault"))
 
@@ -70,6 +70,33 @@ class EvidenceVault(private val root: File) {
         }
         appendManifest(fileName, hash)
         return target to hash
+    }
+
+    /** Persist a sealed report artefact (PDF) under reports/sealed. Returns its SHA-512. */
+    fun storeSealedReport(fileName: String, bytes: ByteArray): String {
+        initialize()
+        val target = File(reportsSealed, fileName)
+        target.writeBytes(bytes)
+        return Sha512.hash(bytes)
+    }
+
+    /** Persist a draft report artefact under reports/draft. Returns its SHA-512. */
+    fun storeDraftReport(fileName: String, bytes: ByteArray): String {
+        initialize()
+        val target = File(reportsDraft, fileName)
+        target.writeBytes(bytes)
+        return Sha512.hash(bytes)
+    }
+
+    /**
+     * Delete a single file inside the vault. Refuses any path that resolves
+     * outside the vault root; never deletes directories.
+     */
+    fun delete(file: File): Boolean {
+        val canonicalRoot = root.canonicalPath
+        val canonical = file.canonicalPath
+        if (canonical == canonicalRoot || !canonical.startsWith("$canonicalRoot/")) return false
+        return file.isFile && file.delete()
     }
 
     fun storeFinding(name: String, json: String) {
@@ -226,7 +253,7 @@ class EvidenceVault(private val root: File) {
     }
 
     private fun appendManifest(fileName: String, hash: String) {
-        val line = "{\"file\":\"$fileName\",\"sha512\":\"$hash\",\"timestamp\":\"${Instant.now()}\"}"
+        val line = "{\"file\":\"$fileName\",\"sha512\":\"$hash\",\"timestamp\":\"${clock()}\"}"
         if (manifest.exists()) manifest.appendText("\n$line") else manifest.writeText(line)
     }
 }

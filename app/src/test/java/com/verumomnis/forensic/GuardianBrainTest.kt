@@ -49,7 +49,8 @@ class GuardianBrainTest {
     @Test
     fun `privatization attempt is flagged`() {
         val assessment = GuardianBrain.analyze(
-            documents = listOf(doc("We should sell shares in Verum to a private equity stake buyer."))
+            documents = listOf(doc("We should sell shares in Verum to a private equity stake buyer.")),
+            now = Instant.parse("2024-01-15T10:00:00Z")
         )
         assertTrue(assessment.violations.any { it.type == GuardianViolationType.ANTI_PRIVATIZATION })
     }

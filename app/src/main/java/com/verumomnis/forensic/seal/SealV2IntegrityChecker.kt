@@ -17,7 +17,9 @@ import java.security.MessageDigest
 object SealV2IntegrityChecker {
 
     private const val VO_SEAL2_PREFIX = "VO-SEAL2|"
-    private const val VO_HASH_PLACEHOLDER =
+
+    /** Fixed 128-zero placeholder patched with the sealed-file hash at seal time. */
+    const val HASH_PLACEHOLDER =
         "0000000000000000000000000000000000000000000000000000000000000000" +
             "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -45,7 +47,7 @@ object SealV2IntegrityChecker {
         if (hits.size != 1) return Result(feasible = false, match = false)
 
         val start = hits[0] + voUtf16Hex(VO_SEAL2_PREFIX).length
-        val placeholder = voUtf16Hex(VO_HASH_PLACEHOLDER)
+        val placeholder = voUtf16Hex(HASH_PLACEHOLDER)
         val placeholderBytes = placeholder.toByteArray(Charsets.US_ASCII)
 
         if (placeholderBytes.size != embeddedHash.length * 4) {
@@ -59,6 +61,28 @@ object SealV2IntegrityChecker {
 
         val recomputed = sha512Hex(restored)
         return Result(feasible = true, match = recomputed == embeddedHash, recomputed = recomputed)
+    }
+
+    /**
+     * Embed the sealed-file hash into a freshly saved VO-SEAL2 PDF whose Subject
+     * still carries [HASH_PLACEHOLDER]. Computes the SHA-512 over the placeholder
+     * bytes and patches the hex in place (length-preserving), mirroring the web
+     * sealer. Returns the sealed-file hash and the patched bytes.
+     */
+    fun embedSealedHash(pdfBytesWithPlaceholder: ByteArray): Pair<String, ByteArray> {
+        val placeholderNeedle = voUtf16Hex(VO_SEAL2_PREFIX + HASH_PLACEHOLDER).toByteArray(Charsets.US_ASCII)
+        val hits = findAll(pdfBytesWithPlaceholder, placeholderNeedle, limit = 2)
+        require(hits.size == 1) {
+            "VO-SEAL2 placeholder subject must appear exactly once in the sealed PDF (found ${hits.size})"
+        }
+        val sealedHash = sha512Hex(pdfBytesWithPlaceholder)
+        val hashHexAscii = voUtf16Hex(sealedHash).toByteArray(Charsets.US_ASCII)
+        val start = hits[0] + voUtf16Hex(VO_SEAL2_PREFIX).length
+        val patched = pdfBytesWithPlaceholder.copyOf()
+        for (i in hashHexAscii.indices) {
+            patched[start + i] = hashHexAscii[i]
+        }
+        return sealedHash to patched
     }
 
     /** Convert a string to its UTF-16BE-hex ASCII representation (no BOM). */

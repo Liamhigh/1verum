@@ -25,7 +25,9 @@ class DownloadedRulesTest {
             ],
             "behavioral_markers": [
               {"id": "BM01", "keywords": ["urgent", "act now"]},
-              {"id": "BM02", "keywords": ["confidential"]}
+              {"id": "BM02", "keywords": ["confidential"]},
+              {"id": "BM11", "name": "Stonewalling", "keywords": ["unable to comment", "query is noted", "in due course"]},
+              {"id": "BM12", "name": "Reverse victim", "keywords": ["injured party", "harassment of"], "produces": "CT49", "min_cooccur": 2}
             ],
             "serial_patterns": [{"id": "SP01"}],
             "case_configs": []
@@ -47,7 +49,14 @@ class DownloadedRulesTest {
         // Only flat string terms are extracted; co-occurrence arrays are skipped.
         assertEquals(listOf("single-term"), rules.fraudTerms)
 
-        assertEquals(listOf("urgent", "act now", "confidential"), rules.behavioralKeywords)
+        assertEquals(listOf("urgent", "act now", "confidential", "unable to comment", "query is noted", "in due course", "injured party", "harassment of"), rules.behavioralKeywords)
+
+        // The seed's own BM01/BM02 are the built-in detectors' vocabulary and
+        // are skipped; curated markers (BM11+) compile for execution.
+        assertEquals(2, rules.behavioralMarkers.size)
+        assertEquals(DownloadedRules.BehavioralMarker("BM11", "Stonewalling", listOf("unable to comment", "query is noted", "in due course")), rules.behavioralMarkers[0])
+        assertEquals("CT49", rules.behavioralMarkers[1].produces)
+        assertEquals(2, rules.behavioralMarkers[1].minCooccur)
 
         assertEquals(2, rules.contradictionPatternCount)
         assertEquals(1, rules.serialPatternCount)
@@ -60,6 +69,7 @@ class DownloadedRulesTest {
         assertTrue(rules.fraudPairs.isEmpty())
         assertTrue(rules.fraudTerms.isEmpty())
         assertTrue(rules.behavioralKeywords.isEmpty())
+        assertTrue(rules.behavioralMarkers.isEmpty())
         assertEquals(0, rules.contradictionPatternCount)
         assertEquals(0, rules.serialPatternCount)
     }

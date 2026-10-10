@@ -375,7 +375,6 @@ private fun ScanSealHeader() {
     }
 }
 
-@Composable
 /**
  * Shown when handing the URL to a browser failed. Silence here would read as
  * "verification happened" when nothing opened at all, so the address is shown
@@ -404,6 +403,7 @@ private fun BrowserLaunchFailedNote(url: String) {
     }
 }
 
+@Composable
 private fun OfflineNote() {
     Text(
         "Offline — showing the decoded seal payload. Verify online for the full check.",

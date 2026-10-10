@@ -59,6 +59,7 @@ import com.verumomnis.forensic.ui.theme.VoGoldWash
 import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoHeading
 import com.verumomnis.forensic.ui.theme.VoPanel
+import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import com.verumomnis.forensic.ui.theme.VoWell
@@ -200,7 +201,7 @@ fun VoGoldRule(modifier: Modifier = Modifier) {
                     listOf(VoGold, VoGold.copy(alpha = 0.1f))
                 )
             )
-    }
+    )
 }
 
 /**

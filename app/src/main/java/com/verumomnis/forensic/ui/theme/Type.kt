@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.R
 
@@ -27,6 +28,16 @@ val Cormorant = FontFamily(
     Font(R.font.cormorant_garamond, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
     Font(R.font.cormorant_garamond, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
     Font(R.font.cormorant_garamond, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700)))
+)
+
+/**
+ * Cormorant Light display style for big headlines (verdicts, hero titles),
+ * tracking tightened to -0.03em per the verumglobal.foundation design lock.
+ */
+val CormorantDisplay = TextStyle(
+    fontFamily = Cormorant,
+    fontWeight = FontWeight.Light,
+    letterSpacing = (-0.03).em
 )
 
 /** Body sans — 'Source Sans 3'. */

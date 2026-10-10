@@ -44,7 +44,7 @@ object GuardianBrain {
         contradictions: List<Contradiction> = emptyList(),
         financial: FinancialAnalysis? = null,
         behavioral: BehavioralAnalysis? = null,
-        now: Instant = Instant.now()
+        now: Instant
     ): GuardianAssessment {
         val violations = mutableListOf<GuardianViolation>()
         val notes = mutableListOf<String>()

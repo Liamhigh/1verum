@@ -81,7 +81,8 @@ if [[ "$needs_release_signing" == 1 ]]; then
   umask 077
   signing_file="$(mktemp "$signing_dir/keystore.XXXXXX.jks")"
   trap 'rm -f "$signing_file"' EXIT
-  if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_file"; then
+  # Phone selection and clipboard tools can insert whitespace into wrapped base64.
+  if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$signing_file"; then
     rm -f "$signing_file"
     echo "ANDROID_KEYSTORE_BASE64 is not valid base64." >&2
     exit 2

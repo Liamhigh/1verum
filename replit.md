@@ -43,6 +43,7 @@ inference behavior on a physical Android device.
 
 `local.properties` is generated with the local SDK path and must not be committed.
 The downloaded SDK, `.cxx`, build output, and generated diagnostics are ignored.
-No new account credentials are required to compile. The imported build currently
-contains a public NewsAPI fallback credential; this setup does not change it.
-Do not put additional credentials into committed configuration.
+No credentials are required to compile. NewsAPI has no shared fallback: debug
+builds work without a key and report news as unavailable. See
+[`docs/NEWS_API_CONFIGURATION.md`](docs/NEWS_API_CONFIGURATION.md) for local
+debug configuration and the security limits of credentials in Android APKs.

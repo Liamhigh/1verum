@@ -232,13 +232,13 @@ object WebSearchService {
     }
 
     // ------------------------------------------------------------------
-    // NewsAPI (real news articles; key via BuildConfig.NEWS_API_KEY)
+    // NewsAPI (real news articles; optional local debug key via BuildConfig)
     // ------------------------------------------------------------------
 
     /** NewsAPI.org "everything" endpoint used for case-relevant news search. */
     private const val NEWS_API_URL = "https://newsapi.org/v2/everything"
 
-    /** True when a NewsAPI key is configured (BuildConfig default or override). */
+    /** True when a non-empty local debug NewsAPI key was supplied at build time. */
     val newsApiAvailable: Boolean
         get() = BuildConfig.NEWS_API_KEY.isNotBlank()
 
@@ -266,15 +266,19 @@ object WebSearchService {
         try {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val pageSize = maxResults.coerceIn(1, 100)
-            val url = "$NEWS_API_URL?q=$encoded&pageSize=$pageSize&sortBy=relevancy&language=en&apiKey=$apiKey"
+            val url = "$NEWS_API_URL?q=$encoded&pageSize=$pageSize&sortBy=relevancy&language=en"
             val request = Request.Builder()
                 .url(url)
+                .header("X-Api-Key", apiKey)
                 .header("User-Agent", "VerumOmnis/5.3.1c (research@verumglobal.foundation)")
                 .build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 if (!response.isSuccessful || body == null) {
-                    android.util.Log.w("WebSearch", "NewsAPI HTTP ${response.code} — news unavailable.")
+                    android.util.Log.w(
+                        "WebSearch",
+                        "NewsAPI HTTP ${response.code} — news unavailable; check local debug configuration and NewsAPI account status."
+                    )
                     return@withContext emptyList()
                 }
                 parseNewsApiArticles(body, maxResults)

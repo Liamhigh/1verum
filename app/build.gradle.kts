@@ -7,17 +7,26 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// NewsAPI key for the Deep Research news feature (WebSearchService.searchNews).
-// Resolution order: -PNEWS_API_KEY / gradle.properties -> local.properties ->
-// baked-in default, so the app works out-of-the-box when cloned.
-// SECURITY NOTE: 1verum is a PUBLIC repository — this default key is visible to
-// anyone. Rotate/restrict it at https://newsapi.org/account if it is abused.
-val newsApiKey: String = (project.findProperty("NEWS_API_KEY") as? String)
-    ?: Properties().apply {
-        val localProps = rootProject.file("local.properties")
-        if (localProps.exists()) localProps.inputStream().use { load(it) }
-    }.getProperty("NEWS_API_KEY")
-    ?: "81dd6f5b08584517a17fc7f64f09ddf0"
+// Optional local-only NewsAPI key. Never provide a shared/default value: any key
+// compiled into an Android APK can be extracted. The release variant below
+// deliberately has no key; production access should go through a backend proxy.
+val localProperties = Properties().apply {
+    val localProps = rootProject.file("local.properties")
+    if (localProps.exists()) localProps.inputStream().use { load(it) }
+}
+val debugNewsApiKey = (
+    providers.gradleProperty("NEWS_API_KEY").orNull
+        ?: providers.environmentVariable("NEWS_API_KEY").orNull
+        ?: localProperties.getProperty("NEWS_API_KEY")
+        ?: ""
+    ).trim()
+
+fun buildConfigString(value: String): String =
+    "\"" + value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r") + "\""
 
 android {
     namespace = "com.verumomnis.forensic"
@@ -35,9 +44,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        // Injected into BuildConfig.NEWS_API_KEY for the research news search.
-        buildConfigField("String", "NEWS_API_KEY", "\"$newsApiKey\"")
 
         // Real build timestamp for the Settings > About screen (replaces a hardcoded date).
         val buildTime = Instant.now().toString()
@@ -69,12 +75,17 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Never embed the optional local debug credential in a distributable APK.
+            buildConfigField("String", "NEWS_API_KEY", "\"\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
         debug {
+            // A locally supplied key still is not secret once compiled into this APK.
+            buildConfigField("String", "NEWS_API_KEY", buildConfigString(debugNewsApiKey))
+
             // Build the native inference library optimised even in debug.
             //
             // AGP passes CMAKE_BUILD_TYPE=Debug for this variant, which compiles

@@ -61,7 +61,7 @@ private fun TrustCard(state: UiState) {
             // PD16: ordinal confidence only — never a numeric score or percentage.
             Text(
                 "Trust: ${score.confidence} · ${score.factors.size} factor(s)",
-                color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
+                color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
             )
             score.factors.forEach { factor ->
                 Text(
@@ -105,7 +105,7 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                     .padding(12.dp)
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(c.contradictionId, color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(c.contradictionId, color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
                         c.severity.toString().replace('_', ' '),
                         color = severityColor(c.severity.toString()),
@@ -154,7 +154,7 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
         AlertDialog(
             onDismissRequest = { rejectTarget = null },
             containerColor = VoNavy2,
-            titleContentColor = VoGold,
+            titleContentColor = VoHeading,
             textContentColor = VoTextPrimary,
             shape = RoundedCornerShape(16.dp),
             title = {
@@ -163,7 +163,7 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                     fontFamily = Cormorant,
                     fontWeight = FontWeight.Medium,
                     fontSize = 22.sp,
-                    color = VoGold
+                    color = VoHeading
                 )
             },
             text = {
@@ -179,11 +179,11 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
                         onValueChange = { rejectReason = it },
                         label = { Text("Reason", color = VoAccentBlue) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = VoGold,
+                            focusedBorderColor = VoAccentBlue,
                             unfocusedBorderColor = VoBlueBorder,
                             focusedTextColor = VoHeading,
                             unfocusedTextColor = VoHeading,
-                            cursorColor = VoGold,
+                            cursorColor = VoAccentBlue,
                             focusedContainerColor = VoPanelInput,
                             unfocusedContainerColor = VoPanelInput
                         ),
@@ -272,6 +272,13 @@ fun ReportScreen(
             return@Column
         }
 
+        val showAllContradictions = remember(report.reference) { mutableStateOf(false) }
+        val visibleContradictions = if (showAllContradictions.value) {
+            report.contradictions
+        } else {
+            report.contradictions.take(3)
+        }
+
         VoCard(title = report.reference, icon = Icons.Filled.Description) {
             Text(report.title, color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             Text(report.classification, color = VoRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -280,16 +287,37 @@ fun ReportScreen(
             InfoRow("Contradictions", report.contradictions.size.toString())
             InfoRow("Seal status", report.seal.status)
             Spacer(Modifier.height(6.dp))
-            Text(report.seal.extendedFooter(), color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            Text(report.seal.extendedFooter(), color = VoAccentBlue, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
             Spacer(Modifier.height(8.dp))
-            Text(report.executiveSummary, color = VoTextMuted, fontSize = 12.sp)
+            Text(
+                report.executiveSummary,
+                color = VoTextMuted,
+                fontSize = 13.sp,
+                lineHeight = 20.sp
+            )
         }
 
-        VoCard(title = "CONTRADICTION MATRIX", icon = Icons.Filled.Person) {
+        VoCard(
+            title = "CONTRADICTION MATRIX · ${report.contradictions.size}",
+            icon = Icons.Filled.Person
+        ) {
             if (report.contradictions.isEmpty()) {
                 Text("No contradictions detected.", color = VoTextMuted, fontSize = 13.sp)
             }
-            report.contradictions.forEach { c ->
+            if (report.contradictions.size > 3) {
+                TextButton(
+                    onClick = { showAllContradictions.value = !showAllContradictions.value },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text(
+                        if (showAllContradictions.value) "Show fewer findings"
+                        else "Show all ${report.contradictions.size} findings",
+                        color = VoAccentBlue,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            visibleContradictions.forEach { c ->
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -299,7 +327,7 @@ fun ReportScreen(
                         .padding(12.dp)
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(c.contradictionId, color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(c.contradictionId, color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         // Severity as TEXT in the site's accent palette (PD16 — no scores).
                         Text(
                             c.severity.name.replace('_', ' '),
@@ -311,13 +339,13 @@ fun ReportScreen(
                     }
                     Text("Person: ${c.respondent}", color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
-                    Text("A: \"${c.claimA.text}\"", color = VoTextPrimary, fontSize = 12.sp)
-                    Text("   ${c.claimA.source} · p${c.claimA.page} · ln${c.claimA.line}", color = VoTextMuted, fontSize = 10.sp)
-                    Text("B: \"${c.claimB.text}\"", color = VoTextPrimary, fontSize = 12.sp)
-                    Text("   ${c.claimB.source} · p${c.claimB.page} · ln${c.claimB.line}", color = VoTextMuted, fontSize = 10.sp)
+                    Text("A: \"${c.claimA.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text("   ${c.claimA.source} · p${c.claimA.page} · ln${c.claimA.line}", color = VoTextMuted, fontSize = 11.sp)
+                    Text("B: \"${c.claimB.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text("   ${c.claimB.source} · p${c.claimB.page} · ln${c.claimB.line}", color = VoTextMuted, fontSize = 11.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("Statute: ${c.applicableLaw.joinToString("; ")}", color = VoGold, fontSize = 11.sp)
-                    Text(c.legalSignificance, color = VoTextMuted, fontSize = 11.sp)
+                    Text("Statute: ${c.applicableLaw.joinToString("; ")}", color = VoTextPrimary, fontSize = 12.sp)
+                    Text(c.legalSignificance, color = VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
                 }
             }
         }
@@ -365,7 +393,7 @@ fun ReportScreen(
                             .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                             .padding(12.dp)
                     ) {
-                        Text("${ex.exhibitId} · ${ex.kind} · ${ex.fileName}", color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("${ex.exhibitId} · ${ex.kind} · ${ex.fileName}", color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("SHA-512 ${ex.sha512.take(24)}…", color = VoTextMuted, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
                         val g = ex.gps
                         Text(
@@ -385,7 +413,7 @@ fun ReportScreen(
             Text(state.otsStatus, color = VoTextMuted, fontSize = 12.sp)
             state.otsResult?.let { ots ->
                 Spacer(Modifier.height(4.dp))
-                Text("SHA-256 digest: ${ots.sha256Digest}", color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                Text("SHA-256 digest: ${ots.sha256Digest}", color = VoTextPrimary, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
                 Text("Calendars: ${ots.calendarUrls.joinToString(", ").ifEmpty { "—" }}", color = VoTextMuted, fontSize = 10.sp)
                 Text("Proof: ${ots.otsProofFile}", color = VoTextMuted, fontSize = 10.sp)
             }

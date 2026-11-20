@@ -3,7 +3,9 @@ package com.verumomnis.forensic
 import android.Manifest
 import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.verumomnis.forensic.identity.IdentityService
@@ -87,6 +89,32 @@ class UiScreenshotTest {
     @Test fun email() = renderScreen("EMAIL", "04_email.png")
     @Test fun vault() = renderScreen("VAULT", "05_vault.png")
     @Test fun tax() = renderScreen("TAX", "11_tax.png")
+
+    @Test
+    fun longChatMessageCanExpandAndCollapse() {
+        val vm = populatedViewModel()
+        composeRule.setContent {
+            VerumOmnisTheme { VerumApp(vm, initialScreen = "CHAT") }
+        }
+
+        composeRule.onNodeWithText("Read full message").performClick()
+        val showLess = composeRule.onNodeWithText("Show less")
+        showLess.fetchSemanticsNode()
+        showLess.performClick()
+        composeRule.onNodeWithText("Read full message").fetchSemanticsNode()
+    }
+
+    @Test
+    fun reportFindingsCanExpandBeyondThePreview() {
+        val vm = populatedViewModel()
+        composeRule.setContent {
+            VerumOmnisTheme { VerumApp(vm, initialScreen = "REPORT") }
+        }
+
+        composeRule.onNodeWithText("Show all 14 findings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Show fewer findings").fetchSemanticsNode()
+    }
 
     @OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
     @Test

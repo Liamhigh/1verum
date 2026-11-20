@@ -36,8 +36,8 @@ import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBlueBorder
-import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoHeading
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 
@@ -73,7 +73,7 @@ fun VerumTopBar(
         ) {
             if (onBack != null) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoGold)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VoAccentBlue)
                 }
             } else {
                 Spacer(Modifier.width(12.dp))

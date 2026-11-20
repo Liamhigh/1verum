@@ -34,6 +34,7 @@ import com.verumomnis.forensic.R
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
@@ -122,7 +123,7 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
                 lineHeight = 27.sp
             )
             Spacer(Modifier.height(8.dp))
-            Text("— Verum Omnis · Constitution v${Constitution.VERSION} FINAL", color = VoGold, fontSize = 11.sp, letterSpacing = 1.sp)
+            Text("— Verum Omnis · Constitution v${Constitution.VERSION} FINAL", color = VoTextMuted, fontSize = 11.sp, letterSpacing = 1.sp)
         }
 
         Spacer(Modifier.height(30.dp))
@@ -153,7 +154,7 @@ private fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
     ) {
         Text(
             value,
-            color = VoGold,
+            color = VoAccentBlue,
             fontFamily = Cormorant,
             fontWeight = FontWeight.SemiBold,
             fontSize = 30.sp,

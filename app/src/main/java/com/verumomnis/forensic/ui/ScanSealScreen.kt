@@ -355,7 +355,7 @@ private fun ScanSealHeader() {
         Icon(
             Icons.Filled.QrCodeScanner,
             contentDescription = "Scan seal",
-            tint = VoGold,
+            tint = VoAccentBlue,
             modifier = Modifier.size(64.dp)
         )
         Spacer(Modifier.height(16.dp))
@@ -385,7 +385,7 @@ private fun BrowserLaunchFailedNote(url: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             "No browser could be opened on this device.",
-            color = VoGold,
+            color = VoTextMuted,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
@@ -407,7 +407,7 @@ private fun BrowserLaunchFailedNote(url: String) {
 private fun OfflineNote() {
     Text(
         "Offline — showing the decoded seal payload. Verify online for the full check.",
-        color = VoGold,
+        color = VoTextMuted,
         fontSize = 12.sp,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
@@ -437,7 +437,7 @@ private fun QrInfoCard(label: String, body: String) {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .padding(20.dp)
     ) {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoGold, letterSpacing = 1.sp)
+        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 1.sp)
         Spacer(Modifier.height(12.dp))
         Text(body, fontFamily = JetBrainsMono, fontSize = 10.sp, color = VoTextPrimary)
     }
@@ -504,7 +504,7 @@ private fun CameraPreviewBox(onQr: (String) -> Unit) {
             .fillMaxWidth()
             .height(320.dp)
             .clip(RoundedCornerShape(16.dp))
-            .border(2.dp, VoGold.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .border(2.dp, VoAccentBlue.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
             .background(VoBackground),
         contentAlignment = Alignment.Center
     ) {
@@ -551,7 +551,7 @@ private fun CameraPreviewBox(onQr: (String) -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = VoGold, modifier = Modifier.size(48.dp))
+                    CircularProgressIndicator(color = VoAccentBlue, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(12.dp))
                     Text("QR code detected", color = VoGold, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -569,7 +569,7 @@ private fun QrPayloadCard(payload: QrScanPayload) {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .padding(20.dp)
     ) {
-        Text("QR PAYLOAD", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoGold, letterSpacing = 1.sp)
+        Text("QR PAYLOAD", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 1.sp)
         Spacer(Modifier.height(12.dp))
         InfoRow("Hash prefix", payload.hashPrefix)
         payload.metadata?.let { meta ->

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.CormorantDisplay
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
@@ -108,7 +109,7 @@ fun ScanHomeScreen(
     ) {
         Text(
             "FORENSIC SCAN",
-            color = VoGold,
+            color = VoAccentBlue,
             fontSize = 12.sp,
             letterSpacing = 4.sp,
             fontWeight = FontWeight.SemiBold
@@ -154,13 +155,13 @@ fun ScanHomeScreen(
                 Icon(
                     Icons.Filled.UploadFile,
                     contentDescription = "Case file",
-                    tint = VoGold,
+                    tint = VoAccentBlue,
                     modifier = Modifier.height(22.dp)
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "CASE FILE",
-                    color = VoGold,
+                    color = VoAccentBlue,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -303,9 +304,9 @@ private fun HowItWorksStrip() {
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         HowStep("1", "Seal")
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = VoGold, modifier = Modifier.width(14.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.width(14.dp))
         HowStep("2", "Vault")
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = VoGold, modifier = Modifier.width(14.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.width(14.dp))
         HowStep("3", "Verify")
     }
 }
@@ -313,7 +314,7 @@ private fun HowItWorksStrip() {
 @Composable
 private fun HowStep(number: String, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(number, color = VoGold, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Text(number, color = VoAccentBlue, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
         Spacer(Modifier.width(6.dp))
         Text(label, color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
@@ -355,7 +356,7 @@ private fun CapabilityTile(
             .clickable(onClick = onClick)
             .padding(14.dp)
     ) {
-        Icon(icon, contentDescription = title, tint = VoGold, modifier = Modifier.height(22.dp))
+        Icon(icon, contentDescription = title, tint = VoAccentBlue, modifier = Modifier.height(22.dp))
         Spacer(Modifier.height(8.dp))
         Text(title, color = VoTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         Text(subtitle, color = VoTextMuted, fontSize = 11.sp, lineHeight = 15.sp)
@@ -375,7 +376,7 @@ private fun SecondaryButton(
         shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, VoBorder)
     ) {
-        Icon(icon, contentDescription = null, tint = VoGold, modifier = Modifier.padding(end = 6.dp))
+        Icon(icon, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.padding(end = 6.dp))
         Text(label, color = VoTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }

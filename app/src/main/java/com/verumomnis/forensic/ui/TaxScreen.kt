@@ -38,6 +38,7 @@ import com.verumomnis.forensic.engine.TaxModule
 import com.verumomnis.forensic.engine.tax.JurisdictionFee
 import com.verumomnis.forensic.engine.tax.JurisdictionFees
 import com.verumomnis.forensic.ui.theme.VoBackground
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoGreen
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -145,7 +146,7 @@ fun TaxScreen(viewModel: VerumViewModel) {
                 Text(
                     if (pickedName == null) "Upload company tax return (PDF)"
                     else "Selected: $pickedName",
-                    color = VoGold, fontSize = 13.sp
+                    color = VoAccentBlue, fontSize = 13.sp
                 )
             }
             if (extracting) {

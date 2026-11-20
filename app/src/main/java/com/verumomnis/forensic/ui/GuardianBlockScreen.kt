@@ -33,6 +33,7 @@ import com.verumomnis.forensic.model.GuardianAssessment
 import com.verumomnis.forensic.model.GuardianViolation
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoBorder
 import com.verumomnis.forensic.ui.theme.VoGold
@@ -117,7 +118,7 @@ fun GuardianBlockScreen(
 
         Text(
             "VIOLATIONS (${assessment.violations.size})",
-            color = VoGold,
+            color = VoAccentBlue,
             fontSize = 12.sp,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Bold,
@@ -135,7 +136,7 @@ fun GuardianBlockScreen(
             Spacer(Modifier.height(16.dp))
             Text(
                 "B9 NOTES",
-                color = VoGold,
+                color = VoAccentBlue,
                 fontSize = 12.sp,
                 letterSpacing = 2.sp,
                 fontWeight = FontWeight.Bold,
@@ -169,9 +170,9 @@ fun GuardianBlockScreen(
             onClick = onReadConstitution,
             modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, VoGold)
+            border = androidx.compose.foundation.BorderStroke(1.dp, VoAccentBlue)
         ) {
-            Text("Read Constitution", color = VoGold, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Read Constitution", color = VoAccentBlue, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(24.dp))

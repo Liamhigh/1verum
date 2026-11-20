@@ -135,7 +135,16 @@ fi
 if [[ "$needs_release_signing" == 1 ]]; then
   # Keep this shell alive so EXIT removes the temporary signing key on success
   # or failure. Don't retain the signing credentials in a reusable Gradle daemon.
-  bash ./gradlew --no-daemon "$@"
+  if bash ./gradlew --no-daemon "$@"; then
+    gradle_status=0
+  else
+    gradle_status=$?
+  fi
+  # Also clean up explicitly after Gradle returns; the EXIT trap remains as a
+  # fallback if this shell is interrupted before the child process completes.
+  rm -f -- "$signing_file"
+  trap - EXIT
+  exit "$gradle_status"
 else
   exec bash ./gradlew "$@"
 fi

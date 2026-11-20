@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.core.Constitution
@@ -78,8 +79,9 @@ fun EmailScreen(
             Spacer(Modifier.height(10.dp))
             Text(state.emailStatus, color = VoTextMuted, fontSize = 12.sp)
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         viewModel.draftAndSendEmail(
                             recipient, subject,
@@ -90,11 +92,18 @@ fun EmailScreen(
                         )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = VoGold, contentColor = VoBackground)
-                ) { Text("Draft & Send Sealed PDF") }
-                OutlinedButton(onClick = {
-                    // Trigger the anti-harassment monitor by repeated sends.
-                    repeat(4) { viewModel.draftAndSendEmail(recipient, subject) }
-                }) { Text("Simulate Repeat Sends") }
+                ) {
+                    Text("Draft & Send Sealed PDF", textAlign = TextAlign.Center)
+                }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        // Trigger the anti-harassment monitor by repeated sends.
+                        repeat(4) { viewModel.draftAndSendEmail(recipient, subject) }
+                    }
+                ) {
+                    Text("Simulate Repeat Sends", textAlign = TextAlign.Center)
+                }
             }
         }
 
@@ -116,17 +125,28 @@ fun EmailScreen(
                         .border(1.dp, VoBorder, RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("#${index + 1} ${sealed.draft.recipient}", color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(sealed.assessment.verdict.name + if (sealed.delivered) " · SENT" else " · HELD", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "#${index + 1} ${sealed.draft.recipient}",
+                            modifier = Modifier.weight(1f),
+                            color = VoTextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            sealed.assessment.verdict.name + if (sealed.delivered) " · SENT" else " · HELD",
+                            color = color,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Text(sealed.sealedPdfFile, color = VoGold, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    Text(sealed.sealedPdfFile, color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                     Text("Seal ${sealed.seal.shortcode} · 24h count ${sealed.assessment.recipientSendCount24h}", color = VoTextMuted, fontSize = 10.sp)
                     if (sealed.assessment.reasons.isNotEmpty()) {
                         Text(sealed.assessment.reasons.joinToString("; "), color = color, fontSize = 10.sp)
                     }
                     TextButton(onClick = { onExportEmail(sealed) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("Export sealed PDF", color = VoGold, fontSize = 11.sp)
+                        Text("Export sealed PDF", color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontSize = 11.sp)
                     }
                 }
             }

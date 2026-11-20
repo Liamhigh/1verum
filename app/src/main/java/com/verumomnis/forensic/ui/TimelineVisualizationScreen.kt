@@ -32,7 +32,7 @@ import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.model.TimelineEvent
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBorder
-import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -70,7 +70,7 @@ fun TimelineVisualizationScreen(state: UiState) {
             Spacer(Modifier.height(8.dp))
             Text(
                 "Red flags (▲) indicate >730-day gaps (consciousness-of-guilt indicator).",
-                color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
+                color = VoAccentBlue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
             )
         }
 
@@ -130,7 +130,7 @@ private fun TimelineEventCard(event: TimelineEvent) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     event.dateTime.take(10), // YYYY-MM-DD
-                    color = VoGold, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, fontFamily = JetBrainsMono
+                    color = VoAccentBlue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, fontFamily = JetBrainsMono
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -157,7 +157,7 @@ private fun TimelineEventCard(event: TimelineEvent) {
         if (event.legalSignificance.isNotEmpty()) {
             Text(
                 "Legal: ${event.legalSignificance}",
-                color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
+                color = VoTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
             )
         }
 

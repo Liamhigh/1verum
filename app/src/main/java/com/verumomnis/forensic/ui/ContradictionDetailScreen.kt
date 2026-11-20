@@ -29,9 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.model.Contradiction
 import com.verumomnis.forensic.model.Severity
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBorder
-import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -112,7 +112,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "#$index · ${contradiction.category.name.replace("_", " ")}",
-                    color = VoGold, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = JetBrainsMono
+                    color = VoAccentBlue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = JetBrainsMono
                 )
                 Text(
                     contradiction.type.name.replace("_", " "),
@@ -143,7 +143,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
         if (contradiction.legalSignificance.isNotEmpty()) {
             Text(
                 "Legal Significance",
-                color = VoGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono
+                color = VoAccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono
             )
             Text(
                 contradiction.legalSignificance,
@@ -152,7 +152,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
         }
 
         // Claim A
-        Text("Claim A", color = VoGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
+        Text("Claim A", color = VoAccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,7 +172,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
         }
 
         // Claim B
-        Text("Claim B", color = VoGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
+        Text("Claim B", color = VoAccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -199,7 +199,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
             ) {
                 Text(
                     "Confirmed: ${contradiction.confirmingBrains.take(2).joinToString(", ")}",
-                    color = VoGold, fontSize = 9.sp, fontWeight = FontWeight.SemiBold
+                    color = com.verumomnis.forensic.ui.theme.VoGreen, fontSize = 9.sp, fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     "Confidence: ${contradiction.confidence.name}",

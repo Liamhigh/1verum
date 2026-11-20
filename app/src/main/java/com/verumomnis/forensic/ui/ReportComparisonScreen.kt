@@ -34,6 +34,7 @@ import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBorder
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurface
@@ -84,7 +85,7 @@ fun ReportComparisonScreen(state: UiState, viewModel: VerumViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("CURRENT REPORT", color = VoGold, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
+            Text("CURRENT REPORT", color = VoAccentBlue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 1.sp, fontFamily = JetBrainsMono)
             Text(
                 report.reference,
                 color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, fontFamily = JetBrainsMono
@@ -183,7 +184,7 @@ private fun ReportDiffSection(current: ForensicReport, previous: ForensicReport)
             DiffList("NEW CONTRADICTIONS", added, VoRed) { "[${it.severity}] ${it.contradictionId} — ${it.respondent}" }
         }
         if (resolved.isNotEmpty()) {
-            DiffList("RESOLVED SINCE ${previous.reference}", resolved, VoGold) { "${it.contradictionId} — ${it.respondent}" }
+            DiffList("RESOLVED SINCE ${previous.reference}", resolved, com.verumomnis.forensic.ui.theme.VoGreen) { "${it.contradictionId} — ${it.respondent}" }
         }
         if (severityChanged.isNotEmpty()) {
             DiffList("SEVERITY CHANGED", severityChanged, VoTextPrimary) {
@@ -226,7 +227,7 @@ private fun ReportStatsRow(report: ForensicReport) {
 @Composable
 private fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = VoGold, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = JetBrainsMono)
+        Text(value, color = VoTextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = JetBrainsMono)
         Text(label, color = VoTextMuted, fontSize = 9.sp)
     }
 }

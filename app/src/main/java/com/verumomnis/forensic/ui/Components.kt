@@ -66,7 +66,7 @@ import com.verumomnis.forensic.ui.theme.VoWell
 
 /**
  * Standard Verum card (§3.2): translucent blue wash `rgba(15,52,96,0.12)`,
- * `1px solid rgba(26,46,82,0.5)` border, 16dp radius, gold serif h3 title.
+ * `1px solid rgba(26,46,82,0.5)` border, 16dp radius, off-white serif h3 title.
  */
 @Composable
 fun VoCard(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
@@ -79,16 +79,16 @@ fun VoCard(title: String, icon: ImageVector? = null, content: @Composable () -> 
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = VoGold, modifier = Modifier.width(20.dp))
+                Icon(icon, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.width(20.dp))
                 Spacer(Modifier.width(8.dp))
             }
-            // Card h3: serif 500, gold (§3.2)
+            // Neutral section title; reserve gold for actions and selected states.
             Text(
                 title,
                 fontFamily = Cormorant,
                 fontWeight = FontWeight.Medium,
                 fontSize = 20.sp,
-                color = VoGold
+                color = VoHeading
             )
         }
         Spacer(Modifier.height(14.dp))
@@ -341,7 +341,7 @@ fun VoConfirmDialog(
         containerColor = VoSurface,
         shape = RoundedCornerShape(16.dp),
         title = {
-            Text(title, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = VoGold)
+            Text(title, fontFamily = Cormorant, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, color = VoHeading)
         },
         text = {
             Text(message, color = VoTextMuted, fontSize = 14.sp, lineHeight = 21.sp)
@@ -380,7 +380,7 @@ fun HashDetailsExpander(label: String, hash: String, modifier: Modifier = Modifi
             Icon(
                 if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                 contentDescription = if (expanded) "Hide details" else "Show details",
-                tint = VoGold,
+                tint = VoAccentBlue,
                 modifier = Modifier.width(16.dp)
             )
             Spacer(Modifier.width(4.dp))

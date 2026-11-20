@@ -137,7 +137,7 @@ private fun Hero() {
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(VoGold.copy(alpha = 0.08f), VoBackground)
+                    listOf(VoAccentBlue.copy(alpha = 0.08f), VoBackground)
                 )
             )
             .padding(top = 32.dp, start = 20.dp, end = 20.dp, bottom = 20.dp),
@@ -177,7 +177,7 @@ private fun StatRow(sealed: Int, verified: Int, flagged: Int) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        StatTile("Sealed", sealed, VoGold, Modifier.weight(1f))
+        StatTile("Sealed", sealed, VoHeading, Modifier.weight(1f))
         StatTile("Verified", verified, VoGreen, Modifier.weight(1f))
         StatTile("Flagged", flagged, VoRedText, Modifier.weight(1f))
     }
@@ -323,7 +323,7 @@ private fun RecentActivitySection(
                 "View All",
                 fontFamily = JetBrainsMono,
                 fontSize = fixedSp(10.5f),
-                color = VoGold,
+                color = VoAccentBlue,
                 modifier = Modifier.clickable { onViewAll() }
             )
         }
@@ -359,7 +359,7 @@ private fun RecentActivitySection(
                         Text(
                             item.initial,
                             fontFamily = Cormorant,
-                            color = VoGold,
+                            color = VoAccentBlue,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )

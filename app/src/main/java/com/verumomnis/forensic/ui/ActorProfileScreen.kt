@@ -32,7 +32,7 @@ import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBorder
-import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoHeading
 import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -67,7 +67,7 @@ fun ActorProfileScreen(state: UiState) {
             Spacer(Modifier.height(8.dp))
             Text(
                 "Includes behavioral patterns, financial anomalies, and evidence mentions.",
-                color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
+                color = VoTextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
             )
         }
 
@@ -111,7 +111,7 @@ private fun PersonProfileCard(person: ExtractedPerson, report: ForensicReport?) 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     person.name,
-                    color = VoGold,
+                    color = VoHeading,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     fontFamily = JetBrainsMono

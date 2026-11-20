@@ -38,6 +38,7 @@ import com.verumomnis.forensic.core.Constitution
 import com.verumomnis.forensic.core.SettingsRepository
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBorder
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
@@ -80,7 +81,7 @@ fun SettingsScreen(
                 if (ojrsEnabled) {
                     Text(
                         "✓ OJRS active — deep research enabled",
-                        color = VoGold, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
+                        color = VoAccentBlue, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = JetBrainsMono
                     )
                 }
             }
@@ -123,7 +124,7 @@ fun SettingsScreen(
                     )
                     Text(
                         "${autoDeleteDays.toInt()} days",
-                        color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = JetBrainsMono
+                        color = VoAccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = JetBrainsMono
                     )
                 }
                 Slider(
@@ -180,7 +181,7 @@ fun SettingsScreen(
                                 LinearProgressIndicator(
                                     progress = { progress },
                                     modifier = Modifier.fillMaxWidth(),
-                                    color = VoGold,
+                                color = VoAccentBlue,
                                     trackColor = VoBorder
                                 )
                             }
@@ -193,7 +194,7 @@ fun SettingsScreen(
                     )
                     Text(
                         "▶ Download & load models",
-                        color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                        color = VoAccentBlue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clickable { viewModel.downloadAndLoadModels() }
                     )
                 }
@@ -213,7 +214,7 @@ fun SettingsScreen(
                 )
                 Text(
                     "▶ View Constitution",
-                    color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    color = VoAccentBlue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onNavigateConstitution() }
                 )
             }

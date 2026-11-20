@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoBackground
-import com.verumomnis.forensic.ui.theme.VoGold
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
 import kotlinx.coroutines.Dispatchers
@@ -292,9 +291,9 @@ fun VerumApp(
                                     IconButton(
                                         onClick = { navigate(Screen.REPORT) },
                                         enabled = state.report != null
-                                    ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) VoGold else VoTextMuted) }
+                                    ) { Icon(Icons.Filled.Description, contentDescription = "Report", tint = if (state.report != null) com.verumomnis.forensic.ui.theme.VoAccentBlue else VoTextMuted) }
                                 }
-                                IconButton(onClick = { navigate(Screen.VAULT) }) { Icon(Icons.Filled.Folder, contentDescription = "Vault", tint = VoGold) }
+                                IconButton(onClick = { navigate(Screen.VAULT) }) { Icon(Icons.Filled.Folder, contentDescription = "Vault", tint = com.verumomnis.forensic.ui.theme.VoAccentBlue) }
                             }
                         )
                     }
@@ -461,7 +460,7 @@ private fun ActionsSheet(
     onReadConstitution: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("SEALED ACTIONS", color = VoGold, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+        Text("SEALED ACTIONS", color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
         Text(
             "Everything you add is sealed by the forensic engine and stored in the vault before the AI can read it.",
             color = VoTextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
@@ -506,7 +505,7 @@ private fun ActionRow(icon: ImageVector, title: String, subtitle: String, onClic
             .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = title, tint = VoGold, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = title, tint = com.verumomnis.forensic.ui.theme.VoAccentBlue, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = VoTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

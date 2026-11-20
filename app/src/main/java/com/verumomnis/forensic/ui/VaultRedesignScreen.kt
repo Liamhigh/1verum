@@ -21,7 +21,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -94,17 +100,61 @@ fun VaultRedesignScreen(
             )
             if (filtered.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.TopCenter
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        if (sets.isEmpty()) "No documents in the vault yet."
-                        else "No documents in this folder.",
-                        color = VoAccentBlue,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 60.dp),
-                        textAlign = TextAlign.Center
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(VoPanel)
+                            .border(1.dp, VoPanelBorder, RoundedCornerShape(18.dp))
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = VoAccentBlue,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            if (sets.isEmpty()) "Your vault is ready"
+                            else "Nothing in ${folder.label.lowercase()} yet",
+                            color = VoHeading,
+                            fontFamily = Cormorant,
+                            fontSize = 23.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            if (sets.isEmpty()) {
+                                "Seal a document or add evidence to start building your protected case file."
+                            } else {
+                                "Try another folder, or return to the full vault."
+                            },
+                            color = VoTextBody,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        if (sets.isEmpty()) {
+                            VerumPrimaryButton(
+                                label = "Seal your first document",
+                                onClick = onNewDocument,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            TextButton(
+                                onClick = { folder = VaultFolder.ALL },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text("View all documents", color = VoAccentBlue, fontSize = 13.sp)
+                            }
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
@@ -162,7 +212,7 @@ private fun VaultHeader() {
                 fontFamily = JetBrainsMono,
                 fontSize = fixedSp(10f),
                 letterSpacing = 1.5.sp,
-                color = VoGold
+                color = VoAccentBlue
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -282,7 +332,7 @@ private fun ScanSetRow(
                 Text(
                     set.initial,
                     fontFamily = Cormorant,
-                    color = VoGold,
+                    color = VoAccentBlue,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -326,12 +376,14 @@ private fun ScanSetRow(
                     maxLines = 1
                 )
             }
-            Text(
-                "🗑",
-                fontSize = 15.sp,
-                color = VoTextMuted,
-                modifier = Modifier.clickable { onDelete() }.padding(4.dp)
-            )
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Filled.DeleteOutline,
+                    contentDescription = "Delete scan set",
+                    tint = VoTextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         if (expanded) {
@@ -347,7 +399,7 @@ private fun ScanSetRow(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 artifact.kind.label,
-                                color = VoGold,
+                                color = VoAccentBlue,
                                 fontFamily = JetBrainsMono,
                                 fontSize = fixedSp(9.5f),
                                 letterSpacing = 0.4.sp

@@ -36,6 +36,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -124,7 +125,7 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
         ) {
             IconButton(
                 onClick = onPlus,
-                modifier = Modifier.size(46.dp).clip(CircleShape).background(VoGold)
+                modifier = Modifier.size(46.dp).clip(CircleShape).background(VoAccentBlue)
             ) { Icon(Icons.Filled.Add, contentDescription = "Add sealed action", tint = VoBackground) }
             Spacer(Modifier.width(8.dp))
             OutlinedTextField(
@@ -135,11 +136,11 @@ fun ChatScreen(state: UiState, viewModel: VerumViewModel, onPlus: () -> Unit = {
                 textStyle = LocalTextStyle.current.copy(color = VoTextPrimary, fontSize = 14.sp),
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VoGold,
+                    focusedBorderColor = VoAccentBlue,
                     unfocusedBorderColor = VoBlueBorder,
                     focusedContainerColor = VoSurface,
                     unfocusedContainerColor = VoSurface,
-                    cursorColor = VoGold
+                    cursorColor = VoAccentBlue
                 ),
                 maxLines = 4
             )
@@ -184,7 +185,7 @@ private fun SealProgressCard(stage: SealStage) {
         LinearProgressIndicator(
             progress = { stage.progress },
             modifier = Modifier.fillMaxWidth(),
-            color = VoGold,
+            color = VoAccentBlue,
             trackColor = VoBackground
         )
     }
@@ -205,7 +206,7 @@ private fun PendingPreviewCard(
     ) {
         Text(
             "READY TO SEAL",
-            color = VoGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp
+            color = VoAccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp
         )
         Spacer(Modifier.height(8.dp))
         previews.forEach { preview ->
@@ -266,6 +267,8 @@ private fun ChatBubble(msg: ChatMessage) {
             }
         }
     } else {
+        var expanded by remember(msg.text) { mutableStateOf(false) }
+        val canCollapse = msg.text.length > 360
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
@@ -277,7 +280,7 @@ private fun ChatBubble(msg: ChatMessage) {
                 modifier = Modifier.size(26.dp).clip(CircleShape)
             )
             Spacer(Modifier.width(10.dp))
-            Box(
+            Column(
                 modifier = Modifier
                     .widthIn(max = 300.dp)
                     .background(VoPanel, RoundedCornerShape(3.dp, 14.dp, 14.dp, 14.dp))
@@ -288,7 +291,26 @@ private fun ChatBubble(msg: ChatMessage) {
                     )
                     .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
-                Text(msg.text, color = VoTextBody, fontSize = 13.sp, lineHeight = 20.sp)
+                Text(
+                    msg.text,
+                    color = VoTextBody,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    maxLines = if (canCollapse && !expanded) 8 else Int.MAX_VALUE,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (canCollapse) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            if (expanded) "Show less" else "Read full message",
+                            color = VoAccentBlue,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
         }
     }
@@ -305,7 +327,7 @@ private fun SuggestedPromptsCard(prompts: List<String>, onPick: (String) -> Unit
     ) {
         Text(
             "TRY ASKING",
-            color = VoGold,
+            color = VoAccentBlue,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp
@@ -337,7 +359,7 @@ private fun ThinkingBubble() {
                 .padding(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(color = VoGold, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(color = VoAccentBlue, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
                 Text("Verum Omnis is thinking…", color = VoTextMuted, fontSize = 13.sp)
             }

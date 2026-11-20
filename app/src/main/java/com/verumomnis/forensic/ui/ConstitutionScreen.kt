@@ -54,8 +54,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
+import com.verumomnis.forensic.ui.theme.VoAccentBlue
 import com.verumomnis.forensic.ui.theme.VoBackground
 import com.verumomnis.forensic.ui.theme.VoGold
+import com.verumomnis.forensic.ui.theme.VoHeading
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
@@ -119,10 +121,10 @@ fun ConstitutionScreen() {
         ) {
             if (showSealedPdf) {
                 val bmp = bitmap
-                if (bmp == null) CircularProgressIndicator(color = VoGold)
+                if (bmp == null) CircularProgressIndicator(color = VoAccentBlue)
                 else ZoomablePage(bitmap = bmp, page = page)
             } else {
-                if (blocks.isEmpty()) CircularProgressIndicator(color = VoGold)
+                if (blocks.isEmpty()) CircularProgressIndicator(color = VoAccentBlue)
                 else ConstitutionText(blocks)
             }
         }
@@ -182,7 +184,7 @@ private fun ConstitutionText(blocks: List<ConstitutionBlock>) {
             when (block) {
                 is ConstitutionBlock.Heading -> Text(
                     ConstitutionMarkdown.stripInline(block.text),
-                    color = if (block.level <= 2) VoGold else VoTextPrimary,
+                    color = if (block.level <= 2) VoHeading else VoTextPrimary,
                     fontSize = when (block.level) {
                         1 -> 22.sp; 2 -> 18.sp; 3 -> 15.sp; else -> 13.sp
                     },
@@ -195,7 +197,7 @@ private fun ConstitutionText(blocks: List<ConstitutionBlock>) {
                 )
                 is ConstitutionBlock.ListItem -> Row {
                     Text(
-                        block.marker, color = VoGold, fontSize = 13.sp,
+                        block.marker, color = VoAccentBlue, fontSize = 13.sp,
                         modifier = Modifier.width(26.dp)
                     )
                     Text(
@@ -224,7 +226,7 @@ private fun ConstitutionText(blocks: List<ConstitutionBlock>) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(VoGold.copy(alpha = 0.25f))
+                        .background(VoAccentBlue.copy(alpha = 0.25f))
                 )
             }
         }
@@ -253,7 +255,7 @@ private fun ConstitutionTable(table: ConstitutionBlock.Table) {
                     if (index == 0) {
                         Text(
                             ConstitutionMarkdown.stripInline(cell),
-                            color = VoGold, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                            color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold
                         )
                     } else {
                         Text(
@@ -369,7 +371,7 @@ private fun PageBar(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () ->
                 fontSize = 12.sp,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (page > 0) VoGold else VoTextMuted
+                color = if (page > 0) VoAccentBlue else VoTextMuted
             )
         }
         Text(
@@ -386,7 +388,7 @@ private fun PageBar(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () ->
                 fontSize = 12.sp,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (pageCount > 0 && page < pageCount - 1) VoGold else VoTextMuted
+                color = if (pageCount > 0 && page < pageCount - 1) VoAccentBlue else VoTextMuted
             )
         }
     }

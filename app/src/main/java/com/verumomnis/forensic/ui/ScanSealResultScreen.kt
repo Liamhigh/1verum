@@ -71,7 +71,7 @@ fun ScanSealResultScreen(
             fontFamily = JetBrainsMono,
             fontSize = 11.sp,
             letterSpacing = 1.sp,
-            color = VoGold,
+            color = VoAccentBlue,
             textAlign = TextAlign.Center
         )
 
@@ -137,7 +137,7 @@ private fun ScanSealVerdictCard(result: com.verumomnis.forensic.model.SealScanRe
                     .background(VoBackground.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                     .padding(16.dp)
             ) {
-                Text("SEAL DETAILS", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoGold, letterSpacing = 1.sp)
+                Text("SEAL DETAILS", fontFamily = JetBrainsMono, fontSize = 11.sp, color = VoAccentBlue, letterSpacing = 1.sp)
                 Spacer(Modifier.height(12.dp))
                 InfoRow("Scheme", seal.scheme)
                 InfoRow("Seal ID", seal.sealId)

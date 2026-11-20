@@ -309,7 +309,7 @@ private fun LawEnforcementBanner() {
             .fillMaxWidth()
             .background(
                 Brush.linearGradient(
-                    listOf(VoAccentBlue.copy(alpha = 0.15f), VoGold.copy(alpha = 0.10f))
+                    listOf(VoAccentBlue.copy(alpha = 0.15f), VoAccentBlue.copy(alpha = 0.04f))
                 ),
                 RoundedCornerShape(12.dp)
             )
@@ -406,7 +406,7 @@ private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text("Forensic Scan", fontFamily = Cormorant, fontSize = 20.sp, color = VoGold)
+        Text("Forensic Scan", fontFamily = Cormorant, fontSize = 20.sp, color = VoHeading)
         Spacer(Modifier.height(10.dp))
         if (scanning) {
             Text(state.sealStage.label, color = VoTextPrimary, fontSize = 13.sp)
@@ -457,7 +457,7 @@ private fun FileInfoCard(name: String, size: String, onClear: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Filled.AttachFile, contentDescription = null, tint = VoGold, modifier = Modifier.size(16.dp))
+            Icon(Icons.Filled.AttachFile, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text(name, color = VoTextPrimary, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
@@ -570,7 +570,7 @@ private fun PasswordSection(
                 colors = CheckboxDefaults.colors(checkedColor = VoGold, checkmarkColor = VoBackground, uncheckedColor = VoBorder)
             )
             Spacer(Modifier.width(6.dp))
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = VoGold, modifier = Modifier.size(16.dp))
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = VoAccentBlue, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text("Password protect this document (delivery receipt mode)", fontSize = 14.sp, color = VoTextMuted)
         }
@@ -634,7 +634,7 @@ private fun VoTextField(
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = VoGold,
+            focusedBorderColor = VoAccentBlue,
             unfocusedBorderColor = VoBorder,
             focusedTextColor = VoTextPrimary,
             unfocusedTextColor = VoTextPrimary,
@@ -694,7 +694,7 @@ private fun PipelineSection(pipeline: List<SealPipelineStep>) {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text("Sealing Pipeline", fontFamily = Cormorant, fontSize = 20.sp, color = VoGold)
+        Text("Sealing Pipeline", fontFamily = Cormorant, fontSize = 20.sp, color = VoHeading)
         Spacer(Modifier.height(14.dp))
         pipeline.forEach { step ->
             PipelineStepRow(step)
@@ -752,7 +752,7 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
     ) {
         VoKicker("Seal Applied")
         Spacer(Modifier.height(6.dp))
-        Text("Document Sealed", fontFamily = Cormorant, fontWeight = FontWeight.Medium, fontSize = 24.sp, color = VoGold)
+        Text("Document Sealed", fontFamily = Cormorant, fontWeight = FontWeight.Medium, fontSize = 24.sp, color = VoHeading)
         Spacer(Modifier.height(14.dp))
         VoHonestyNote(
             title = "OpenTimestamps proof pending",
@@ -771,7 +771,7 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
             VoIdField("Document", documentName.ifBlank { "Sealed document" })
             VoIdField("SHA-512", result.sha512.take(16) + "…" + result.sha512.takeLast(16), valueColor = VoGreen)
             VoIdField("Sealed", sealedAt)
-            VoIdField("Seal ID", result.sealId, valueColor = VoGold, lastRow = result.priorChain.isEmpty())
+        VoIdField("Seal ID", result.sealId, valueColor = VoTextPrimary, lastRow = result.priorChain.isEmpty())
             if (result.priorChain.isNotEmpty()) {
                 VoIdField("Chain of Custody", result.priorChain.joinToString(", "), valueColor = VoAccentBlue, lastRow = true)
             }
@@ -789,12 +789,12 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
             onClick = onVerifyClick,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = VoGold),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = VoAccentBlue),
             border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.horizontalGradient(listOf(VoBorder, VoBorder)))
         ) {
-            Icon(Icons.Filled.Visibility, contentDescription = null, tint = VoGold)
+            Icon(Icons.Filled.Visibility, contentDescription = null, tint = VoAccentBlue)
             Spacer(Modifier.width(8.dp))
-            Text("Verify on verumglobal.foundation", color = VoGold)
+            Text("Verify on verumglobal.foundation", color = VoAccentBlue)
         }
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -823,7 +823,7 @@ private fun PreviewSection() {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text("What Your Sealed Document Looks Like", fontFamily = Cormorant, fontSize = 18.sp, color = VoGold)
+        Text("What Your Sealed Document Looks Like", fontFamily = Cormorant, fontSize = 18.sp, color = VoHeading)
         Spacer(Modifier.height(8.dp))
         Text(
             "Every page has the A4 watermark as a background layer at 20% opacity. Your document content stays at full size. A clean QR code with a subtle gray panel sits in the top-right corner. The seal footer with your SHA-512 fingerprint appears at the bottom of every page.",
@@ -886,10 +886,10 @@ private fun DownloadButton(label: String, primary: Boolean, modifier: Modifier =
         modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (primary) Color.Transparent else VoGold.copy(alpha = 0.08f),
-            contentColor = if (primary) VoBackground else VoGold
+            containerColor = if (primary) Color.Transparent else VoAccentBlue.copy(alpha = 0.08f),
+            contentColor = if (primary) VoBackground else VoAccentBlue
         ),
-        border = if (!primary) androidx.compose.foundation.BorderStroke(1.dp, VoGold) else null,
+        border = if (!primary) androidx.compose.foundation.BorderStroke(1.dp, VoAccentBlue) else null,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
     ) {
         Box(
@@ -918,7 +918,7 @@ private fun InfoSection() {
     Column(modifier = Modifier.fillMaxWidth()) {
         VoKicker("The Sealing Pipeline")
         Spacer(Modifier.height(6.dp))
-        Text("How Document Sealing Works", fontFamily = Cormorant, fontWeight = FontWeight.Normal, fontSize = 26.sp, color = VoGold)
+        Text("How Document Sealing Works", fontFamily = Cormorant, fontWeight = FontWeight.Normal, fontSize = 26.sp, color = VoHeading)
         Spacer(Modifier.height(8.dp))
         VoGoldRule()
         Spacer(Modifier.height(12.dp))
@@ -955,7 +955,7 @@ private fun InfoItem(title: String, body: String, modifier: Modifier = Modifier)
             .border(1.dp, VoBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text(title, fontFamily = Cormorant, fontSize = 17.sp, color = VoGold, fontWeight = FontWeight.Medium)
+        Text(title, fontFamily = Cormorant, fontSize = 17.sp, color = VoHeading, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(6.dp))
         Text(body, fontSize = 12.sp, color = VoAccentBlue, lineHeight = 18.sp)
     }

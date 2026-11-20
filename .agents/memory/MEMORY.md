@@ -1,0 +1,1 @@
+- [Public native dependency downloads](public-native-dependencies.md) — use checksum-pinned archives when the import connection cannot clone public GitHub sources.

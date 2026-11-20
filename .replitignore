@@ -1,0 +1,5 @@
+/.local/android-sdk/
+/.gradle/
+/app/build/
+/app/.cxx/
+/generated-artifacts/

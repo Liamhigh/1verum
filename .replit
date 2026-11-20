@@ -1,7 +1,9 @@
 modules = ["web", "python-3.12", "nodejs-20"]
+run = "bash scripts/android-build.sh"
 
 [nix]
 channel = "stable-25_05"
+packages = ["jdk17", "unzip"]
 
 [agent]
 expertMode = true

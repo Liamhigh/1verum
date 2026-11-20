@@ -25,3 +25,7 @@ local.properties
 # FetchContent, pinned commit) — never vendored into this repo's git history.
 /app/src/main/cpp/llama.cpp/
 /app/.cxx/
+
+# Local Android SDK and generated build diagnostics (never commit toolchains).
+/.local/android-sdk/
+/generated-artifacts/

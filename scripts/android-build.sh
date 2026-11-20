@@ -94,6 +94,42 @@ if [[ "$needs_release_signing" == 1 ]]; then
   fi
   export ANDROID_KEYSTORE_FILE="$signing_file"
   unset ANDROID_KEYSTORE_BASE64
+  # Validate the store before compiling. A freshly generated keystore commonly
+  # contains just one key, so recover from a mistyped alias without another upload.
+  ANDROID_KEY_ALIAS="$(python3 - <<'PY'
+import os
+import re
+import subprocess
+import sys
+
+result = subprocess.run(
+    [
+        "keytool", "-J-Duser.language=en", "-J-Duser.country=US",
+        "-list", "-v", "-keystore", os.environ["ANDROID_KEYSTORE_FILE"],
+        "-storepass:env", "ANDROID_KEYSTORE_PASSWORD",
+    ],
+    capture_output=True,
+    text=True,
+)
+if result.returncode:
+    sys.exit("Unable to open signing keystore. Check the keystore file and store password.")
+entries = re.findall(
+    r"^Alias name: ([^\r\n]+)\r?\n(.*?)(?=^Alias name: |\Z)",
+    result.stdout,
+    re.MULTILINE | re.DOTALL,
+)
+aliases = [alias for alias, body in entries if "Entry type: PrivateKeyEntry" in body]
+configured = os.environ.get("ANDROID_KEY_ALIAS", "")
+if configured in aliases:
+    print(configured)
+elif len(aliases) == 1:
+    print("Selecting the keystore's only signing key instead of the mismatched alias.", file=sys.stderr)
+    print(aliases[0])
+else:
+    sys.exit("The signing alias does not match a unique private key. Check ANDROID_KEY_ALIAS.")
+PY
+)"
+  export ANDROID_KEY_ALIAS
 fi
 
 if [[ "$needs_release_signing" == 1 ]]; then

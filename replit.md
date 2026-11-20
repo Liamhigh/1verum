@@ -42,6 +42,11 @@ the keystore or its passwords in Git or chat. The build script materializes the
 keystore under the ignored `.local/release-signing/` directory only while
 Gradle runs, then removes the temporary copy.
 
+The alias is the key's label, not its password. The script validates the keystore
+before compiling; if the configured alias is wrong but the store contains exactly
+one private key, it explicitly selects that key. Stores with multiple keys require
+the correct alias. Signing credentials are not printed.
+
 Download the signed APK from `app/build/outputs/apk/release/app-release.apk`.
 Keep the original keystore and password backup: every update must use the same
 signing identity. The release APK deliberately contains no NewsAPI credential.

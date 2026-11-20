@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "aarK6IUkOoZyNKwjMjA3v"
+uri = "file://app/build/outputs/apk/release/app-release.apk"
+type = "unspecified"
+title = "Verum Omnis — signed Android APK"
+description = "Release 5.2.8, 89.2 MB. Signed APK for Android 10+ ARM64 devices. Signature verified; no device installation test performed."
+logical_id = "e204d293-e294-4896-b4be-fe324252fb1c"
+content_hash = "sha256:da236d14731688edfc558d63c8ad33fa221753e918d9639bc8c3e7890f858b97"
+size = 93541676
+mtime_ms = 1795170660876
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/e204d293-e294-4896-b4be-fe324252fb1c/477ad2cd-9ae2-4b63-b663-a04b30c35806"
+storage_version_token = "1795170682522596"
+content_type = "application/octet-stream"

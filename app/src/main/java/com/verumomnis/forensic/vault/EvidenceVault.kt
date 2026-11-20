@@ -4,6 +4,9 @@ import android.content.Context
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.model.ForensicReport
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import javax.crypto.SecretKey
 import kotlinx.serialization.json.Json
@@ -11,13 +14,15 @@ import kotlinx.serialization.json.Json
 /**
  * Evidence Vault (Part VII). Local storage following the specified directory
  * structure. Files are written under the app's private storage and every write is
- * accompanied by a SHA-512 integrity entry.
- *
- * Note: AES-256-GCM at-rest encryption and SQLCipher are specified for production;
- * this implementation lays out the vault structure and integrity manifest that
- * those layers wrap.
+ * accompanied by a SHA-512 integrity entry. New raw evidence is encrypted with
+ * AES-256-GCM. Existing pre-encryption files remain readable as legacy plaintext
+ * and can be migrated explicitly after their manifest hash is verified.
  */
-class EvidenceVault(private val root: File, private val clock: () -> Instant = { Instant.now() }) {
+class EvidenceVault(
+    private val root: File,
+    private val clock: () -> Instant = { Instant.now() },
+    masterKeyProvider: (() -> SecretKey)? = null
+) {
 
     constructor(context: Context) : this(File(context.filesDir, "vault"))
 
@@ -31,6 +36,9 @@ class EvidenceVault(private val root: File, private val clock: () -> Instant = {
     val research = File(root, "research")
     val config = File(root, "config")
 
+    private val keyProvider: () -> SecretKey = masterKeyProvider ?: {
+        VaultKeyStore.getOrCreateMasterKey(hasEncryptedVaultData())
+    }
     private val manifest = File(findings, "integrity_manifest.json")
 
     fun initialize() {
@@ -42,9 +50,11 @@ class EvidenceVault(private val root: File, private val clock: () -> Instant = {
 
     fun storeEvidence(fileName: String, bytes: ByteArray): String {
         initialize()
-        val target = File(evidenceRaw, fileName)
-        target.writeBytes(bytes)
-        val hash = Sha512.hash(bytes)
+        val target = evidenceFile(fileName)
+        val key = keyProvider()
+        val hash = writeAtomically(target) { output ->
+            VaultEncryption.encryptEvidence(bytes.inputStream(), output, key)
+        }
         appendManifest(fileName, hash)
         return hash
     }
@@ -64,12 +74,102 @@ class EvidenceVault(private val root: File, private val clock: () -> Instant = {
      */
     fun storeEvidenceStreaming(fileName: String, input: java.io.InputStream): Pair<File, String> {
         initialize()
-        val target = File(evidenceRaw, fileName)
-        val (hash, _) = input.use { source ->
-            target.outputStream().use { sink -> Sha512.copyAndHash(source, sink) }
-        }
+        val target = evidenceFile(fileName)
+        val key = keyProvider()
+        val hash =
+            input.use { source ->
+                writeAtomically(target) { output ->
+                    VaultEncryption.encryptEvidence(source, output, key)
+                }
+            }
         appendManifest(fileName, hash)
         return target to hash
+    }
+
+    /** Original-byte length, excluding the fixed AES-GCM evidence framing. */
+    fun evidenceSize(fileName: String): Long {
+        val file = evidenceFile(fileName)
+        if (!file.isFile) return 0L
+        return if (VaultEncryption.isEncryptedEvidence(file)) {
+            (file.length() - VaultEncryption.EVIDENCE_OVERHEAD_BYTES).coerceAtLeast(0L)
+        } else {
+            file.length()
+        }
+    }
+
+    /** Reads a raw evidence item, transparently supporting old plaintext records. */
+    fun readEvidence(fileName: String): ByteArray {
+        val file = evidenceFile(fileName)
+        require(file.isFile) { "Evidence not found: $fileName" }
+        val plaintext = if (VaultEncryption.isEncryptedEvidence(file)) {
+            VaultEncryption.decryptEvidence(file.readBytes(), keyProvider())
+        } else {
+            file.readBytes()
+        }
+        expectedHash(fileName)?.let { expected ->
+            check(Sha512.hash(plaintext) == expected) { "Evidence integrity check failed: $fileName" }
+        }
+        return plaintext
+    }
+
+    /**
+     * Writes a verified plaintext view to a caller-controlled private location.
+     * The temporary destination is committed only after GCM authentication passes.
+     */
+    fun materializeEvidence(fileName: String, destination: File): File {
+        val source = evidenceFile(fileName)
+        require(source.isFile) { "Evidence not found: $fileName" }
+        destination.parentFile?.mkdirs()
+        val temp = File.createTempFile("evidence-", ".tmp", destination.parentFile)
+        try {
+            temp.outputStream().use { output ->
+                if (VaultEncryption.isEncryptedEvidence(source)) {
+                    source.inputStream().use { input ->
+                        VaultEncryption.decryptEvidence(input, output, keyProvider())
+                    }
+                } else {
+                    source.inputStream().use { it.copyTo(output) }
+                }
+            }
+            expectedHash(fileName)?.let { expected ->
+                check(Sha512.hash(temp) == expected) { "Evidence integrity check failed: $fileName" }
+            }
+            replaceAtomically(temp, destination)
+            return destination
+        } catch (error: Exception) {
+            temp.delete()
+            throw error
+        }
+    }
+
+    /**
+     * Migrates legacy plaintext records only when a matching manifest entry
+     * authenticates their current bytes. Unindexed or altered files are untouched.
+     */
+    fun migrateLegacyEvidence(): List<String> {
+        val manifestByName = integrityManifest().associateBy { it.fileName }
+        val candidates = evidenceRaw.listFiles()?.filter { file ->
+            file.isFile && !VaultEncryption.isEncryptedEvidence(file) &&
+                manifestByName[file.name]?.sha512 == runCatching { Sha512.hash(file) }.getOrNull()
+        }.orEmpty()
+        if (candidates.isEmpty()) return emptyList()
+
+        val key = keyProvider()
+        return candidates.mapNotNull { file ->
+            val temp = File.createTempFile("evidence-", ".enc", evidenceRaw)
+            try {
+                file.inputStream().use { input ->
+                    temp.outputStream().use { output ->
+                        VaultEncryption.encryptEvidence(input, output, key)
+                    }
+                }
+                replaceAtomically(temp, file)
+                file.name
+            } catch (error: Exception) {
+                temp.delete()
+                throw error
+            }
+        }
     }
 
     /** Persist a sealed report artefact (PDF) under reports/sealed. Returns its SHA-512. */
@@ -162,8 +262,8 @@ class EvidenceVault(private val root: File, private val clock: () -> Instant = {
 
     data class IntegrityEntry(val fileName: String, val sha512: String, val timestamp: String)
 
-    /** Default hardware-backed (or test fallback) master key for vault encryption. */
-    fun defaultMasterKey(): SecretKey = VaultKeyStore.getOrCreateMasterKey()
+    /** Stable master key for this vault instance, supplied by Android Keystore in production. */
+    fun defaultMasterKey(): SecretKey = keyProvider()
 
     /** Encrypted chat session at rest (AES-256-GCM), stored under chat_sessions as .json.enc. */
     fun storeChatSession(name: String, json: String, key: SecretKey) {
@@ -241,15 +341,66 @@ class EvidenceVault(private val root: File, private val clock: () -> Instant = {
     fun verifyIntegrity(): List<String> {
         val mismatches = mutableListOf<String>()
         integrityManifest().forEach { entry ->
-            val file = File(evidenceRaw, entry.fileName)
+            val file = runCatching { evidenceFile(entry.fileName) }.getOrElse {
+                mismatches += "TAMPERED: ${entry.fileName}"
+                return@forEach
+            }
             if (!file.exists()) {
                 mismatches += "MISSING: ${entry.fileName}"
             } else {
-                val current = Sha512.hash(file.readBytes())
-                if (current != entry.sha512) mismatches += "TAMPERED: ${entry.fileName}"
+                try {
+                    val current = if (VaultEncryption.isEncryptedEvidence(file)) {
+                        VaultEncryption.hashEvidence(file, keyProvider())
+                    } else {
+                        Sha512.hash(file)
+                    }
+                    if (current != entry.sha512) mismatches += "TAMPERED: ${entry.fileName}"
+                } catch (_: IllegalStateException) {
+                    mismatches += "KEY_UNAVAILABLE: ${entry.fileName}"
+                } catch (_: Exception) {
+                    mismatches += "TAMPERED: ${entry.fileName}"
+                }
             }
         }
         return mismatches
+    }
+
+    private fun evidenceFile(fileName: String): File {
+        require(fileName.isNotBlank() && File(fileName).name == fileName && fileName != "." && fileName != "..") {
+            "Evidence name must be a single file name"
+        }
+        return File(evidenceRaw, fileName)
+    }
+
+    private fun expectedHash(fileName: String): String? =
+        integrityManifest().lastOrNull { it.fileName == fileName }?.sha512
+
+    private fun hasEncryptedVaultData(): Boolean =
+        evidenceRaw.listFiles()?.any { it.isFile && VaultEncryption.isEncryptedEvidence(it) } == true ||
+            chatSessions.listFiles()?.any { it.isFile && it.extension == "enc" } == true
+
+    private fun writeAtomically(target: File, write: (java.io.OutputStream) -> String): String {
+        target.parentFile?.mkdirs()
+        val temp = File.createTempFile("evidence-", ".tmp", target.parentFile)
+        try {
+            val result = temp.outputStream().use(write)
+            replaceAtomically(temp, target)
+            return result
+        } catch (error: Exception) {
+            temp.delete()
+            throw error
+        }
+    }
+
+    private fun replaceAtomically(source: File, destination: File) {
+        try {
+            Files.move(
+                source.toPath(), destination.toPath(),
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun appendManifest(fileName: String, hash: String) {

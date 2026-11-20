@@ -15,6 +15,7 @@ import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.MediaKind
 import com.verumomnis.forensic.security.EicarScanner
 import com.verumomnis.forensic.vault.EvidenceVault
+import java.io.File
 import java.io.ByteArrayInputStream
 import java.time.Instant
 
@@ -142,26 +143,38 @@ class MediaIngestor(
         val (stored, hash) = runCatching { vault.storeEvidenceStreaming(fileName, stream) }
             .getOrElse { return IngestResult.Error.ReadFailed(it.message ?: "could not store evidence") }
 
-        if (stored.length() > MAX_FILE_SIZE_BYTES) {
+        if (vault.evidenceSize(fileName) > MAX_FILE_SIZE_BYTES) {
             stored.delete()
             return IngestResult.Error.TooLarge(MAX_FILE_SIZE_BYTES)
         }
+        val plainFile = File.createTempFile("evidence-preview-", ".tmp", context.cacheDir)
+        runCatching { vault.materializeEvidence(fileName, plainFile) }
+            .getOrElse {
+                plainFile.delete()
+                stored.delete()
+                return IngestResult.Error.ReadFailed(it.message ?: "could not read stored evidence")
+            }
         // EICAR is a 68-byte marker at the start of the file, so only the head
         // needs reading — the whole artifact never has to be resident.
-        if (EicarScanner.isEicar(stored.readHead(EICAR_PROBE_BYTES))) {
+        if (EicarScanner.isEicar(plainFile.readHead(EICAR_PROBE_BYTES))) {
+            plainFile.delete()
             stored.delete()
             return IngestResult.Error.MalwareDetected()
         }
 
-        val text = when {
-            mime.startsWith("text") -> stored.readText(Charsets.UTF_8)
-            mime.startsWith("application/pdf") -> {
-                val extracted = pdfExtractor.extractText(stored).trim()
-                if (extracted.isNotBlank()) extracted else "(PDF sealed and vaulted; no extractable text layer found.)"
+        val text = try {
+            when {
+                mime.startsWith("text") -> plainFile.readText(Charsets.UTF_8)
+                mime.startsWith("application/pdf") -> {
+                    val extracted = pdfExtractor.extractText(plainFile).trim()
+                    if (extracted.isNotBlank()) extracted else "(PDF sealed and vaulted; no extractable text layer found.)"
+                }
+                else -> "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
             }
-            else -> "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
+        } finally {
+            plainFile.delete()
         }
-        return IngestResult.DocumentSuccess(fileName, mime, text, hash, stored.length())
+        return IngestResult.DocumentSuccess(fileName, mime, text, hash, vault.evidenceSize(fileName))
     }
 
     /** Compute SHA-512 of a picked file for seal verification. Streams; never resident. */

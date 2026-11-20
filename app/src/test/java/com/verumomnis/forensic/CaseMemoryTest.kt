@@ -2,6 +2,7 @@ package com.verumomnis.forensic
 
 import com.verumomnis.forensic.vault.CaseMemory
 import com.verumomnis.forensic.vault.EvidenceVault
+import com.verumomnis.forensic.vault.VaultEncryption
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -22,7 +23,10 @@ class CaseMemoryTest {
     @get:Rule
     val temp = TemporaryFolder()
 
-    private fun vault() = EvidenceVault(temp.newFolder()).also { it.initialize() }
+    private fun vault(): EvidenceVault {
+        val key = VaultEncryption.generateKey()
+        return EvidenceVault(temp.newFolder(), masterKeyProvider = { key }).also { it.initialize() }
+    }
 
     @Test
     fun `a saved session is restored verbatim`() {

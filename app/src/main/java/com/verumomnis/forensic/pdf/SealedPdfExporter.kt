@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.SealedEmail
+import com.verumomnis.forensic.vault.EvidenceVault
 import java.io.File
 
 /**
@@ -31,11 +32,19 @@ class SealedPdfExporter(private val context: Context) {
     fun exportReport(report: ForensicReport): File {
         // Load preserved originals for image exhibits so they render on the exhibit pages.
         val rawDir = File(context.filesDir, "vault/evidence/raw")
+        val vault = EvidenceVault(context)
         val exhibitImages = report.mediaExhibits
             .filter { it.kind == com.verumomnis.forensic.model.MediaKind.IMAGE }
             .mapNotNull { ex ->
                 val f = File(rawDir, ex.fileName)
-                if (f.exists()) BitmapFactory.decodeFile(f.path)?.let { ex.fileName to it } else null
+                if (!f.exists()) return@mapNotNull null
+                val plaintext = File.createTempFile("pdf-exhibit-", ".tmp", context.cacheDir)
+                try {
+                    vault.materializeEvidence(ex.fileName, plaintext)
+                    BitmapFactory.decodeFile(plaintext.path)?.let { ex.fileName to it }
+                } finally {
+                    plaintext.delete()
+                }
             }.toMap()
         val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark, logo, exhibitImages)
         val file = File(sealedDir(), "${report.reference}.pdf")

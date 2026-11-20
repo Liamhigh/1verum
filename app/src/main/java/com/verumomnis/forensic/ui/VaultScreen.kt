@@ -91,9 +91,8 @@ private enum class VaultGroup(val title: String) {
 
 private enum class VaultSort(val label: String) { DATE("Date"), NAME("Name") }
 
-private class VaultFile(val file: File) {
+private class VaultFile(val file: File, val sizeBytes: Long = file.length()) {
     val name: String = file.name
-    val sizeBytes: Long = file.length()
     val lastModified: Long = file.lastModified()
     val extension: String = file.extension.lowercase()
     val isPdf: Boolean = extension == "pdf"
@@ -510,6 +509,7 @@ private fun Modifier.dashedZone(color: Color): Modifier = this.drawBehind {
 /** Group the on-disk vault by meaning; config and chat_sessions are never listed. */
 private fun listVaultGroups(context: Context): List<Pair<VaultGroup, List<VaultFile>>> {
     val root = File(context.filesDir, "vault")
+    val vault = EvidenceVault(context)
     fun files(rel: String): List<File> =
         File(root, rel).listFiles()?.filter { it.isFile }.orEmpty()
 
@@ -525,7 +525,12 @@ private fun listVaultGroups(context: Context): List<Pair<VaultGroup, List<VaultF
         VaultGroup.REPORTS to reports,
         VaultGroup.MEDIA to media,
         VaultGroup.OTHER to other
-    ).map { (group, groupFiles) -> group to groupFiles.map { VaultFile(it) } }
+    ).map { (group, groupFiles) ->
+        group to groupFiles.map { file ->
+            val size = if (file.parentFile == vault.evidenceRaw) vault.evidenceSize(file.name) else file.length()
+            VaultFile(file, size)
+        }
+    }
 }
 
 private fun vaultUri(context: Context, file: File) =
@@ -540,8 +545,9 @@ internal fun openVaultArtifact(context: Context, file: File) = openVaultFile(con
 
 private fun openVaultFile(context: Context, file: File) {
     runCatching {
-        val uri = vaultUri(context, file)
-        val mime = mimeFor(file.name)
+        val readableFile = readableVaultFile(context, file)
+        val uri = vaultUri(context, readableFile)
+        val mime = mimeFor(readableFile.name)
         val view = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, mime)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -549,7 +555,7 @@ private fun openVaultFile(context: Context, file: File) {
         if (view.resolveActivity(context.packageManager) != null) {
             context.startActivity(Intent.createChooser(view, "Open sealed file"))
         } else {
-            shareVaultFile(context, file)
+            shareVaultFile(context, readableFile)
         }
     }
 }
@@ -557,14 +563,24 @@ private fun openVaultFile(context: Context, file: File) {
 /** Shares a vault file to any app that accepts it (mail, drive, messaging). */
 private fun shareVaultFile(context: Context, file: File) {
     runCatching {
-        val uri = vaultUri(context, file)
+        val readableFile = readableVaultFile(context, file)
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = mimeFor(file.name)
-            putExtra(Intent.EXTRA_STREAM, uri)
+            type = mimeFor(readableFile.name)
+            putExtra(Intent.EXTRA_STREAM, vaultUri(context, readableFile))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(send, "Share sealed file"))
     }
+}
+
+private fun readableVaultFile(context: Context, file: File): File {
+    val vault = EvidenceVault(context)
+    if (file.parentFile?.canonicalFile != vault.evidenceRaw.canonicalFile ||
+        !com.verumomnis.forensic.vault.VaultEncryption.isEncryptedEvidence(file)
+    ) return file
+
+    val plaintext = File.createTempFile("vault-export-", "-${file.name}", context.cacheDir)
+    return vault.materializeEvidence(file.name, plaintext)
 }
 
 private fun mimeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {

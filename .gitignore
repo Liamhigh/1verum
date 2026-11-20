@@ -1,34 +1,84 @@
-*.iml
-.gradle
-/local.properties
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+.next
+.turbo
+.svelte-kit
+.nuxt
+.output
+.vercel
+
+# dependencies
+node_modules
+
+# IDEs and editors
 /.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
 .DS_Store
-build/
-/captures
-.externalNativeBuild
-.cxx
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
+
+# Native Android project (coexists with web artifacts).
+*.iml
+.gradle/
 local.properties
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
 *.apk
 *.ap_
 *.aab
-
-# Logs and temporary outputs
+*.jks
+*.keystore
 *.log
+/app/src/main/cpp/llama.cpp/
+/generated-artifacts/
+/.migration-backup/
 
-# Root-level documents that should not be tracked
+# Preserve the original project's private/generated document exclusions.
 /*.pdf
 /*.PDF
 /*.png
 /*.txt
 
-# llama.cpp is fetched at CMake configure time (see app/src/main/cpp/CMakeLists.txt
-# FetchContent, pinned commit) — never vendored into this repo's git history.
-/app/src/main/cpp/llama.cpp/
-/app/.cxx/
-
-# Local Android SDK and generated build diagnostics (never commit toolchains).
-/.local/android-sdk/
-/.local/release-signing/
-/generated-artifacts/
-*.jks
-*.keystore
+# These two existing tracked brand references predate the migration.
+# Explicitly retain them despite the environment-wide attached_assets ignore.
+!/attached_assets/Seal_Document_—_Verum_Omnis_(2)_1795172520071.mht
+!/attached_assets/Verum_Omnis_-_AI_Forensics_for_Truth_1795172409993.mht

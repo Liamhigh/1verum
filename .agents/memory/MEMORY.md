@@ -1,2 +1,4 @@
 - [Public native dependency downloads](public-native-dependencies.md) — use checksum-pinned archives when the import connection cannot clone public GitHub sources.
 - [Signing diagnostic privacy](signing-diagnostics.md) — signing failures can echo secret-supplied labels; report allowlisted error categories, not raw logs.
+- [Moved reference assets](moved-reference-assets.md) — environment-wide Git ignores can hide previously tracked uploads after a workspace move.
+- [Native test memory limits](native-test-memory.md) — isolate full Robolectric test classes on this host instead of weakening native coverage.

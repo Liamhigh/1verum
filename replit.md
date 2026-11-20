@@ -1,55 +1,65 @@
 # Verum Omnis on Replit
 
-This repository is a native Android app (Kotlin, Jetpack Compose, and a C++
-llama.cpp inference bridge), not a web app. Keep the existing Gradle structure.
-Read `AGENTS.md` before changing application code.
+Verum Omnis remains a native Kotlin/Jetpack Compose Android app with a C++
+llama.cpp inference bridge. The pnpm workspace allows a separate public download
+page to be added later; it does not replace or serve the Android UI. Read
+`AGENTS.md` before changing application code.
 
-## Build
+## Workspace layout and boundaries
 
-Press **Run** or use the Shell:
+- `app/`, `gradle/`, `gradlew`, and root Gradle files: original native project.
+- `scripts/android-build.sh`: one-shot Android toolchain setup and build entry point.
+- `artifacts/`: separate web artifacts and their HTTP services, not Android sources.
+- `lib/` and the TypeScript files in `scripts/`: pnpm scaffold utilities.
+  Scaffold API/database packages are not part of the Android app.
+- `docs/`, `design/`, and root specifications: internal native project references.
+- `.migration-backup/`: retained migration metadata; not a build entry point.
 
-```bash
-bash scripts/android-build.sh
-```
+Never configure `android-build.sh` or Gradle as a web/deployment server. They
+finish after producing files and do not open a port. A future download page must
+have its own artifact-owned HTTP workflow. Do not port the native UI, expose the
+workspace with a static file server, or auto-publish. No Android emulator is
+available here.
 
-The script uses Java 17 from the Replit Nix configuration and installs the
-official Android command-line tools into `.local/android-sdk` on first use.
-It accepts Android SDK licenses and installs API 34, Build Tools 34.0.0,
-NDK 27.2.12479018, and CMake 3.22.1. The first build requires network access
-and several GB of disk space. Gradle downloads dependencies, and CMake fetches
-the pinned llama.cpp revision as a checksum-verified public archive (no GitHub
-credentials required). Later builds reuse these local downloads.
+## Android build
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Download it from
-the Files panel and install it on an Android 10+ ARM64 device. It is debug-signed,
-not a store-ready release. Building an APK does not run the Android UI here.
-There is no web server or browser preview; do not add one just for setup.
-Use the Run command rather than a persistent server workflow for this one-off build.
-
-## Direct APK sharing
-
-Create a release-signed APK with:
+Run from the workspace root (the script also works from any directory):
 
 ```bash
+bash scripts/android-build.sh                 # assembleDebug
 bash scripts/android-build.sh assembleRelease
 ```
 
-Release builds require the following Replit Secrets:
-`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
-and `ANDROID_KEY_PASSWORD`. Base64-encode your locally backed-up `.jks` file
-and add the encoded value and credentials through the Secrets tool. Do not put
-the keystore or its passwords in Git or chat. The build script materializes the
-keystore under the ignored `.local/release-signing/` directory only while
-Gradle runs, then removes the temporary copy.
+The script uses Java 17 from `.replit` and installs official Android command-line
+tools in `.local/android-sdk` on first use. It accepts SDK licenses and installs
+API 34, Build Tools 34.0.0, NDK 27.2.12479018, and CMake 3.22.1. First use needs
+network access and several GB of space. Gradle downloads dependencies; CMake
+fetches the pinned, checksum-verified llama.cpp archive without Git credentials.
+Later builds reuse local downloads. `local.properties` is generated locally.
 
-The alias is the key's label, not its password. The script validates the keystore
-before compiling; if the configured alias is wrong but the store contains exactly
-one private key, it explicitly selects that key. Stores with multiple keys require
-the correct alias. Signing credentials are not printed.
+| Build | Output |
+| --- | --- |
+| Debug (debug-signed) | `app/build/outputs/apk/debug/app-debug.apk` |
+| Release (release-signed) | `app/build/outputs/apk/release/app-release.apk` |
 
-Download the signed APK from `app/build/outputs/apk/release/app-release.apk`.
-Keep the original keystore and password backup: every update must use the same
-signing identity. The release APK deliberately contains no NewsAPI credential.
+Install on an Android 10+ ARM64 device. Building does not run or preview the app.
+For a preconfigured SDK outside Replit, standard `./gradlew assembleDebug`,
+`./gradlew testDebugUnitTest`, and `./gradlew lintDebug` remain valid.
+
+## Release identity and secrets
+
+Release builds require existing Replit Secrets `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`.
+Keep the same backed-up keystore for every update; do not generate a replacement.
+The script writes a temporary key under ignored `.local/release-signing/` only
+while Gradle runs and removes it afterward. It validates the store before
+compiling; a mismatched alias is resolved only if the store has one private key.
+Multiple-key stores require the correct alias. Never print signing diagnostics
+that could contain secret values. Capture release logs privately.
+
+The release APK contains no NewsAPI credential. Debug builds work without a key
+and report news as unavailable. See `docs/NEWS_API_CONFIGURATION.md` for optional
+local debug configuration and the limits of credentials in APKs.
 
 ## Checks
 
@@ -57,18 +67,33 @@ signing identity. The release APK deliberately contains no NewsAPI credential.
 bash scripts/android-build.sh testDebugUnitTest
 bash scripts/android-build.sh lintDebug
 bash scripts/android-build.sh testDebugUnitTest --tests 'com.verumomnis.forensic.UiScreenshotTest'
+pnpm install --frozen-lockfile
+pnpm run typecheck
 ```
 
-Unit-test HTML reports: `app/build/reports/tests/testDebugUnitTest/index.html`.
-JVM screenshot output: `app/build/screenshots/`.
-These checks do not replace testing device-only camera, GPS, biometric, and native
-inference behavior on a physical Android device.
+Android test reports: `app/build/reports/tests/testDebugUnitTest/index.html`.
+JVM screenshots: `app/build/screenshots/`. Device-only camera, GPS, biometrics,
+and native inference still need a physical Android device. No browser screenshot
+can verify native Compose UI.
 
-## Local files and credentials
+The full Robolectric/native-graphics suite can exceed this host's memory in a
+shared test process. For broad verification, use one test worker and fork a new
+process per test class; the workspace preservation check passed with a 1 GiB
+Gradle heap and 512 MiB test heaps. This is a host-only test constraint, not an
+Android app/runtime setting.
 
-`local.properties` is generated with the local SDK path and must not be committed.
-The downloaded SDK, `.cxx`, build output, and generated diagnostics are ignored.
-No credentials are required to compile. NewsAPI has no shared fallback: debug
-builds work without a key and report news as unavailable. See
-[`docs/NEWS_API_CONFIGURATION.md`](docs/NEWS_API_CONFIGURATION.md) for local
-debug configuration and the security limits of credentials in Android APKs.
+pnpm checks cover only the web workspace, not Kotlin. The post-merge script
+installs pnpm dependencies only; it must not push a scaffold database or start
+Android compilation. Web artifacts own their service run/build commands.
+
+## Private files and future downloads
+
+`.gitignore` excludes SDKs, signing files, local properties, caches, APKs, and
+`generated-artifacts/`. `.replitignore` additionally excludes native sources,
+private inputs, supporting documents, and the migration backup from web
+deployment images. Do not weaken those boundaries to serve an APK.
+
+A future download artifact must use an explicit public-assets allowlist: only
+the verified release APK and deliberately selected brand assets/metadata. Never
+copy signing materials, vault/evidence data, internal reports, or the project
+root into a public directory. No public download page is built in this step.

@@ -1,0 +1,2 @@
+- [Public native dependency downloads](public-native-dependencies.md) — use checksum-pinned archives when the import connection cannot clone public GitHub sources.
+- [Signing diagnostic privacy](signing-diagnostics.md) — signing failures can echo secret-supplied labels; report allowlisted error categories, not raw logs.

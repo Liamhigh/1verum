@@ -1,6 +1,49 @@
-/.local/android-sdk/
-/.local/release-signing/
-/.gradle/
-/app/build/
-/app/.cxx/
-/generated-artifacts/
+# The format of this file is identical to `.dockerignore`.
+# It is used to reduce the size of deployed images to make the process of publishing faster.
+
+# No need to store the pnpm store twice.
+.local
+
+# Web deployments must never include the native workspace, build caches,
+# signing files, private inputs, internal documentation, or migration backup.
+.migration-backup/
+.agents/
+.git/
+.github/
+.gradle/
+.cache/
+.config/
+.upm/
+app/
+gradle/
+gradlew
+gradlew.bat
+build/
+build.gradle.kts
+settings.gradle.kts
+gradle.properties
+local.properties
+scripts/android-build.sh
+generated-artifacts/
+attached_assets/
+docs/
+design/
+examples/
+tests/
+/*.md
+/*.py
+/*.json
+!package.json
+!tsconfig.json
+!tsconfig.base.json
+/verum-ui.css
+*.apk
+*.aab
+*.ap_
+*.jks
+*.keystore
+*.pem
+*.key
+.env
+.env.*
+*.log

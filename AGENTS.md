@@ -42,7 +42,18 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
 - Every `ForensicService.scan()` now writes a `findings.json` artefact into the vault following the G3 Hybrid Report Pipeline contract (`FINDINGS_JSON_SCHEMA.json`).
 - G3-raised candidates are explicitly labelled in `ReportWriter.kt` and never presented as engine-verified.
 
-## Common commands (standard Gradle; run from repo root)
+## Workspace coexistence
+- The native Gradle project stays at the workspace root; `artifacts/` is reserved
+  for independent web surfaces. Do not run JavaScript migration copy scripts on
+  Kotlin sources or convert the Compose UI.
+- On Replit, use `bash scripts/android-build.sh [Gradle tasks...]` to provision
+  the local Android SDK and build. See `replit.md` for outputs and signing.
+- Android compilation is a one-shot shell operation, never an HTTP workflow or
+  deployment run command. Only a web artifact may own its web server.
+- Native sources, private inputs, signing materials, and internal reports must
+  stay outside every web artifact's public directory and deployment image.
+
+## Common commands (standard Gradle with a configured SDK; run from repo root)
 - Unit tests: `./gradlew testDebugUnitTest`
 - Lint: `./gradlew lintDebug`
 - Debug APK: `./gradlew assembleDebug` (output `app/build/outputs/apk/debug/app-debug.apk`)

@@ -1,0 +1,6 @@
+/.local/android-sdk/
+/.local/release-signing/
+/.gradle/
+/app/build/
+/app/.cxx/
+/generated-artifacts/

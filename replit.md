@@ -26,6 +26,26 @@ not a store-ready release. Building an APK does not run the Android UI here.
 There is no web server or browser preview; do not add one just for setup.
 Use the Run command rather than a persistent server workflow for this one-off build.
 
+## Direct APK sharing
+
+Create a release-signed APK with:
+
+```bash
+bash scripts/android-build.sh assembleRelease
+```
+
+Release builds require the following Replit Secrets:
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+and `ANDROID_KEY_PASSWORD`. Base64-encode your locally backed-up `.jks` file
+and add the encoded value and credentials through the Secrets tool. Do not put
+the keystore or its passwords in Git or chat. The build script materializes the
+keystore under the ignored `.local/release-signing/` directory only while
+Gradle runs, then removes the temporary copy.
+
+Download the signed APK from `app/build/outputs/apk/release/app-release.apk`.
+Keep the original keystore and password backup: every update must use the same
+signing identity. The release APK deliberately contains no NewsAPI credential.
+
 ## Checks
 
 ```bash

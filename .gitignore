@@ -28,4 +28,7 @@ local.properties
 
 # Local Android SDK and generated build diagnostics (never commit toolchains).
 /.local/android-sdk/
+/.local/release-signing/
 /generated-artifacts/
+*.jks
+*.keystore

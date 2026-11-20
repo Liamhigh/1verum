@@ -21,6 +21,12 @@ val debugNewsApiKey = (
         ?: ""
     ).trim()
 
+val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
+    ?.takeIf { it.isNotBlank() }
+val releaseStorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+
 fun buildConfigString(value: String): String =
     "\"" + value
         .replace("\\", "\\\\")
@@ -72,9 +78,32 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseKeystorePath != null) {
+            if (
+                releaseStorePassword.isNullOrBlank() ||
+                releaseKeyAlias.isNullOrBlank() ||
+                releaseKeyPassword.isNullOrBlank()
+            ) {
+                throw GradleException(
+                    "Release signing is incomplete. Configure the Android signing secrets."
+                )
+            }
+            create("releaseUpload") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("releaseUpload")
+            }
             // Never embed the optional local debug credential in a distributable APK.
             buildConfigField("String", "NEWS_API_KEY", "\"\"")
             proguardFiles(
@@ -140,6 +169,26 @@ android {
     // The in-app Constitution reads the generated copy of the repo's
     // CONSTITUTION.md — see syncConstitution below.
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/constitution"))
+}
+
+val validateReleaseSigning by tasks.registering {
+    group = "verification"
+    description = "Prevents creating an unsigned APK or app bundle for distribution."
+    doLast {
+        if (releaseKeystorePath == null) {
+            throw GradleException(
+                "Release outputs must be signed. Run scripts/android-build.sh with " +
+                    "ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, " +
+                    "ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD configured as Replit Secrets."
+            )
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "packageRelease" || name == "bundleRelease") {
+        dependsOn(validateReleaseSigning)
+    }
 }
 
 /**

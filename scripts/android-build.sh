@@ -47,4 +47,51 @@ mv "$properties" "$ROOT/local.properties"
 if [[ "$#" == 0 ]]; then
   set -- assembleDebug
 fi
+
+needs_release_signing=0
+for task in "$@"; do
+  case "$task" in
+    *assembleRelease*|*bundleRelease*|*packageRelease*|*installRelease*)
+      needs_release_signing=1
+      ;;
+  esac
+done
+
+if [[ "$needs_release_signing" == 1 ]]; then
+  required_secrets=(
+    ANDROID_KEYSTORE_BASE64
+    ANDROID_KEYSTORE_PASSWORD
+    ANDROID_KEY_ALIAS
+    ANDROID_KEY_PASSWORD
+  )
+  missing=()
+  for name in "${required_secrets[@]}"; do
+    if [[ -z "${!name:-}" ]]; then
+      missing+=("$name")
+    fi
+  done
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    printf 'Release signing requires these Replit Secrets: %s\n' "${missing[*]}" >&2
+    exit 2
+  fi
+
+  signing_dir="$ROOT/.local/release-signing"
+  signing_file="$signing_dir/verum-omnis-release.jks"
+  mkdir -p "$signing_dir"
+  chmod 700 "$signing_dir"
+  umask 077
+  if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_file"; then
+    rm -f "$signing_file"
+    echo "ANDROID_KEYSTORE_BASE64 is not valid base64." >&2
+    exit 2
+  fi
+  if [[ ! -s "$signing_file" ]]; then
+    rm -f "$signing_file"
+    echo "The decoded Android signing keystore is empty." >&2
+    exit 2
+  fi
+  export ANDROID_KEYSTORE_FILE="$signing_file"
+  trap 'rm -f "$signing_file"' EXIT
+fi
+
 exec bash ./gradlew "$@"

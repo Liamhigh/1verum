@@ -7,3 +7,7 @@ packages = ["jdk17", "unzip"]
 
 [agent]
 expertMode = true
+
+[deployment]
+deploymentTarget = "cloudrun"
+run = "bash scripts/android-build.sh"

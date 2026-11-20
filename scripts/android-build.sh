@@ -76,10 +76,11 @@ if [[ "$needs_release_signing" == 1 ]]; then
   fi
 
   signing_dir="$ROOT/.local/release-signing"
-  signing_file="$signing_dir/verum-omnis-release.jks"
   mkdir -p "$signing_dir"
   chmod 700 "$signing_dir"
   umask 077
+  signing_file="$(mktemp "$signing_dir/keystore.XXXXXX.jks")"
+  trap 'rm -f "$signing_file"' EXIT
   if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_file"; then
     rm -f "$signing_file"
     echo "ANDROID_KEYSTORE_BASE64 is not valid base64." >&2
@@ -91,7 +92,13 @@ if [[ "$needs_release_signing" == 1 ]]; then
     exit 2
   fi
   export ANDROID_KEYSTORE_FILE="$signing_file"
-  trap 'rm -f "$signing_file"' EXIT
+  unset ANDROID_KEYSTORE_BASE64
 fi
 
-exec bash ./gradlew "$@"
+if [[ "$needs_release_signing" == 1 ]]; then
+  # Keep this shell alive so EXIT removes the temporary signing key on success
+  # or failure. Don't retain the signing credentials in a reusable Gradle daemon.
+  bash ./gradlew --no-daemon "$@"
+else
+  exec bash ./gradlew "$@"
+fi

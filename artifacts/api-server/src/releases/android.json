@@ -1,0 +1,11 @@
+{
+  "version": "5.2.8",
+  "versionCode": 1,
+  "packageName": "com.verumomnis.forensic",
+  "filename": "verum-omnis-5.2.8.apk",
+  "sizeBytes": 93558060,
+  "minSdk": 29,
+  "abi": "arm64-v8a",
+  "sha256": "27e9df0693a11739aedc12924cdb376ce76b08a2245473256b75aeecca348cb7",
+  "objectName": "public/releases/27e9df0693a11739aedc12924cdb376ce76b08a2245473256b75aeecca348cb7/verum-omnis-5.2.8.apk"
+}

@@ -11,6 +11,38 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /releases/verum-omnis-5.2.8.apk:
+    get:
+      operationId: downloadAndroidRelease
+      summary: Download the signed Verum Omnis Android release
+      description: Fixed approved release only. Supports HEAD and single byte ranges for resumed downloads.
+      responses:
+        "200":
+          description: Signed release APK
+          content:
+            application/vnd.android.package-archive:
+              schema: { type: string, format: binary }
+        "206":
+          description: Requested byte range
+          content:
+            application/vnd.android.package-archive:
+              schema: { type: string, format: binary }
+        "304":
+          description: Release unchanged
+        "416":
+          description: Invalid or unsatisfiable byte range
+        "503":
+          description: Download temporarily unavailable
+  /releases/verum-omnis-5.2.8.apk.sha256:
+    get:
+      operationId: downloadAndroidChecksum
+      summary: Download the SHA-256 checksum file
+      responses:
+        "200":
+          description: SHA-256 checksum and APK filename
+          content:
+            text/plain:
+              schema: { type: string }
   /healthz:
     get:
       operationId: healthCheck

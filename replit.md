@@ -1,8 +1,8 @@
 # Verum Omnis on Replit
 
 Verum Omnis remains a native Kotlin/Jetpack Compose Android app with a C++
-llama.cpp inference bridge. The pnpm workspace allows a separate public download
-page to be added later; it does not replace or serve the Android UI. Read
+llama.cpp inference bridge. The pnpm workspace includes a separate public download
+page; it does not replace or serve the Android UI. Read
 `AGENTS.md` before changing application code.
 
 ## Workspace layout and boundaries
@@ -86,14 +86,41 @@ pnpm checks cover only the web workspace, not Kotlin. The post-merge script
 installs pnpm dependencies only; it must not push a scaffold database or start
 Android compilation. Web artifacts own their service run/build commands.
 
-## Private files and future downloads
+## Private files and public downloads
 
 `.gitignore` excludes SDKs, signing files, local properties, caches, APKs, and
 `generated-artifacts/`. `.replitignore` additionally excludes native sources,
 private inputs, supporting documents, and the migration backup from web
 deployment images. Do not weaken those boundaries to serve an APK.
 
-A future download artifact must use an explicit public-assets allowlist: only
+The download artifact uses an explicit public-assets allowlist: only
 the verified release APK and deliberately selected brand assets/metadata. Never
 copy signing materials, vault/evidence data, internal reports, or the project
-root into a public directory. No public download page is built in this step.
+root into a public directory.
+
+`artifacts/verum-download` owns `/` and builds to its own static `dist/public`
+directory. Its production build has no Android SDK or signing-secret dependency.
+`artifacts/api-server` owns `/api`, with health probe `/api/healthz`, and serves
+only the approved APK and checksum at the two exact `/api/releases/` routes.
+There is no storage browsing or public upload API. The APK is in App Storage,
+not the deployment image or Git. `DEFAULT_OBJECT_STORAGE_BUCKET_ID` must be
+available in production; the configured shared storage setting supplies it.
+
+For a future release, first build and verify the signed APK with `apksigner`.
+Update `artifacts/api-server/src/releases/android.json`, the fixed API routes,
+OpenAPI contract, and download page metadata/links together, then regenerate
+the client with `pnpm --filter @workspace/api-spec run codegen`. Stage only the
+approved file with:
+
+```bash
+node --experimental-strip-types artifacts/api-server/scripts/stage-release.mjs app/build/outputs/apk/release/app-release.apk
+```
+
+Staging verifies local and stored SHA-256, uses a checksum-addressed object path,
+and refuses overwrites. It is a maintainer operation, never a web startup/build
+step. The API pins the validated storage generation while streaming and supports
+resumable byte ranges. Run range unit checks with:
+
+```bash
+node --experimental-strip-types --test artifacts/api-server/tests/download-range.test.mjs
+```

@@ -1,0 +1,24 @@
+kind = "web"
+previewPath = "/"
+title = "Verum Omnis — Android Download"
+description = "Public signed Android APK download with installation instructions, compatibility details, and SHA-256 checksum."
+version = "1.0.0"
+id = "artifacts/verum-download"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19798
+
+[services.development]
+run = "pnpm --filter @workspace/verum-download run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/verum-download", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/verum-download/dist/public"
+
+[services.env]
+PORT = "19798"
+BASE_PATH = "/"

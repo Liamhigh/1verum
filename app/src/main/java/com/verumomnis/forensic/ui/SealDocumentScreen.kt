@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +60,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -118,6 +120,7 @@ fun SealDocumentScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    var showOptionalDetails by rememberSaveable { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
@@ -147,7 +150,8 @@ fun SealDocumentScreen(
             Spacer(Modifier.height(8.dp))
             HeaderSection()
             Spacer(Modifier.height(20.dp))
-            LawEnforcementBanner()
+            if (!state.sealBusy && state.sealResult == null) {
+            SealingModeSelector(selected = state.sealMode, onSelect = viewModel::setSealMode)
             Spacer(Modifier.height(20.dp))
             UploadZone(
                 hasFile = state.sealPdfBytes != null,
@@ -158,9 +162,16 @@ fun SealDocumentScreen(
                 FileInfoCard(name = state.sealPdfName, size = formatFileSize(state.sealPdfSize), onClear = { viewModel.clearSealDocument() })
             }
             Spacer(Modifier.height(20.dp))
+            Text("GPS and device details are captured when available. You can seal without running analysis.",
+                color = VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
+            TextButton(onClick = { showOptionalDetails = !showOptionalDetails }) {
+                Text(if (showOptionalDetails) "Hide optional details" else "+ Optional details",
+                    color = VoAccentBlue)
+            }
+            if (showOptionalDetails) {
+            Text("Identity, password protection and commercial use", color = VoTextMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
             SealTypeSelector(selected = state.sealType, onSelect = viewModel::setSealType)
-            Spacer(Modifier.height(20.dp))
-            SealingModeSelector(selected = state.sealMode, onSelect = viewModel::setSealMode)
             if (state.sealType == "commercial") {
                 Spacer(Modifier.height(16.dp))
                 Label("Organisation Name")
@@ -176,13 +187,21 @@ fun SealDocumentScreen(
                 confirm = state.sealPasswordConfirm,
                 onPasswordChange = { p, c -> viewModel.setPassword(p, c) }
             )
+            }
             Spacer(Modifier.height(24.dp))
             SealButton(
-                label = if (state.sealMode == "forensic") "Seal + Forensic Scan" else "Seal Document",
+                label = if (state.sealMode == "forensic") "Seal with forensic report" else "Seal document",
                 enabled = state.sealPdfBytes != null && !state.sealBusy,
                 busy = state.sealBusy,
                 onClick = { viewModel.sealDocument() }
             )
+            }
+            if (state.sealBusy) {
+                Text(state.sealPdfName, color = VoTextPrimary, fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Text(if (state.sealForensicRequested) "Sealing document and preparing forensic report…"
+                    else "Sealing document…", color = VoTextMuted, fontSize = 13.sp)
+            }
             if (state.sealError.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text(state.sealError, color = VoRed, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -191,15 +210,20 @@ fun SealDocumentScreen(
                 Spacer(Modifier.height(24.dp))
                 PipelineSection(state.sealPipeline)
             }
-            if (state.sealMode == "forensic") {
-                ForensicScanStatus(state = state, onOpenReport = onNavigateReport)
+            if (state.sealForensicRequested) {
+                ForensicScanStatus(state = state, onOpenReport = onNavigateReport,
+                    onShareReport = { state.reportPdfFile?.let { com.verumomnis.forensic.pdf.SealedPdfExporter(context).share(it) } },
+                    onRetryReport = viewModel::retryReportPdf)
             }
             state.sealResult?.let { result ->
                 Spacer(Modifier.height(24.dp))
                 ResultsCard(result = result, documentName = state.sealPdfName, viewModel = viewModel, context = context, onVerifyClick = { openWebsiteVerify(context) })
             }
-            Spacer(Modifier.height(32.dp))
-            InfoSection()
+            if (!state.sealBusy && state.sealResult != null) {
+                TextButton(onClick = { viewModel.clearSealDocument() }) {
+                    Text("Seal another document", color = VoAccentBlue)
+                }
+            }
             Spacer(Modifier.height(32.dp))
             Footer()
     }
@@ -347,16 +371,16 @@ private fun SealingModeSelector(selected: String, onSelect: (String) -> Unit) {
         Label("Sealing Mode")
         ModeCard(
             icon = Icons.Filled.Shield,
-            title = "Seal Only — Tamper Protection (default)",
-            body = "Cryptographic seal + blockchain timestamp only. No content is analysed and nothing leaves this device. You receive the sealed PDF and a Seal Certificate.",
+            title = "Seal document",
+            body = "Protect your PDF with a watermark, QR code and cryptographic seal. Record available GPS and device details. No content analysis. Only the document hash is sent for blockchain timestamping.",
             active = selected == "seal-only",
             onClick = { onSelect("seal-only") }
         )
         Spacer(Modifier.height(10.dp))
         ModeCard(
             icon = Icons.Filled.Search,
-            title = "Seal + Forensic Analysis",
-            body = "Everything in Seal Only, plus an on-device forensic scan by the Nine-Brain engine (findings for human review) and a sealed forensic report.",
+            title = "Seal document with forensic report",
+            body = "Everything above, plus on-device Nine-Brain analysis and a separate sealed forensic report PDF. Document content stays on your device.",
             active = selected == "forensic",
             onClick = { onSelect("forensic") }
         )
@@ -394,10 +418,13 @@ private fun ModeCard(icon: androidx.compose.ui.graphics.vector.ImageVector, titl
  * "Seal + Forensic Analysis" mode, with a link to the sealed report.
  */
 @Composable
-private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
-    val scanning = state.sealStage != SealStage.IDLE && state.sealStage != SealStage.DONE && state.sealStage != SealStage.ERROR
-    val done = state.report != null
-    if (!scanning && !done) return
+private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit,
+                              onShareReport: () -> Unit, onRetryReport: () -> Unit) {
+    val linkedReport = state.sealReportReference.isNotBlank() && state.report?.reference == state.sealReportReference
+    val scanning = state.sealForensicRunning || (linkedReport && state.reportPdfGenerating)
+    val done = linkedReport && !scanning && state.reportPdfFile?.isFile == true && state.reportPdfError.isBlank()
+    val error = if (linkedReport) state.reportPdfError else state.sealForensicError
+    if (!scanning && !done && error.isBlank()) return
     Spacer(Modifier.height(24.dp))
     Column(
         modifier = Modifier
@@ -406,10 +433,11 @@ private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
             .border(1.dp, VoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
-        Text("Forensic Scan", fontFamily = Cormorant, fontSize = 20.sp, color = VoHeading)
+        Text("Forensic report", fontFamily = Cormorant, fontSize = 20.sp, color = VoHeading)
         Spacer(Modifier.height(10.dp))
         if (scanning) {
-            Text(state.sealStage.label, color = VoTextPrimary, fontSize = 13.sp)
+            Text(if (state.reportPdfGenerating) "Writing the sealed report PDF…" else "Please wait for analysis and report generation to finish.",
+                color = VoTextPrimary, fontSize = 13.sp)
             Spacer(Modifier.height(10.dp))
             LinearProgressIndicator(
                 progress = { state.sealStage.progress },
@@ -417,6 +445,10 @@ private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
                 color = VoGold,
                 trackColor = VoBackground
             )
+        }
+        if (error.isNotBlank() && !scanning) {
+            Text(error, color = VoRed, fontSize = 13.sp)
+            if (linkedReport) TextButton(onClick = onRetryReport) { Text("Retry report PDF", color = VoAccentBlue) }
         }
         if (done) {
             Text(
@@ -431,6 +463,10 @@ private fun ForensicScanStatus(state: UiState, onOpenReport: () -> Unit) {
                 onClick = onOpenReport,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onShareReport, modifier = Modifier.fillMaxWidth()) {
+                Text("Save / share forensic PDF", color = VoAccentBlue)
+            }
         }
     }
 }

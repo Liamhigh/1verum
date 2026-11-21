@@ -102,7 +102,8 @@ fun VerumApp(
     initialMenuOpen: Boolean = false
 ) {
     val state by viewModel.state.collectAsState()
-    var screen by remember { mutableStateOf(runCatching { Screen.valueOf(initialScreen) }.getOrDefault(Screen.SCAN_HOME)) }
+    var screen by remember { mutableStateOf(runCatching { Screen.valueOf(initialScreen) }
+        .getOrDefault(Screen.LANDING).let { if (it == Screen.SCAN_HOME) Screen.SEAL_DOCUMENT else it }) }
     var showMenu by remember { mutableStateOf(initialMenuOpen) }
     var confirmNewScan by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -111,17 +112,19 @@ fun VerumApp(
     // the system back button / top-bar arrow pops it (falls back to scan home).
     val backStack = remember { mutableStateListOf<Screen>() }
     fun navigate(target: Screen) {
-        if (target != screen) {
+        val destination = if (target == Screen.SCAN_HOME) Screen.SEAL_DOCUMENT else target
+        if (destination != screen) {
             backStack.add(screen)
-            screen = target
+            screen = destination
         }
     }
     fun goBack() {
-        screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex) else Screen.SCAN_HOME
+        screen = if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex) else Screen.LANDING
     }
     fun resetToHome() {
         backStack.clear()
-        screen = Screen.SCAN_HOME
+        viewModel.clearSealDocument()
+        screen = Screen.LANDING
     }
     BackHandler(enabled = backStack.isNotEmpty() && !showMenu) { goBack() }
 
@@ -242,8 +245,8 @@ fun VerumApp(
                     verifiedCount = state.vaultVerifiedCount,
                     flaggedCount = state.vaultFlaggedCount,
                     recent = state.recentActivity,
-                    onVerify = { navigate(Screen.SCAN_SEAL) },
-                    onSeal = { navigate(Screen.SCAN_HOME) },
+                    onVerify = { openWebsiteVerify(context) },
+                    onSeal = { navigate(Screen.SEAL_DOCUMENT) },
                     onAskVerum = { navigate(Screen.CHAT) },
                     onViewAll = { navigate(Screen.VAULT) },
                     onOpenRecent = { navigate(Screen.VAULT) },
@@ -261,7 +264,7 @@ fun VerumApp(
                     topBar = {
                         VerumTopBar(
                             title = when (screen) {
-                                Screen.SCAN_HOME -> "New Forensic Scan"
+                                Screen.SCAN_HOME -> "Seal Document"
                                 // Spec §1/§3.7: the AI is "Verum Omnis" everywhere.
                                 Screen.CHAT -> "Verum Omnis"
                                 Screen.REPORT -> "Forensic Report"
@@ -281,7 +284,7 @@ fun VerumApp(
                                 Screen.STORY -> ""
                                 Screen.LANDING -> ""
                             },
-                            onBack = if (screen == Screen.SCAN_HOME || screen == Screen.LANDING) null else ({ goBack() }),
+                            onBack = if (screen == Screen.LANDING) null else ({ goBack() }),
                             trailing = {
                                 // The device tier / RAM readout used to live here, but on the
                                 // chat screen (back arrow + logo + 2 icons) it squeezed the
@@ -333,7 +336,7 @@ fun VerumApp(
                                 onOpenArtifact = { openVaultArtifact(context, it.file) },
                                 onDeleteSet = { viewModel.deleteScanSet(it) },
                                 onEmptyVault = { viewModel.emptyVault() },
-                                onNewDocument = { showMenu = true }
+                                onNewDocument = { navigate(Screen.SEAL_DOCUMENT) }
                             )
                             Screen.STORY -> {}
                             Screen.LANDING -> {}
@@ -386,7 +389,7 @@ fun VerumApp(
                     containerColor = VoBackground
                 ) {
                     ActionsSheet(
-                        onSealDocument = { showMenu = false; sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
+                        onSealDocument = { showMenu = false; navigate(Screen.SEAL_DOCUMENT) },
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
                         onVerifyWebsite = { showMenu = false; openWebsiteVerify(context) },
@@ -397,7 +400,7 @@ fun VerumApp(
                         onReport = {
                             showMenu = false
                             if (state.report != null) navigate(Screen.REPORT)
-                            else viewModel.postEngine("No sealed report yet. Start a forensic scan first.")
+                            else viewModel.postEngine("Choose Seal document with forensic report to create a report.")
                         },
                         onVault = { showMenu = false; navigate(Screen.VAULT) },
                         onTimeline = { showMenu = false; navigate(Screen.TIMELINE) },

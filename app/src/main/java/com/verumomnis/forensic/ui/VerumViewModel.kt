@@ -241,6 +241,11 @@ data class UiState(
     val sealResult: SealResult? = null,
     val sealError: String = "",
     val sealBusy: Boolean = false,
+    /** Outputs are linked to this request, never to an unrelated earlier scan. */
+    val sealForensicRequested: Boolean = false,
+    val sealForensicRunning: Boolean = false,
+    val sealForensicError: String = "",
+    val sealReportReference: String = "",
     /** Verify Document screen state. */
     val verifyHashInput: String = "",
     val verifyFileBytes: ByteArray? = null,
@@ -279,7 +284,8 @@ class VerumViewModel(
     seedSampleCase: Boolean = false,
     private val reportPdfWriter: (ForensicReport) -> File = { report ->
         SealedPdfExporter(application).exportReport(report)
-    }
+    },
+    private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application)
 ) : AndroidViewModel(application) {
 
     /** Constructor used by Android's default ViewModelProvider factory. */
@@ -566,7 +572,7 @@ class VerumViewModel(
      * Seal everything added so far through the forensic engine and store it in the
      * vault (findings JSON + forensic report). Only now may the AI read the case.
      */
-    fun sealCase(now: Instant = Instant.now(), caseName: String = "Matter") {
+    fun sealCase(now: Instant = Instant.now(), caseName: String = "Matter", awaitReportPdf: Boolean = false) {
         if (documents.isEmpty() && audios.isEmpty() && medias.isEmpty()) {
             postEngine("Nothing to seal yet — add evidence with the + button first.")
             _state.update { it.copy(sealStage = SealStage.IDLE) }
@@ -576,7 +582,7 @@ class VerumViewModel(
         runScan(now, caseName)
         _state.update { it.copy(sealStage = SealStage.SEALING) }
         storeFindingsJson()
-        generateReportSync(caseName = caseName, now = now)
+        generateReportSync(caseName = caseName, now = now, awaitReportPdf = awaitReportPdf)
         signSealsAndAnchor()
         _state.update { it.copy(sealStage = SealStage.ANCHORING) }
         val r = _state.value.scanResult
@@ -1003,6 +1009,7 @@ class VerumViewModel(
 
     /** Select a PDF for the VO-DSS-1.2 Seal Document screen. */
     fun selectPdfForSealing(bytes: ByteArray, name: String, size: Long) {
+        if (_state.value.sealBusy) return
         _state.update {
             it.copy(
                 sealPdfBytes = bytes,
@@ -1010,6 +1017,10 @@ class VerumViewModel(
                 sealPdfSize = size,
                 sealResult = null,
                 sealError = "",
+                sealForensicRequested = false,
+                sealForensicRunning = false,
+                sealForensicError = "",
+                sealReportReference = "",
                 sealPipeline = UiState.defaultSealPipeline(),
                 websiteSealStatus = "Selected $name (${formatFileSize(size)})"
             )
@@ -1021,6 +1032,7 @@ class VerumViewModel(
     }
 
     fun setSealMode(mode: String) {
+        if (_state.value.sealBusy || mode !in setOf("seal-only", "forensic")) return
         _state.update { it.copy(sealMode = mode) }
     }
 
@@ -1041,6 +1053,7 @@ class VerumViewModel(
     }
 
     fun clearSealDocument() {
+        if (_state.value.sealBusy) return
         _state.update {
             it.copy(
                 sealPdfBytes = null,
@@ -1050,6 +1063,11 @@ class VerumViewModel(
                 sealError = "",
                 sealPipeline = UiState.defaultSealPipeline(),
                 sealBusy = false,
+                sealMode = "seal-only",
+                sealForensicRequested = false,
+                sealForensicRunning = false,
+                sealForensicError = "",
+                sealReportReference = "",
                 passwordProtect = false,
                 sealPassword = "",
                 sealPasswordConfirm = "",
@@ -1071,6 +1089,12 @@ class VerumViewModel(
      * Mirrors the web sealer flow and stores the sealed PDF for sharing/download.
      */
     fun sealDocument(now: Instant = Instant.now()) {
+        if (_state.value.sealBusy) return
+        val request = _state.value
+        if (request.scanning || request.reportPdfGenerating) {
+            _state.update { it.copy(sealError = "Please wait for the current analysis or report PDF to finish.") }
+            return
+        }
         val bytes = _state.value.sealPdfBytes ?: return
         val name = _state.value.sealPdfName.ifBlank { "sealed_document.pdf" }
         val type = _state.value.sealType
@@ -1088,12 +1112,22 @@ class VerumViewModel(
             return
         }
 
-        _state.update { it.copy(sealBusy = true, sealError = "", sealResult = null, sealPipeline = UiState.defaultSealPipeline()) }
+        val forensic = request.sealMode == "forensic"
+        _state.update {
+            it.copy(
+                sealBusy = true, sealError = "", sealResult = null,
+                sealForensicRequested = forensic, sealForensicRunning = forensic,
+                sealForensicError = "", sealReportReference = "",
+                sealPipeline = UiState.defaultSealPipeline() + if (forensic) listOf(
+                    SealPipelineStep("Forensic report", "Forensic report", "Nine-Brain analysis and sealed PDF")
+                ) else emptyList()
+            )
+        }
 
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 updatePipelineStep("GPS + Device", SealPipelineStepStatus.PROCESSING)
-                val gps = _state.value.gps
+                val gps = request.gps
                 updatePipelineStep("GPS + Device", SealPipelineStepStatus.COMPLETE,
                     gps?.let { "%.4f, %.4f".format(it.latitude, it.longitude) } ?: "not recorded")
 
@@ -1104,7 +1138,7 @@ class VerumViewModel(
                 updatePipelineStep("OpenTimestamps", SealPipelineStepStatus.PROCESSING)
                 // Anchor the document's SHA-512 fingerprint via the canonical OTS service.
                 val sha512ForAnchor = com.verumomnis.forensic.seal.SealHasher.sha512Hex(bytes)
-                val ots = runCatching { OpenTimestampsClient.submit(sha512ForAnchor) }.getOrNull()
+                val ots = runCatching { documentSealServices.anchor(sha512ForAnchor) }.getOrNull()
                 updatePipelineStep(
                     "OpenTimestamps",
                     if (ots is OpenTimestampsClient.OtsResult.Success) SealPipelineStepStatus.COMPLETE else SealPipelineStepStatus.ERROR,
@@ -1125,10 +1159,9 @@ class VerumViewModel(
                 updatePipelineStep("Seal Footer", SealPipelineStepStatus.COMPLETE)
 
                 updatePipelineStep("Finalize", SealPipelineStepStatus.PROCESSING)
-                val result = DocumentSealer.sealWithBundledWatermark(
-                    context = getApplication<Application>(),
-                    originalPdfBytes = bytes,
-                    options = DocumentSealer.SealOptions(
+                val result = documentSealServices.seal(
+                    bytes,
+                    DocumentSealer.SealOptions(
                         timestampMs = now.toEpochMilli(),
                         sealType = type,
                         org = org,
@@ -1164,7 +1197,6 @@ class VerumViewModel(
 
                 _state.update {
                     it.copy(
-                        sealBusy = false,
                         sealResult = SealResult(
                             sealedPdf = result.sealedPdf,
                             otsProof = otsProofBytes,
@@ -1187,38 +1219,40 @@ class VerumViewModel(
                 // Seal + Forensic Analysis mode (website parity): after the seal is
                 // applied, the same document goes through the Nine-Brain scan and a
                 // sealed forensic report is generated for human review.
-                if (_state.value.sealMode == "forensic") {
-                    val text = runCatching {
-                        // OCRs image-only pages on-device (ML Kit) so scanned
-                        // bundles are read, not just PDFs with a text layer.
-                        com.verumomnis.forensic.engine.PdfOcrExtractor(getApplication())
-                            .extractText(bytes)
-                    }.getOrDefault("").trim()
-                    if (text.isNotBlank()) {
-                        setPendingFiles(
-                            listOf(
-                                PendingFilePreview(
-                                    fileName = name,
-                                    mimeType = "application/pdf",
-                                    sizeBytes = bytes.size.toLong(),
-                                    sha512 = sha512ForAnchor,
-                                    displayText = text.take(280) + if (text.length > 280) "…" else "",
-                                    isMedia = false,
-                                    documentText = text
-                                )
-                            )
-                        )
-                        confirmAndSeal(caseName = name.removeSuffix(".pdf"), now = now)
-                    } else {
-                        postEngine(
-                            "Forensic scan could not run — no extractable text in $name. " +
-                                "The scan did not complete; absence of findings is NOT a clean result."
-                        )
+                if (forensic) {
+                    updatePipelineStep("Forensic report", SealPipelineStepStatus.PROCESSING, "Reading evidence and running Nine-Brain analysis")
+                    val text = documentSealServices.extractText(bytes).trim()
+                    check(text.isNotBlank()) {
+                        "No readable text was extracted. Analysis did not complete; this is not a clean result."
                     }
+                    // Each selected document starts a fresh active case, rather
+                    // than accidentally including previous uploads. Vault files stay.
+                    clearCase()
+                    addDocument(EvidenceDocument(
+                        evidenceId = "DOC001", fileName = name, type = "pdf",
+                        text = text, sha512 = sha512ForAnchor, gps = gps
+                    ))
+                    sealCase(now, name.removeSuffix(".pdf"), awaitReportPdf = true)
+                    val completed = _state.value
+                    _state.update { it.copy(sealReportReference = completed.report?.reference.orEmpty()) }
+                    check(completed.report != null) { "The forensic report could not be generated." }
+                    check(completed.reportPdfFile?.isFile == true && completed.reportPdfError.isBlank()) {
+                        completed.reportPdfError.ifBlank { "The sealed forensic report PDF could not be saved." }
+                    }
+                    updatePipelineStep("Forensic report", SealPipelineStepStatus.COMPLETE, "Sealed report PDF ready to save or share")
                 }
+                _state.update { it.copy(sealBusy = false, sealForensicRunning = false) }
             }.onFailure { e ->
-                _state.update { it.copy(sealBusy = false, sealError = "Seal failed: ${e.message}") }
-                postEngine("Seal failed: ${e.message}")
+                val partial = forensic && _state.value.sealResult != null
+                val message = if (partial) "Document sealed, but the forensic report did not complete. ${e.message.orEmpty()}"
+                    else "Sealing could not finish. Existing vault files were kept. Please try again."
+                _state.update {
+                    it.copy(sealBusy = false, sealForensicRunning = false,
+                        sealError = if (partial) "" else message,
+                        sealForensicError = if (partial) message else "")
+                }
+                if (forensic) updatePipelineStep("Forensic report", SealPipelineStepStatus.ERROR, message)
+                postEngine(message)
             }
         }
     }
@@ -1410,8 +1444,12 @@ class VerumViewModel(
     private fun createReportPdf(report: ForensicReport) {
         try {
             val file = reportPdfWriter(report)
+            check(file.isFile && file.length() > 0) { "The report PDF was not saved." }
             _state.update {
                 it.copy(reportPdfFile = file, reportPdfGenerating = false, reportPdfError = "")
+            }
+            if (_state.value.sealReportReference == report.reference) {
+                updatePipelineStep("Forensic report", SealPipelineStepStatus.COMPLETE, "Sealed report PDF ready to save or share")
             }
         } catch (_: Exception) {
             _state.update {
@@ -1427,7 +1465,7 @@ class VerumViewModel(
         }
     }
 
-    /** Clear the current case so the user can start a new scan from an empty vault. */
+    /** Clear only the active case; saved vault files and chat history are kept. */
     fun clearCase() {
         documents.clear()
         audios.clear()
@@ -1551,7 +1589,8 @@ class VerumViewModel(
     private fun generateReportSync(
         caseName: String = "Matter",
         now: Instant = Instant.now(),
-        judicialFindings: List<Contradiction> = emptyList()
+        judicialFindings: List<Contradiction> = emptyList(),
+        awaitReportPdf: Boolean = false
     ) {
         val findings = _state.value.scanResult?.findings ?: run {
             runScan(now, caseName)
@@ -1605,7 +1644,8 @@ class VerumViewModel(
             )
         }
         _state.update { it.copy(reportPdfGenerating = true, reportPdfError = "", reportPdfFile = null) }
-        viewModelScope.launch(Dispatchers.IO) { createReportPdf(signedReport) }
+        if (awaitReportPdf) createReportPdf(signedReport)
+        else viewModelScope.launch(Dispatchers.IO) { createReportPdf(signedReport) }
         computeTrustScore()
         anchorSealToBitcoin(auto = true)
     }

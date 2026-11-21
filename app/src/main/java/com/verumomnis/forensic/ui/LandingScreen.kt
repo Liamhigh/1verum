@@ -87,10 +87,10 @@ fun LandingScreen(
     ) {
         Hero()
         Spacer(Modifier.height(20.dp))
-        StatRow(sealedCount, verifiedCount, flaggedCount)
-        Spacer(Modifier.height(20.dp))
         CtaRow(onVerify = onVerify, onSeal = onSeal)
         Spacer(Modifier.height(22.dp))
+        StatRow(sealedCount, verifiedCount, flaggedCount)
+        Spacer(Modifier.height(20.dp))
         AskVerumCard(onClick = onAskVerum)
         Spacer(Modifier.height(22.dp))
         RecentActivitySection(recent, onViewAll = onViewAll, onOpen = onOpenRecent)
@@ -159,8 +159,8 @@ private fun Hero() {
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                "A constitutional forensic AI platform built to democratise justice. " +
-                    "Free for every citizen.",
+                "Seal a document or check its seal. " +
+                    "Add a forensic report only when you need analysis.",
                 color = VoTextBody,
                 fontSize = 12.5.sp,
                 lineHeight = 20.sp,
@@ -235,7 +235,7 @@ private fun CtaRow(onVerify: () -> Unit, onSeal: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "VERIFY DOCUMENT",
+                "CHECK DOCUMENT",
                 color = VoHeading,
                 fontSize = fixedSp(12.5f),
                 letterSpacing = 0.4.sp,

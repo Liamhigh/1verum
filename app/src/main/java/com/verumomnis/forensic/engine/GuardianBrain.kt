@@ -12,7 +12,6 @@ import com.verumomnis.forensic.model.GuardianViolationType
 import com.verumomnis.forensic.model.Severity
 import com.verumomnis.forensic.security.EicarScanner
 import java.time.Instant
-import java.util.Locale
 
 /**
  * B9 — Guardian / Red Team Brain.
@@ -38,6 +37,23 @@ object GuardianBrain {
         "sniper", "ied", "improvised explosive", "bioweapon", "chemical weapon"
     )
 
+    // Never find a weapon keyword inside ordinary words (e.g. IED in "denied").
+    // Keep boundaries Unicode-aware and permit PDF line wrapping within phrases.
+    private fun wholeTermPattern(term: String): Regex {
+        val plural = if (term in setOf(
+                "ied", "munition", "missile", "drone strike", "sniper",
+                "improvised explosive", "bioweapon", "chemical weapon"
+            )) "(?:s)?" else ""
+        val phrase = term.split(' ').joinToString("[\\s\\p{Z}]+") { Regex.escape(it) }
+        return Regex(
+            "(?<![\\p{L}\\p{M}\\p{N}_])$phrase$plural(?![\\p{L}\\p{M}\\p{N}_])",
+            RegexOption.IGNORE_CASE
+        )
+    }
+
+    private val articleXPatterns = ARTICLE_X_KEYWORDS.associateWith(::wholeTermPattern)
+    private val coercionPatterns = COERCION_PATTERNS.associateWith(::wholeTermPattern)
+
     fun analyze(
         documents: List<EvidenceDocument>,
         audioTranscripts: List<String> = emptyList(),
@@ -53,10 +69,9 @@ object GuardianBrain {
 
         // Article X — anti-war / anti-weaponization hard stop.
         allTexts.forEachIndexed { index, text ->
-            val lower = text.lowercase(Locale.ROOT)
             val evidenceId = documents.getOrNull(index)?.evidenceId ?: ""
-            ARTICLE_X_KEYWORDS.forEach { keyword ->
-                if (lower.contains(keyword)) {
+            articleXPatterns.forEach { (keyword, pattern) ->
+                if (pattern.containsMatchIn(text)) {
                     violations += GuardianViolation(
                         type = GuardianViolationType.ARTICLE_X_WEAPONIZATION,
                         severity = Severity.CRITICAL,
@@ -68,8 +83,8 @@ object GuardianBrain {
                     )
                 }
             }
-            COERCION_PATTERNS.forEach { pattern ->
-                if (lower.contains(pattern)) {
+            coercionPatterns.forEach { (pattern, matcher) ->
+                if (matcher.containsMatchIn(text)) {
                     violations += GuardianViolation(
                         type = GuardianViolationType.COERCION_ATTEMPT,
                         severity = Severity.VERY_HIGH,
@@ -133,8 +148,7 @@ object GuardianBrain {
      * assessment with `hardStopRequired = true` if the prompt violates Article X.
      */
     fun validatePrompt(prompt: String, now: Instant = Instant.now()): GuardianAssessment {
-        val lower = prompt.lowercase(Locale.ROOT)
-        val violations = ARTICLE_X_KEYWORDS.filter { lower.contains(it) }.map { keyword ->
+        val violations = articleXPatterns.filterValues { it.containsMatchIn(prompt) }.keys.map { keyword ->
             GuardianViolation(
                 type = GuardianViolationType.ARTICLE_X_WEAPONIZATION,
                 severity = Severity.CRITICAL,

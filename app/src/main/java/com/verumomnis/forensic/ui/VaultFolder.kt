@@ -29,9 +29,18 @@ data class ScanSet(
     val artifacts: List<VaultArtifact>,
     /** Contradictions found, when this set includes a report. */
     val contradictionCount: Int = 0,
-    val timestamp: String = ""
+    val timestamp: String = "",
+    /** Absence of a linked result is not a successful clean scan. */
+    val analysisKnown: Boolean = contradictionCount > 0
 ) {
     val flagged: Boolean get() = contradictionCount > 0
+    val statusLabel: String get() = when {
+        flagged -> "$contradictionCount potential contradiction indicator(s)"
+        analysisKnown -> "Analysed · no contradiction indicators flagged"
+        folder == VaultFolder.RAW -> "Raw evidence · not assessed here"
+        folder == VaultFolder.SEALED -> "Sealed · analysis status unknown"
+        else -> "Stored · analysis status unknown"
+    }
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
     val sizeBytes: Long get() = artifacts.sumOf { it.sizeBytes }
 }
@@ -43,7 +52,7 @@ data class VaultArtifact(
     val sizeBytes: Long
 ) {
     enum class Kind(val label: String) {
-        ORIGINAL("Sealed original"),
+        ORIGINAL("Original evidence"),
         REPORT("Forensic report"),
         FINDINGS("Findings JSON"),
         OTHER("Document")
@@ -90,7 +99,8 @@ object VaultGrouping {
                 name = key,
                 folder = folderOf[key] ?: VaultFolder.RAW,
                 artifacts = artifacts.sortedBy { it.kind.ordinal },
-                contradictionCount = contradictionsByRef[key] ?: 0
+                contradictionCount = contradictionsByRef[key] ?: 0,
+                analysisKnown = contradictionsByRef.containsKey(key)
             )
         }
     }

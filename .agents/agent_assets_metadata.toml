@@ -14,3 +14,17 @@ mtime_ms = 1795287888893
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/1a3df4e8-aa1d-4192-9c7d-5fc6f4448f69/10298e7c-388a-41f5-9f53-cc86a3ecc5b2"
 storage_version_token = "1795287895648139"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "XxCWUsLeAXeKG__Tka07N"
+uri = "file://generated-artifacts/guardian-regression/verum-omnis-5.2.10.apk"
+type = "unspecified"
+title = "Verum Omnis 5.2.10 — Guardian fix"
+description = "Signed Android update, 93.57 MB. Fixes IED substring false positives and misleading raw-vault status labels. Keeps genuine weaponization safeguards. If the download adds .zip, rename the file to verum-omnis-5.2.10.apk without extracting it."
+logical_id = "09cdc7a8-d763-4b66-b7fe-369b7a2a6c78"
+content_hash = "sha256:7db764472334a0f4fb864ab351f81b2cc5ed900e0a0a6cfec9fff2521b8283e0"
+size = 93574440
+mtime_ms = 1795292571383
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/09cdc7a8-d763-4b66-b7fe-369b7a2a6c78/a2de9cac-749e-4ffc-b2f2-da110910d11b"
+storage_version_token = "1795292593742252"
+content_type = "application/octet-stream"

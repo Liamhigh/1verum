@@ -345,7 +345,7 @@ private fun ScanSetRow(
                             .padding(3.dp)
                             .size(8.dp)
                             .clip(RoundedCornerShape(50))
-                            .background(if (set.flagged) VoRed else VoGreen)
+                            .background(if (set.flagged) VoRed else if (set.analysisKnown) VoGreen else VoAccentBlue)
                     )
                 }
             }
@@ -360,8 +360,7 @@ private fun ScanSetRow(
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    if (set.flagged) "${set.contradictionCount} contradiction(s) flagged"
-                    else "Sealed · no contradictions detected",
+                    set.statusLabel,
                     color = if (set.flagged) VoRedText else VoAccentBlue,
                     fontSize = 12.5.sp,
                     maxLines = 1,

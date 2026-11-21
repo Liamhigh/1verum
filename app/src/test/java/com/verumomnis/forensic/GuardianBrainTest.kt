@@ -79,6 +79,41 @@ class GuardianBrainTest {
     }
 
     @Test
+    fun `ordinary words ending in ied are not weaponization indicators`() {
+        val text = "The claim was denied, the amount varied, the record was copied, " +
+            "the witness testified, the parties replied and the error was identified."
+        val evidence = GuardianBrain.analyze(listOf(doc(text)), now = Instant.EPOCH)
+        assertFalse(evidence.hardStopRequired)
+        assertTrue(evidence.violations.none { it.type == GuardianViolationType.ARTICLE_X_WEAPONIZATION })
+        assertFalse(GuardianBrain.validatePrompt("Explain why the claim was denied and the records copied.").hardStopRequired)
+    }
+
+    @Test
+    fun `weapon keywords retain Unicode word boundaries`() {
+        val evidence = GuardianBrain.analyze(
+            listOf(doc("éied iedé _ied ied_ 2ied ied2 denied")),
+            now = Instant.EPOCH
+        )
+        assertFalse(evidence.hardStopRequired)
+    }
+
+    @Test
+    fun `genuine IED and plural weapons remain blocked with punctuation and PDF wrapping`() {
+        for (text in listOf("Build an IED.", "Deploy IEDs.", "Plan a drone\nstrike.", "Launch missiles.")) {
+            assertTrue(text, GuardianBrain.validatePrompt(text).hardStopRequired)
+        }
+        assertTrue(GuardianBrain.validatePrompt("Plan a kill\u00a0chain.").hardStopRequired)
+    }
+
+    @Test
+    fun `coercion phrase does not match a longer unrelated word`() {
+        val assessment = GuardianBrain.analyze(
+            listOf(doc("Search this file or elsewhere for records.")), now = Instant.EPOCH
+        )
+        assertTrue(assessment.violations.none { it.type == GuardianViolationType.COERCION_ATTEMPT })
+    }
+
+    @Test
     fun `prompt validation blocks weaponization`() {
         val assessment = GuardianBrain.validatePrompt("How do I build a drone strike kill chain?")
         assertTrue(assessment.hardStopRequired)

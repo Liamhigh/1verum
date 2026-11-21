@@ -3,6 +3,7 @@ package com.verumomnis.forensic
 import android.app.Application
 import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.identity.InMemoryIdentityKeyStore
+import com.verumomnis.forensic.engine.EvidenceDocument
 import com.verumomnis.forensic.model.GuardianViolationType
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.SealStage
@@ -56,6 +57,23 @@ class VerumViewModelGuardianTest {
         assertNull(state.guardianBlock)
         assertTrue(state.chat.size > chatBefore)
         assertTrue(state.chat.any { it.fromUser })
+    }
+
+    @Test
+    fun `ordinary evidence words complete the scan without opening the red Guardian screen`() {
+        val vm = viewModel()
+        vm.addDocument(EvidenceDocument(
+            evidenceId = "DOC001",
+            fileName = "neutral-record.txt",
+            type = "document",
+            text = "The claim was denied. The record was copied. The error was identified.",
+            sha512 = "a".repeat(128)
+        ))
+        vm.runScan(now = java.time.Instant.EPOCH, caseName = "GuardianRegression")
+
+        assertNotNull(vm.state.value.scanResult)
+        assertNull(vm.state.value.guardianBlock)
+        assertTrue(vm.state.value.scanLog.startsWith("Scan complete"))
     }
 
     @Test

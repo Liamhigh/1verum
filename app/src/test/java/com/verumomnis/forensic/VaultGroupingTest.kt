@@ -5,6 +5,7 @@ import com.verumomnis.forensic.ui.VaultFolder
 import com.verumomnis.forensic.ui.VaultGrouping
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -100,6 +101,29 @@ class VaultGroupingTest {
         assertEquals("matter", VaultGrouping.baseName("matter_findings.json"))
         assertEquals("matter", VaultGrouping.baseName("matter-sealed.pdf"))
         assertEquals("matter", VaultGrouping.baseName("matter.pdf"))
+    }
+
+    @Test
+    fun `raw evidence without a linked result never claims a clean or sealed analysis`() {
+        val set = VaultGrouping.group(
+            raw = listOf(file("raw.pdf")),
+            processed = emptyList(),
+            sealed = emptyList()
+        ).single()
+        assertFalse(set.analysisKnown)
+        assertEquals("Raw evidence · not assessed here", set.statusLabel)
+    }
+
+    @Test
+    fun `a known zero result differs from a missing result`() {
+        val set = VaultGrouping.group(
+            raw = emptyList(),
+            processed = emptyList(),
+            sealed = listOf(file("case_report.pdf")),
+            contradictionsByRef = mapOf("case" to 0)
+        ).single()
+        assertTrue(set.analysisKnown)
+        assertEquals("Analysed · no contradiction indicators flagged", set.statusLabel)
     }
 
     @Test

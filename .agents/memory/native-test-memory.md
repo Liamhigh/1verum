@@ -16,6 +16,9 @@ same unchanged tests to finish successfully. JVM heap limits alone do not cover
 all native-graphics memory. The native PDF writer is also unavailable in this
 Robolectric environment, so an export test may be skipped without indicating a
 device-side failure.
+Actual report PDFs supplied from an Android device were readable and rendered
+with the watermark despite those JVM skips. Do not replace the device PDF writer
+solely to make unsupported Robolectric serialization pass.
 
 **How to apply:** Use an opt-in local Gradle test init configuration with
 `maxParallelForks = 1`, `forkEvery = 1`, and `maxHeapSize = "512m"`; a 1 GiB

@@ -28,3 +28,17 @@ mtime_ms = 1795292571383
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/09cdc7a8-d763-4b66-b7fe-369b7a2a6c78/a2de9cac-749e-4ffc-b2f2-da110910d11b"
 storage_version_token = "1795292593742252"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "6RrnySPgrwndg0NHw0gPB"
+uri = "file://generated-artifacts/simple-sealing/verum-omnis-5.2.11.apk"
+type = "unspecified"
+title = "Verum Omnis 5.2.11 — Simple sealing"
+description = "Signed Android update, 93.59 MB. Home opens Seal or Check. Sealing offers seal-only or seal with an on-device forensic report PDF, with GPS retained when available. Install over the existing app without uninstalling. If the download adds .zip, rename it to verum-omnis-5.2.11.apk; do not extract it."
+logical_id = "f0cb70da-8c97-4ebf-b8bf-597e12ef9a49"
+content_hash = "sha256:dcd31ca167cd79847143f72d05939389c265cbc4a5389a6fca0bd8ae4b1c4ed1"
+size = 93590824
+mtime_ms = 1795296914134
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/f0cb70da-8c97-4ebf-b8bf-597e12ef9a49/c66f8836-eddf-40bc-8079-8a8efe07b6da"
+storage_version_token = "1795296935225480"
+content_type = "application/octet-stream"

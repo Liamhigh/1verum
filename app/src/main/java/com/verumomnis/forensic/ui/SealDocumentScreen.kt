@@ -251,13 +251,13 @@ private fun HeaderSection() {
         )
         Spacer(Modifier.height(16.dp))
         // Eyebrow kicker (§2.1): mono, uppercase, ls 0.15em, gold.
-        VoKicker("AI Forensics for Truth — Client-Side — Nothing Leaves Your Device", center = true)
+        VoKicker("Document content stays on your device", center = true)
         Spacer(Modifier.height(12.dp))
         // Page h1 (§2.2): serif light, tight tracking, off-white.
-        VoSerifHeading("Document Sealing Service", fontSize = 34, center = true)
+        VoSerifHeading("Seal a document", fontSize = 34, center = true)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Apply a forensic-grade cryptographic seal with A4 watermark, clean QR code, SHA-512 fingerprint, identity verification, GPS/device tracking, optional password protection, and Bitcoin blockchain anchoring via OpenTimestamps.",
+            "Choose a PDF and seal it, with or without an on-device forensic report.",
             fontFamily = SourceSans,
             fontSize = 15.sp,
             color = VoTextMuted,
@@ -298,21 +298,17 @@ private fun UploadZone(hasFile: Boolean, onClick: () -> Unit) {
         Icon(Icons.Filled.FileUpload, contentDescription = null, tint = if (hasFile) VoGold else VoAccentBlue, modifier = Modifier.size(48.dp))
         Spacer(Modifier.height(12.dp))
         Text(
-            "Upload PDF Document(s) — sealed as one",
+            "Choose a PDF",
             fontFamily = Cormorant,
             fontSize = 22.sp,
             color = VoHeading,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(6.dp))
-        // Website parity, and the engine's real limit. This read "Max 50MB" while
-        // MediaIngestor.MAX_FILE_SIZE_BYTES has been 150 MB — the screen turned
-        // away case bundles the app could already seal, and contradicted the
-        // figure verumglobal.foundation quotes for the same service.
+        // This screen uses a single-document picker, not the website's merge flow.
         Text(
-            "Tap to browse — up to 10 PDFs. Multiple documents are merged and " +
-                "sealed as ONE: a single sealed document and a single certificate, " +
-                "not one per file. Max 150MB total.",
+            "Tap to choose one PDF. Your sealed document and any forensic report " +
+                "are saved separately.",
             fontSize = 13.sp,
             color = VoAccentBlue,
             lineHeight = 18.sp,
@@ -772,6 +768,7 @@ private fun PipelineStepRow(step: SealPipelineStep) {
 
 @Composable
 private fun ResultsCard(result: SealResult, documentName: String, viewModel: VerumViewModel, context: Context, onVerifyClick: () -> Unit) {
+    var showDetails by remember(result.sealId) { mutableStateOf(false) }
     // Sealed-at display timestamp — the actual sealing time carried by the
     // seal metadata (SealMetadata.t), never the time this card composes.
     val sealedAt = remember(result.sealedAtMs) {
@@ -790,6 +787,15 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
         Spacer(Modifier.height(6.dp))
         Text("Document Sealed", fontFamily = Cormorant, fontWeight = FontWeight.Medium, fontSize = 24.sp, color = VoHeading)
         Spacer(Modifier.height(14.dp))
+        Text(documentName, color = VoTextPrimary, fontSize = 14.sp)
+        Spacer(Modifier.height(12.dp))
+        DownloadButton(label = "Save / share sealed PDF", primary = true,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { viewModel.shareWebsiteSealedFile(context) })
+        TextButton(onClick = { showDetails = !showDetails }) {
+            Text(if (showDetails) "Hide seal details" else "Show seal details", color = VoAccentBlue)
+        }
+        if (showDetails) {
         VoHonestyNote(
             title = "OpenTimestamps proof pending",
             text = "The Bitcoin blockchain confirmation typically completes within 1–2 hours. " +
@@ -835,17 +841,12 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             DownloadButton(
-                label = "Download Sealed PDF",
-                primary = true,
-                modifier = Modifier.weight(1f),
-                onClick = { viewModel.shareWebsiteSealedFile(context) }
-            )
-            DownloadButton(
                 label = "Download .OTS Proof",
                 primary = false,
                 modifier = Modifier.weight(1f),
                 onClick = { shareOtsProof(context, result) }
             )
+        }
         }
     }
 }

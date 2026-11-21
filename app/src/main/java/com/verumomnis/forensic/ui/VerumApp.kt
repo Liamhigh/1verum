@@ -6,6 +6,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccountBalance
@@ -126,6 +129,10 @@ fun VerumApp(
         viewModel.clearSealDocument()
         screen = Screen.LANDING
     }
+    fun openSealing() {
+        if (!state.sealBusy) viewModel.clearSealDocument()
+        navigate(Screen.SEAL_DOCUMENT)
+    }
     BackHandler(enabled = backStack.isNotEmpty() && !showMenu) { goBack() }
 
     val scope = rememberCoroutineScope()
@@ -214,18 +221,6 @@ fun VerumApp(
                 .onSuccess { (name, hash) -> viewModel.verifyUploaded(name, hash) }
         }
     }
-    val sealDocumentPdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            scope.launch(Dispatchers.IO) {
-                val name = viewModel.uriFileName(it, context)
-                val bytes = context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
-                bytes?.let { b ->
-                    viewModel.selectPdfForSealing(b, name, b.size.toLong())
-                    launch(Dispatchers.Main) { navigate(Screen.SEAL_DOCUMENT) }
-                }
-            }
-        }
-    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = VoBackground) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -246,7 +241,7 @@ fun VerumApp(
                     flaggedCount = state.vaultFlaggedCount,
                     recent = state.recentActivity,
                     onVerify = { openWebsiteVerify(context) },
-                    onSeal = { navigate(Screen.SEAL_DOCUMENT) },
+                    onSeal = { openSealing() },
                     onAskVerum = { navigate(Screen.CHAT) },
                     onViewAll = { navigate(Screen.VAULT) },
                     onOpenRecent = { navigate(Screen.VAULT) },
@@ -310,18 +305,6 @@ fun VerumApp(
                             .fillMaxSize()
                     ) {
                         when (screen) {
-                            Screen.SCAN_HOME -> ScanHomeScreen(
-                                state = state,
-                                onSelectFile = { sealPicker.launch(arrayOf("application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
-                                onStartScan = { caseName -> viewModel.startForensicScan(caseName) },
-                                onNewScan = { viewModel.clearCase(); resetToHome() },
-                                onOpenChat = { navigate(Screen.CHAT) },
-                                onOpenVault = { navigate(Screen.VAULT) },
-                                onOpenReport = { navigate(Screen.REPORT) },
-                                onSealDocument = { sealDocumentPdfPicker.launch(arrayOf("application/pdf")) },
-                                onVerifyDocument = { navigate(Screen.VERIFY_DOCUMENT) },
-                                onOpenConstitution = { navigate(Screen.CONSTITUTION) }
-                            )
                             Screen.CHAT -> ChatScreen(state, viewModel, onPlus = { showMenu = true })
                             Screen.REPORT -> ReportScreen(
                                 state = state,
@@ -336,7 +319,7 @@ fun VerumApp(
                                 onOpenArtifact = { openVaultArtifact(context, it.file) },
                                 onDeleteSet = { viewModel.deleteScanSet(it) },
                                 onEmptyVault = { viewModel.emptyVault() },
-                                onNewDocument = { navigate(Screen.SEAL_DOCUMENT) }
+                                onNewDocument = { openSealing() }
                             )
                             Screen.STORY -> {}
                             Screen.LANDING -> {}
@@ -346,7 +329,7 @@ fun VerumApp(
                                 onBack = { goBack() },
                                 onNavigateSeal = { navigate(Screen.SEAL_DOCUMENT) }
                             )
-                            Screen.SEAL_DOCUMENT -> SealDocumentScreen(
+                            Screen.SCAN_HOME, Screen.SEAL_DOCUMENT -> SealDocumentScreen(
                                 state = state,
                                 viewModel = viewModel,
                                 onBack = { goBack() },
@@ -389,7 +372,7 @@ fun VerumApp(
                     containerColor = VoBackground
                 ) {
                     ActionsSheet(
-                        onSealDocument = { showMenu = false; navigate(Screen.SEAL_DOCUMENT) },
+                        onSealDocument = { showMenu = false; openSealing() },
                         onAddMedia = { showMenu = false; sealPicker.launch(arrayOf("image/*", "video/*")) },
                         onVerify = { showMenu = false; verifyPicker.launch(arrayOf("application/pdf", "*/*")) },
                         onVerifyWebsite = { showMenu = false; openWebsiteVerify(context) },
@@ -468,30 +451,34 @@ private fun ActionsSheet(
     onSettings: () -> Unit,
     onReadConstitution: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    var moreTools by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("SEALED ACTIONS", color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Everything you add is sealed by the forensic engine and stored in the vault before the AI can read it.",
+            "Seal only, or add a forensic report. Saved evidence stays in your vault.",
             color = VoTextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
         )
-        ActionRow(Icons.Filled.Verified, "Seal document", "PDF → forensic seal → vault", onSealDocument)
+        ActionRow(Icons.Filled.Verified, "Seal document", "Choose seal only or seal with a forensic report", onSealDocument)
+        ActionRow(Icons.Filled.TaskAlt, "Check document", "Open the website Verification Hub", onVerifyWebsite)
+        ActionRow(Icons.Filled.Description, "View sealed report", "Open your current forensic report", onReport)
+        ActionRow(Icons.Filled.Lock, "Open vault", "Your saved documents and reports", onVault)
+        ActionRow(Icons.Filled.Settings, "Settings", "Privacy, security and app configuration", onSettings)
+        ActionRow(Icons.Filled.Add, if (moreTools) "Fewer tools" else "More tools", "Other case and legal tools", { moreTools = !moreTools })
+        if (moreTools) {
         ActionRow(Icons.Filled.PhotoCamera, "Add photo / video", "GPS + timestamp anchored, sealed", onAddMedia)
         // Constitution §7: verification authority lives at the Verification Hub.
         // The on-device option is a vault integrity check, never a verdict.
         ActionRow(Icons.Filled.VerifiedUser, "Vault integrity check", "Compare a file's hash against the sealed vault (not verification)", onVerify)
-        ActionRow(Icons.Filled.TaskAlt, "Verify on verumglobal.foundation", "The website is the ONLY verification authority", onVerifyWebsite)
         ActionRow(Icons.Filled.QrCodeScanner, "Scan Seal QR", "Point camera at a sealed document QR", onScanSeal)
         ActionRow(Icons.Filled.TravelExplore, "Deep research", "AI reads the sealed case file", onDeepResearch)
         ActionRow(Icons.Filled.Email, "Draft sealed email", "AI-drafted, delivered as a sealed PDF", onDraftEmail)
         ActionRow(Icons.Filled.Calculate, "Tax return", "Company or individual · 50% of accountant fee", onTax)
-        ActionRow(Icons.Filled.Description, "View sealed report", "Anchored contradictions, exhibits, seal", onReport)
         ActionRow(Icons.Filled.AccessTime, "Event timeline", "Chronological reconstruction of evidence", onTimeline)
         ActionRow(Icons.Filled.Person, "Actor profiles", "Per-person dishonesty scorecard", onActorProfile)
         ActionRow(Icons.Filled.Difference, "Contradiction analysis", "Detailed contradiction breakdown", onContradictionDetail)
         ActionRow(Icons.Filled.CompareArrows, "Report comparison", "Side-by-side report analysis", onReportComparison)
-        ActionRow(Icons.Filled.Lock, "Open vault", "Sealed evidence, findings & seals", onVault)
-        ActionRow(Icons.Filled.Settings, "Settings", "App configuration, privacy, security", onSettings)
         ActionRow(Icons.Filled.AccountBalance, "Read Constitution", "Verum Omnis governing principles", onReadConstitution)
+        }
         Spacer(Modifier.height(12.dp))
     }
 }

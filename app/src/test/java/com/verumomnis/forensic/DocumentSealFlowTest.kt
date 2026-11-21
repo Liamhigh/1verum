@@ -175,4 +175,20 @@ class DocumentSealFlowTest {
         assertArrayEquals(firstBytes, firstPdf.readBytes())
         assertEquals(2, extractionCalls.get())
     }
+
+    @Test fun bothModesPassCapturedGpsToTheSealer() {
+        for (mode in listOf("seal-only", "forensic")) {
+            var observed: DocumentSealer.SealOptions? = null
+            val vm = vm(inspectOptions = { observed = it })
+            vm.setGps(GpsRecord(latitude = 0.0, longitude = 0.0, accuracy = 12.0, timestamp = now.toString()))
+            vm.selectPdfForSealing(input, "gps.pdf", input.size.toLong())
+            vm.setSealMode(mode)
+            vm.sealDocument(now)
+            await { !vm.state.value.sealBusy }
+            assertEquals("0.0", observed!!.gpsLat)
+            assertEquals("0.0", observed!!.gpsLng)
+            assertEquals(12, observed!!.gpsAccuracyM)
+            assertEquals(now.toEpochMilli(), observed!!.timestampMs)
+        }
+    }
 }

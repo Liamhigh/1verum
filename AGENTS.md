@@ -59,11 +59,17 @@ Cormorant Garamond / Source Sans 3 / JetBrains Mono).
 - Debug APK: `./gradlew assembleDebug` (output `app/build/outputs/apk/debug/app-debug.apk`)
 
 ## App UX model (important)
-- The app is a chat room. The front **Story** screen leads to the **Chat** home. The chat input has a **+**
-  that opens a "Sealed actions" bottom sheet: seal a document, add photo/video, **scan a seal QR**,
-  verify a document, deep research, draft sealed email, tax return, view report, open vault,
-  and **read the Constitution**. Report/Email/Tax/Vault/QR-scan/Constitution are sub-screens
-  reached from the sheet or top bar (back arrow returns to chat).
+- The front **Story** screen leads to a home with **Seal document** and **Check document**.
+  Sealing offers **Seal document** or **Seal document with forensic report** in one flow.
+  Do not put a separate scan dashboard between home and these choices. The report
+  option runs the same Nine-Brain engine and must expose a real saved report PDF,
+  not just a sealed input or an unrelated previous report. Seal-only does not analyse content.
+- The **legal chat interface remains required**, but is a secondary tool alongside
+  the vault. The action sheet keeps specialist tools under **More tools** rather than
+  presenting every capability as a competing starting point. Optional identity,
+  password and commercial fields are collapsed in the seal form.
+- Check document opens the website Verification Hub. Keep existing saved vault
+  artifacts intact when starting another document.
 - Constitutional boundary (enforced by design): anything the user adds goes to the **forensic engine only**
   (`ForensicService`/`NineBrainEngine`) → SHA-512 sealed + GPS-anchored + vaulted with findings JSON + report.
   The chat AI (`VerumViewModel.respond`) reads ONLY the sealed `scanResult`/report — never raw uploads. Keep

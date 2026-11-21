@@ -333,7 +333,7 @@ private fun RecentActivitySection(
             // vaulted artifacts, so "nothing sealed yet" would contradict a
             // non-zero count on the same screen — which is exactly what it did.
             Text(
-                "No forensic reports yet. Run a scan and it will appear here.",
+                "No forensic reports yet. Choose “Seal document with forensic report” to create one.",
                 color = VoTextBody,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(vertical = 8.dp)

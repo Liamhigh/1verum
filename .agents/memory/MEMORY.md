@@ -4,3 +4,4 @@
 - [Native test memory limits](native-test-memory.md) — isolate full Robolectric test classes on this host instead of weakening native coverage.
 - [Storage client compatibility](storage-client-compatibility.md) — verify sidecar authentication before upgrading Google storage client major versions.
 - [Verum brand preference](download-brand-preference.md) — the user prefers the website appearance and restrained gold.
+- [Simple document sealing](sealing-flow-intent.md) — the user wants one seal flow, with forensic reporting as an explicit option, not a separate scan journey.

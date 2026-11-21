@@ -22,3 +22,6 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["jdk17", "unzip"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-e05d218a-84ff-4d78-8b29-b117a4fa7cd9"

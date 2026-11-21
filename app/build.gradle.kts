@@ -43,8 +43,8 @@ android {
         applicationId = "com.verumomnis.forensic"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "5.2.8"
+        versionCode = 2
+        versionName = "5.2.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

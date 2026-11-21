@@ -966,7 +966,8 @@ class VerumViewModel(
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: throw IllegalStateException("Could not read $originalName")
                 val gps = _state.value.gps
-                val result = DocumentSealer.seal(
+                val result = DocumentSealer.sealWithBundledWatermark(
+                    context = context,
                     originalPdfBytes = bytes,
                     options = DocumentSealer.SealOptions(
                         timestampMs = now.toEpochMilli(),
@@ -1124,7 +1125,8 @@ class VerumViewModel(
                 updatePipelineStep("Seal Footer", SealPipelineStepStatus.COMPLETE)
 
                 updatePipelineStep("Finalize", SealPipelineStepStatus.PROCESSING)
-                val result = DocumentSealer.seal(
+                val result = DocumentSealer.sealWithBundledWatermark(
+                    context = getApplication<Application>(),
                     originalPdfBytes = bytes,
                     options = DocumentSealer.SealOptions(
                         timestampMs = now.toEpochMilli(),

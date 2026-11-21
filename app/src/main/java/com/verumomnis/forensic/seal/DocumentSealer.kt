@@ -1,7 +1,10 @@
 package com.verumomnis.forensic.seal
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import com.verumomnis.forensic.R
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
@@ -30,7 +33,7 @@ import java.util.TimeZone
  * VO-DSS-1.2 — Document sealer (Android/PDFBox port).
  * Faithful port of buildSealedPDF() from seal-module/web/seal-document.html:
  *   - optional password cover page (delivery-receipt mode)
- *   - A4 watermark background at 20% opacity
+ *   - A4 watermark overlay at 20% opacity, including over opaque scanned pages
  *   - original pages embedded at 88% scale, per-page error recovery (v1.2)
  *   - clean QR (no border/box) top-right, 10% of page dimension, 2.5% margin
  *   - seal footer bar on every page: type + chain, Seal ID + SHA-512 prefix + timestamp + page x/y
@@ -90,6 +93,22 @@ object DocumentSealer {
         val passwordProtected: Boolean
     )
 
+    /** App entry point: a missing watermark must be reported, never silently omitted. */
+    fun sealWithBundledWatermark(
+        context: Context,
+        originalPdfBytes: ByteArray,
+        options: SealOptions
+    ): SealedDocument {
+        val watermark = requireNotNull(
+            BitmapFactory.decodeResource(context.resources, R.drawable.watermark_portrait)
+        ) { "The document watermark asset is missing or could not be decoded." }
+        return try {
+            seal(originalPdfBytes, options, watermark)
+        } finally {
+            watermark.recycle()
+        }
+    }
+
     /**
      * Seal a PDF document to VO-DSS-1.2.
      * @param watermarkPng optional A4 watermark bitmap (asset); pages seal without it.
@@ -136,13 +155,7 @@ object DocumentSealer {
         var totalPages = 0
         val sealedBytes = PDDocument.load(originalPdfBytes).use { orig ->
             PDDocument().use { sealed ->
-                val wmImg = watermarkPng?.let {
-                    try {
-                        LosslessFactory.createFromImage(sealed, it)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
+                val wmImg = watermarkPng?.let { LosslessFactory.createFromImage(sealed, it) }
                 val qrImg = LosslessFactory.createFromImage(sealed, qrBitmap(verifyUrl, 400))
 
                 val ts = formatUtc(options.timestampMs)
@@ -169,16 +182,6 @@ object DocumentSealer {
                     sealed.addPage(page)
 
                     PDPageContentStream(sealed, page).use { cs ->
-                        if (wmImg != null) {
-                            val s = maxOf(pw / wmImg.width, ph / wmImg.height)
-                            val gs = PDExtendedGraphicsState()
-                            gs.nonStrokingAlphaConstant = WATERMARK_OPACITY
-                            cs.saveGraphicsState()
-                            cs.setGraphicsStateParameters(gs)
-                            cs.drawImage(wmImg, (pw - wmImg.width * s) / 2f, (ph - wmImg.height * s) / 2f, wmImg.width * s, wmImg.height * s)
-                            cs.restoreGraphicsState()
-                        }
-
                         try {
                             val form = layerUtility.importPageAsForm(orig, i)
                             cs.saveGraphicsState()
@@ -195,6 +198,18 @@ object DocumentSealer {
                             drawText(cs, "! Page content could not be embedded", PDType1Font.HELVETICA_BOLD, 14f, 0.9f, 0.3f, 0.3f, pw * 0.15f, ph * 0.5f)
                             drawText(cs, "This page contained complex elements that could not be copied.", PDType1Font.HELVETICA, 10f, 0.7f, 0.5f, 0.5f, pw * 0.15f, ph * 0.46f)
                             drawText(cs, "The original file is preserved in the metadata. Seal ID: $sealId", PDType1Font.HELVETICA, 9f, 0.5f, 0.5f, 0.5f, pw * 0.15f, ph * 0.43f)
+                        }
+
+                        // Draw AFTER the source: an image-only scan or an opaque white
+                        // page background would otherwise completely hide the watermark.
+                        if (wmImg != null) {
+                            val s = maxOf(pw / wmImg.width, ph / wmImg.height)
+                            val gs = PDExtendedGraphicsState()
+                            gs.nonStrokingAlphaConstant = WATERMARK_OPACITY
+                            cs.saveGraphicsState()
+                            cs.setGraphicsStateParameters(gs)
+                            cs.drawImage(wmImg, (pw - wmImg.width * s) / 2f, (ph - wmImg.height * s) / 2f, wmImg.width * s, wmImg.height * s)
+                            cs.restoreGraphicsState()
                         }
 
                         // Clean QR: top-right, 10% of page dimension, 2.5% margin, no border/box.

@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Ir1TB0dI9NtWwnvgj5wiw"
+uri = "file://generated-artifacts/android-release-checks/verum-omnis-5.2.9.apk"
+type = "unspecified"
+title = "Verum Omnis 5.2.9 — Android APK"
+description = "Signed update, 93.57 MB. Includes report PDF generation/retry/sharing fixes and document watermark repairs. Android 10+ ARM64; same signing certificate as the previous release."
+logical_id = "1a3df4e8-aa1d-4192-9c7d-5fc6f4448f69"
+content_hash = "sha256:d72748e3289b5f30471c22817df2e22e63eb76694880c0e1ca39093196d3f285"
+size = 93574444
+mtime_ms = 1795287888893
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/1a3df4e8-aa1d-4192-9c7d-5fc6f4448f69/10298e7c-388a-41f5-9f53-cc86a3ecc5b2"
+storage_version_token = "1795287895648139"
+content_type = "application/octet-stream"

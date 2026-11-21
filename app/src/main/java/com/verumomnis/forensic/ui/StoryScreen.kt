@@ -76,7 +76,7 @@ fun StoryScreen(onEnter: () -> Unit, onReadConstitution: () -> Unit = {}) {
         Spacer(Modifier.height(16.dp))
         Text(
             "A constitutional forensic AI platform built to democratise justice. " +
-                "Evidence sealed, GPS-anchored and court-ready. Free for every citizen.",
+                "Evidence sealed, GPS-anchored and ready for human review. Free for every citizen.",
             color = VoTextMuted, fontSize = 15.sp, lineHeight = 22.sp, textAlign = TextAlign.Center
         )
 

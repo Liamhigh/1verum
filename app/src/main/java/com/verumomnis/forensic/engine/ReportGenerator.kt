@@ -12,7 +12,7 @@ import com.verumomnis.forensic.model.Severity
 import java.time.Instant
 
 /**
- * Forensic Report Generation (Part IX). Produces a court-ready report in which
+ * Forensic Report Generation (Part IX). Produces a reviewable report in which
  * EVERY contradiction is anchored to:
  *   - a person (respondent),
  *   - a page number (evidence anchor), and
@@ -119,18 +119,19 @@ object ReportGenerator {
     )
 
     private fun buildExecutiveSummary(findings: ForensicFindings): String = buildString {
-        append("This report presents the findings of the Verum Omnis Nine-Brain forensic engine ")
+        append("This report presents the screening results of the Verum Omnis Nine-Brain forensic engine ")
         append("over ${findings.documentsAnalyzed} evidence item(s) within jurisdiction ${findings.jurisdiction}. ")
-        append("${findings.contradictions.size} material contradiction(s) were identified, each anchored to a ")
-        append("responsible person, an evidence page, and an applicable statute. ")
+        append("${findings.contradictions.size} potential contradiction indicator(s) were flagged, each anchored to a ")
+        append("person mentioned in the cited evidence, an evidence page, and a potentially relevant statute. ")
         findings.financial?.companyTax?.let {
             append("Estimated company tax exposure: R%,.2f. ".format(it.taxLiability))
         }
         if (findings.extractedPersons.isNotEmpty()) {
             append("${findings.extractedPersons.size} person(s) were extracted from the evidence. ")
         }
-        append("Every reported finding was accepted by the Nine-Brain council (B1 plus at least two corroborating brains). ")
-        append("Unconfirmed indicators are excluded from the findings and listed separately for transparency. ")
+        append("Indicators that passed the engine's council review are listed as engine results; this is not a ")
+        append("factual or legal determination. Automated screening indicators require independent human review. ")
+        append("Unconfirmed indicators are listed separately for transparency. ")
         append("Sealed under Constitution v${Constitution.VERSION}.")
     }
 
@@ -231,7 +232,7 @@ object ReportGenerator {
         appendLine("5. LEGAL FRAMEWORK")
         findings.legalMappings.forEach { appendLine("   - $it") }
         appendLine()
-        appendLine("6. OFFENCE MATRIX")
+        appendLine("6. POTENTIAL LEGAL HYPOTHESES — SCREENING INDICATORS, NOT LEGAL FINDINGS")
         offenceMatrix.forEach {
             appendLine("   - ${it.person}: ${it.offence}")
             appendLine("     Law: ${it.applicableLaw.joinToString("; ")} | Anchor: ${it.evidenceAnchor} | ${it.confidence}")
@@ -270,6 +271,7 @@ object ReportGenerator {
         }
         findings.guardian?.let { g ->
             appendLine("9a. B9 GUARDIAN ASSESSMENT")
+            appendLine("   Safety screening indicators are keyword matches only; they do not establish intent, wrongdoing, or a legal finding.")
             if (g.hardStopRequired) {
                 appendLine("   *** ARTICLE X HARD STOP ACTIVE ***")
             }
@@ -306,7 +308,7 @@ object ReportGenerator {
             }
         }
         appendLine("12. DECLARATION")
-        appendLine("   Reviewed by the Nine-Brain council: each finding above was proposed by B1 and corroborated by at least two other brains (B2–B8); B9 validates after the vote. No external AI model forms part of this determination. Evidence before narrative.")
+        appendLine("   These are automated screening results, not proven facts, legal findings, or legal advice. Human review of the cited source material is required. The council records corroboration among engine components; it is not independent verification by a court or investigator.")
         // States what actually ran, never what was hoped for. This previously read
         // "Triple-verified (Gemma 3 · communicator · Nine-Brain)" on every report,
         // including reports produced with no model loaded at all — the AI verdicts

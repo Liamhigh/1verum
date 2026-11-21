@@ -5,14 +5,17 @@ import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.identity.InMemoryIdentityKeyStore
 import com.verumomnis.forensic.model.GuardianViolationType
 import com.verumomnis.forensic.ui.VerumViewModel
+import com.verumomnis.forensic.ui.SealStage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class VerumViewModelGuardianTest {
@@ -53,5 +56,27 @@ class VerumViewModelGuardianTest {
         assertNull(state.guardianBlock)
         assertTrue(state.chat.size > chatBefore)
         assertTrue(state.chat.any { it.fromUser })
+    }
+
+    @Test
+    fun `missing report export shows failure and leaves existing vault data untouched`() {
+        val app = RuntimeEnvironment.getApplication() as Application
+        val vm = viewModel()
+        val sentinelBytes = "already sealed artifact".toByteArray()
+        val sentinel = File(
+            app.filesDir,
+            "vault/reports/sealed/preserved-test-${System.nanoTime()}.bin"
+        ).apply {
+            parentFile?.mkdirs()
+            writeBytes(sentinelBytes)
+        }
+
+        vm.retryReportPdf()
+        vm.confirmAndSeal()
+
+        assertEquals("No completed report is available to export.", vm.state.value.reportPdfError)
+        assertEquals(SealStage.ERROR, vm.state.value.sealStage)
+        assertTrue(vm.state.value.scanLog.contains("select and preview"))
+        assertArrayEquals(sentinelBytes, sentinel.readBytes())
     }
 }

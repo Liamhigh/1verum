@@ -65,7 +65,6 @@ import com.verumomnis.forensic.seal.SealVerifier
 import com.verumomnis.forensic.seal.AnchorUpgrader
 import com.verumomnis.forensic.vault.CaseMemory
 import com.verumomnis.forensic.vault.EvidenceVault
-import com.verumomnis.forensic.work.ScanWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -204,6 +203,10 @@ data class UiState(
     val scanLog: String = "Awaiting evidence. Select a case file to begin a forensic scan.",
     val chat: List<ChatMessage> = emptyList(),
     val report: ForensicReport? = null,
+    /** PDF export is a separate sealed copy; raw evidence remains untouched. */
+    val reportPdfFile: File? = null,
+    val reportPdfGenerating: Boolean = false,
+    val reportPdfError: String = "",
     val emails: List<SealedEmail> = emptyList(),
     val emailStatus: String = "Draft a sealed forensic email. The sealed PDF is generated into the vault and handed to your mail app — you choose the recipient and press send yourself.",
     val otsResult: OtsAnchorResult? = null,
@@ -273,7 +276,10 @@ class VerumViewModel(
     private val identityService: IdentityService = IdentityService(application),
     private val blockchainService: BlockchainService = OpenTimestampsService,
     private val vault: EvidenceVault = EvidenceVault(application),
-    seedSampleCase: Boolean = false
+    seedSampleCase: Boolean = false,
+    private val reportPdfWriter: (ForensicReport) -> File = { report ->
+        SealedPdfExporter(application).exportReport(report)
+    }
 ) : AndroidViewModel(application) {
 
     /** Constructor used by Android's default ViewModelProvider factory. */
@@ -1330,31 +1336,92 @@ class VerumViewModel(
     /** Add pending files to the case, clear the preview, and run the seal pipeline. */
     fun confirmAndSeal(caseName: String = "Matter", now: Instant = Instant.now()) {
         val pending = _state.value.pendingFiles
-        if (pending.isEmpty()) return
-        // Schedule a WorkManager background scan so the process survives backgrounding.
-        ScanWorkScheduler.schedule(getApplication(), caseName, pending)
-        _state.update { it.copy(sealStage = SealStage.SCANNING, pendingFiles = emptyList()) }
+        if (pending.isEmpty()) {
+            _state.update {
+                it.copy(
+                    sealStage = SealStage.ERROR,
+                    scanLog = "Scan not started: select and preview at least one evidence file first."
+                )
+            }
+            return
+        }
+        // Use one authoritative scan. The old fire-and-forget WorkManager job
+        // duplicated analysis and persisted only JSON/text, while the UI never
+        // observed its result or exposed its report.
+        _state.update {
+            it.copy(
+                sealStage = SealStage.SCANNING,
+                pendingFiles = emptyList(),
+                reportPdfFile = null,
+                reportPdfGenerating = false,
+                reportPdfError = "",
+                scanLog = "Nine-Brain forensic analysis in progress…"
+            )
+        }
         viewModelScope.launch(Dispatchers.IO) {
-            pending.forEach { preview ->
-                if (preview.isMedia && preview.mediaEvidence != null) {
-                    addMedia(preview.mediaEvidence)
-                } else {
-                    val doc = EvidenceDocument(
-                        evidenceId = "DOC%03d".format(documents.size + 1),
-                        fileName = preview.fileName,
-                        type = when {
-                            preview.mimeType.contains("pdf") -> "pdf"
-                            preview.mimeType.startsWith("text") -> "document"
-                            else -> "document"
-                        },
-                        text = preview.documentText,
-                        sha512 = preview.sha512,
-                        gps = _state.value.gps
+            try {
+                pending.forEach { preview ->
+                    if (preview.isMedia && preview.mediaEvidence != null) {
+                        addMedia(preview.mediaEvidence)
+                    } else {
+                        val doc = EvidenceDocument(
+                            evidenceId = "DOC%03d".format(documents.size + 1),
+                            fileName = preview.fileName,
+                            type = when {
+                                preview.mimeType.contains("pdf") -> "pdf"
+                                preview.mimeType.startsWith("text") -> "document"
+                                else -> "document"
+                            },
+                            text = preview.documentText,
+                            sha512 = preview.sha512,
+                            gps = _state.value.gps
+                        )
+                        addDocument(doc)
+                    }
+                }
+                sealCase(now, caseName)
+            } catch (_: Exception) {
+                _state.update {
+                    it.copy(
+                        scanning = false,
+                        sealStage = SealStage.ERROR,
+                        scanLog = "Scan incomplete. The app could not finish analysis or save the report. " +
+                            "Existing vault files were left in place; try again after checking device storage."
                     )
-                    addDocument(doc)
                 }
             }
-            sealCase(now, caseName)
+        }
+    }
+
+    /** Retry creating the sealed PDF without changing evidence or existing vault files. */
+    fun retryReportPdf() {
+        val report = _state.value.report
+        if (report == null) {
+            _state.update { it.copy(reportPdfError = "No completed report is available to export.") }
+            return
+        }
+        if (_state.value.reportPdfGenerating) return
+        _state.update { it.copy(reportPdfGenerating = true, reportPdfError = "", reportPdfFile = null) }
+        viewModelScope.launch(Dispatchers.IO) { createReportPdf(report) }
+    }
+
+    private fun createReportPdf(report: ForensicReport) {
+        try {
+            val file = reportPdfWriter(report)
+            _state.update {
+                it.copy(reportPdfFile = file, reportPdfGenerating = false, reportPdfError = "")
+            }
+        } catch (_: Exception) {
+            _state.update {
+                it.copy(
+                    reportPdfFile = null,
+                    reportPdfGenerating = false,
+                    reportPdfError = "The report is ready, but its sealed PDF could not be created. " +
+                        "Check available device storage and retry. Existing vault files were not replaced."
+                )
+            }
+        } finally {
+            refreshVaultStats()
         }
     }
 
@@ -1368,6 +1435,9 @@ class VerumViewModel(
                 files = emptyList(),
                 scanResult = null,
                 report = null,
+                reportPdfFile = null,
+                reportPdfGenerating = false,
+                reportPdfError = "",
                 pendingFiles = emptyList(),
                 sealStage = SealStage.IDLE,
                 scanLog = "Awaiting evidence. Select a case file to begin a forensic scan.",
@@ -1532,6 +1602,8 @@ class VerumViewModel(
                 )
             )
         }
+        _state.update { it.copy(reportPdfGenerating = true, reportPdfError = "", reportPdfFile = null) }
+        viewModelScope.launch(Dispatchers.IO) { createReportPdf(signedReport) }
         computeTrustScore()
         anchorSealToBitcoin(auto = true)
     }
@@ -1649,10 +1721,9 @@ class VerumViewModel(
                 OtsStatus.CONFIRMED -> "CONFIRMED on Bitcoin."
                 OtsStatus.FAILED -> "FAILED · ${res.message}"
             }
-            val stage = when (res.status) {
-                OtsStatus.CONFIRMED, OtsStatus.PENDING -> SealStage.DONE
-                else -> SealStage.ERROR
-            }
+            // An offline timestamp calendar does not undo the completed local
+            // scan/report. Keep the anchor outcome in otsStatus, not scan status.
+            val stage = if (_state.value.report != null) SealStage.DONE else SealStage.ERROR
             _state.update { it.copy(anchoring = false, otsResult = res, otsStatus = status, sealStage = stage) }
             computeTrustScore()
         }

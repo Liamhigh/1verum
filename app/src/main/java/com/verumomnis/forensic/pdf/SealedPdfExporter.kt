@@ -17,7 +17,17 @@ import java.io.File
  * stores them in the Evidence Vault. Also builds a share intent so a sealed PDF
  * can be distributed.
  */
-class SealedPdfExporter(private val context: Context) {
+class SealedPdfExporter(
+    private val context: Context,
+    private val reportRenderer: (
+        SealedPdfContent,
+        Bitmap?,
+        Bitmap?,
+        Map<String, Bitmap>
+    ) -> ByteArray = { content, mark, badge, exhibits ->
+        SealedPdfGenerator.render(content, mark, badge, exhibits)
+    }
+) {
 
     private val watermark: Bitmap? by lazy {
         BitmapFactory.decodeResource(context.resources, R.drawable.watermark_portrait)
@@ -26,10 +36,10 @@ class SealedPdfExporter(private val context: Context) {
         BitmapFactory.decodeResource(context.resources, R.drawable.vo_badge)
     }
 
-    private fun sealedDir(): File =
-        File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
-
     fun exportReport(report: ForensicReport): File {
+        val reportWatermark = requireNotNull(watermark) {
+            "The report watermark asset is missing or could not be decoded."
+        }
         // Load preserved originals for image exhibits so they render on the exhibit pages.
         val rawDir = File(context.filesDir, "vault/evidence/raw")
         val vault = EvidenceVault(context)
@@ -46,15 +56,31 @@ class SealedPdfExporter(private val context: Context) {
                     plaintext.delete()
                 }
             }.toMap()
-        val bytes = SealedPdfGenerator.render(SealedPdfContent.fromReport(report), watermark, logo, exhibitImages)
-        val file = File(sealedDir(), "${report.reference}.pdf")
-        file.writeBytes(bytes)
-        return file
+        val bytes = reportRenderer(
+            SealedPdfContent.fromReport(report),
+            reportWatermark,
+            logo,
+            exhibitImages
+        )
+        val safeReference = report.reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        var suffix = 1
+        while (true) {
+            val suffixPart = if (suffix == 1) "" else "_$suffix"
+            val fileName = "${safeReference}_report$suffixPart.pdf"
+            val file = File(vault.reportsSealed, fileName)
+            try {
+                vault.storeSealedReport(fileName, bytes)
+                return file
+            } catch (_: java.nio.file.FileAlreadyExistsException) {
+                suffix++
+            }
+        }
     }
 
     fun exportEmail(email: SealedEmail): File {
         val bytes = SealedPdfGenerator.render(SealedPdfContent.fromEmail(email), watermark, logo)
-        val file = File(sealedDir(), email.sealedPdfFile)
+        val file = File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
+            .resolve(email.sealedPdfFile)
         file.writeBytes(bytes)
         return file
     }

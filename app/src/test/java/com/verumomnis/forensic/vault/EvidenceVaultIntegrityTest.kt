@@ -4,6 +4,7 @@ import com.verumomnis.forensic.crypto.Sha512
 import java.io.File
 import javax.crypto.SecretKey
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -62,5 +63,20 @@ class EvidenceVaultIntegrityTest {
 
         assertEquals(expectedManifest, reopenedVault.integrityManifest())
         assertEquals(listOf("MISSING: kept.txt"), reopenedVault.verifyIntegrity())
+    }
+
+    @Test
+    fun `sealed report writes never replace an existing vault artifact`() {
+        val vault = vault(temp.newFolder())
+        val fileName = "forensic-report.pdf"
+        val originalPdf = "%PDF-original".toByteArray()
+        val replacementPdf = "%PDF-replacement".toByteArray()
+
+        vault.storeSealedReport(fileName, originalPdf)
+        val secondWrite = runCatching { vault.storeSealedReport(fileName, replacementPdf) }
+
+        assertTrue(secondWrite.isFailure)
+        assertArrayEquals(originalPdf, File(vault.reportsSealed, fileName).readBytes())
+        assertTrue(secondWrite.exceptionOrNull() is java.nio.file.FileAlreadyExistsException)
     }
 }

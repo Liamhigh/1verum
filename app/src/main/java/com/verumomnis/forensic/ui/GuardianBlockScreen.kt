@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -22,6 +23,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.model.GuardianAssessment
 import com.verumomnis.forensic.model.GuardianViolation
+import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
 import com.verumomnis.forensic.ui.theme.VoAccentBlue
@@ -41,6 +47,7 @@ import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurface
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import java.io.File
 
 /**
  * Full-screen B9 constitutional hard stop.
@@ -56,9 +63,17 @@ fun GuardianBlockScreen(
     assessment: GuardianAssessment,
     onClearCase: () -> Unit,
     onReadConstitution: () -> Unit,
+    report: ForensicReport? = null,
+    reportPdfFile: File? = null,
+    reportPdfGenerating: Boolean = false,
+    reportPdfError: String = "",
+    onRetryPdf: () -> Unit = {},
+    onSharePdf: (File) -> String? = { null },
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    var showReport by remember { mutableStateOf(false) }
+    var shareError by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -102,12 +117,13 @@ fun GuardianBlockScreen(
         Spacer(Modifier.height(16.dp))
 
         Text(
-            "What happened: the Guardian safety check found content linked to weaponization or " +
-                "planning harm (Article X of the Verum Omnis Constitution — the only rule that " +
-                "hard-stops the app). This app cannot be used to plan, target, or coordinate harm.\n\n" +
-                "What to do: clear the case below to remove this content and continue, or read the " +
-                "Constitution to understand the rule. The attempt has been recorded in the " +
-                "immutable Silence Ledger.",
+            "The safety screen was triggered because a keyword in the scanned text matched an " +
+                "Article X screening rule. A keyword match alone does not establish intent, " +
+                "wrongdoing, or that the source advocates harm. This app cannot be used to plan, " +
+                "target, or coordinate harm.\n\n" +
+                "You can review the report produced from this scan below, or clear the active case " +
+                "from this session. Clearing the session does not delete original evidence or " +
+                "saved reports from the vault.",
             color = VoTextMuted,
             fontSize = 14.sp,
             lineHeight = 21.sp,
@@ -115,6 +131,96 @@ fun GuardianBlockScreen(
         )
 
         Spacer(Modifier.height(32.dp))
+
+        if (report != null) {
+            Spacer(Modifier.height(18.dp))
+            Text(
+                "SCAN REPORT",
+                color = VoAccentBlue,
+                fontSize = 12.sp,
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "The report is available for read-only review. Safety keyword matches remain screening indicators, not proven legal findings.",
+                color = VoTextMuted,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Start
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { showReport = !showReport },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, VoAccentBlue)
+            ) {
+                Text(
+                    if (showReport) "Hide report" else "Review sealed report",
+                    color = VoAccentBlue,
+                    fontSize = 14.sp
+                )
+            }
+            if (reportPdfFile != null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { shareError = onSharePdf(reportPdfFile) ?: "" },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VoAccentBlue)
+                ) {
+                    Text("Share sealed PDF · ${reportPdfFile.name}", color = VoAccentBlue, fontSize = 12.sp)
+                }
+            } else if (reportPdfGenerating) {
+                Spacer(Modifier.height(10.dp))
+                Text("Creating watermarked, sealed PDF…", color = VoTextMuted, fontSize = 12.sp)
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    reportPdfError.ifBlank { "The report PDF is not ready yet." },
+                    color = if (reportPdfError.isBlank()) VoTextMuted else VoRed,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp
+                )
+                OutlinedButton(
+                    onClick = onRetryPdf,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, VoAccentBlue)
+                ) {
+                    Text("Retry PDF export", color = VoAccentBlue, fontSize = 14.sp)
+                }
+            }
+            if (shareError.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(shareError, color = VoRed, fontSize = 12.sp)
+            }
+            if (showReport) {
+                Spacer(Modifier.height(12.dp))
+                Text(report.title, color = VoTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("Reference ${report.reference} · ${report.seal.extendedFooter()}", color = VoTextMuted, fontSize = 10.sp)
+                Spacer(Modifier.height(8.dp))
+                SelectionContainer {
+                    Text(
+                        report.body,
+                        color = VoTextPrimary,
+                        fontFamily = JetBrainsMono,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "The scan report is still being prepared. It will appear here when ready.",
+                color = VoTextMuted,
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+        }
 
         Text(
             "VIOLATIONS (${assessment.violations.size})",
@@ -161,7 +267,7 @@ fun GuardianBlockScreen(
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = VoRed, contentColor = VoTextPrimary)
         ) {
-            Text("Clear case and close", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("Clear active case", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(12.dp))

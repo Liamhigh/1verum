@@ -176,7 +176,18 @@ class EvidenceVault(
     fun storeSealedReport(fileName: String, bytes: ByteArray): String {
         initialize()
         val target = File(reportsSealed, fileName)
-        target.writeBytes(bytes)
+        require(target.canonicalFile.parentFile == reportsSealed.canonicalFile) {
+            "Sealed report filename must stay inside the reports vault"
+        }
+        if (!target.createNewFile()) {
+            throw java.nio.file.FileAlreadyExistsException(target.path)
+        }
+        try {
+            target.outputStream().use { it.write(bytes) }
+        } catch (error: Exception) {
+            target.delete()
+            throw error
+        }
         return Sha512.hash(bytes)
     }
 
@@ -232,10 +243,26 @@ class EvidenceVault(
             .orEmpty()
 
     /** Persists a generated report's JSON snapshot so it can later be loaded for comparison. */
-    fun storeReport(report: ForensicReport) {
+    fun storeReport(report: ForensicReport): File {
         initialize()
         val safeName = report.reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        File(reportsSealed, "$safeName.json").writeText(Json.encodeToString(ForensicReport.serializer(), report))
+        val json = Json.encodeToString(ForensicReport.serializer(), report)
+        var suffix = 1
+        while (true) {
+            val suffixPart = if (suffix == 1) "" else "_$suffix"
+            val target = File(reportsSealed, "${safeName}_report$suffixPart.json")
+            if (!target.createNewFile()) {
+                suffix++
+                continue
+            }
+            try {
+                target.writeText(json)
+                return target
+            } catch (error: Exception) {
+                target.delete()
+                throw error
+            }
+        }
     }
 
     /** All previously generated reports, most recent first, for the Report Comparison screen. */

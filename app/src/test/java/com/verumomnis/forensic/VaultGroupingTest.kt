@@ -96,8 +96,26 @@ class VaultGroupingTest {
     @Test
     fun `base name strips the suffixes a scan appends`() {
         assertEquals("matter", VaultGrouping.baseName("matter_report.pdf"))
+        assertEquals("matter", VaultGrouping.baseName("matter_report_2.pdf"))
         assertEquals("matter", VaultGrouping.baseName("matter_findings.json"))
         assertEquals("matter", VaultGrouping.baseName("matter-sealed.pdf"))
         assertEquals("matter", VaultGrouping.baseName("matter.pdf"))
+    }
+
+    @Test
+    fun `versioned sealed report exports remain discoverable as report artifacts`() {
+        val sets = VaultGrouping.group(
+            raw = emptyList(),
+            processed = emptyList(),
+            sealed = listOf(
+                file("matter_report.json"),
+                file("matter_report.pdf"),
+                file("matter_report_2.pdf")
+            )
+        )
+
+        assertEquals(1, sets.size)
+        assertEquals("matter", sets.single().name)
+        assertTrue(sets.single().artifacts.all { it.kind == VaultArtifact.Kind.REPORT })
     }
 }

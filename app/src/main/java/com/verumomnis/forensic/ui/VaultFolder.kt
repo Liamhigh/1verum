@@ -100,6 +100,7 @@ object VaultGrouping {
         val stem = fileName.substringBeforeLast('.', fileName)
         return stem
             .removeSuffix("_findings")
+            .replace(Regex("_report(?:_\\d+)?$"), "")
             .removeSuffix("_report")
             .removeSuffix("-sealed")
             .removeSuffix("_sealed")

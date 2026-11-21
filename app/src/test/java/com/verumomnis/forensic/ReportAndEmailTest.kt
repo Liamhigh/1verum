@@ -60,6 +60,27 @@ class ReportAndEmailTest {
     }
 
     @Test
+    fun `automated scan report labels outputs as indicators rather than legal findings`() {
+        val scan = ForensicService.scan(
+            listOf(
+                ForensicService.ingest(
+                    "DOC001",
+                    "quoted-terms.txt",
+                    "document",
+                    "The record quotes “lethal targeting” and “battlefield” for review.".toByteArray()
+                )
+            ),
+            now
+        )
+        val report = ReportGenerator.generate(scan.findings, "QuotedTerms", now)
+
+        assertTrue(report.body.contains("potential contradiction indicator"))
+        assertTrue(report.body.contains("not proven facts, legal findings, or legal advice"))
+        assertTrue(report.body.contains("Safety screening indicators are keyword matches only"))
+        assertTrue(report.body.contains("lethal targeting"))
+    }
+
+    @Test
     fun offenceMatrixHasPersonAndLaw() {
         val report = ReportGenerator.generate(findings(), "AllFuels", now)
         // Doctrine: the offence matrix contains council-ACCEPTED findings only.

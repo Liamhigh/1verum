@@ -2,7 +2,7 @@ package com.verumomnis.forensic.model
 
 import kotlinx.serialization.Serializable
 
-/** A single row of the Offence Matrix (spec 9.1). */
+/** A potential legal-significance row derived from an automated screening indicator. */
 @Serializable
 data class OffenceRow(
     val offence: String,
@@ -13,7 +13,7 @@ data class OffenceRow(
 )
 
 /**
- * A court-ready forensic report (Part IX). Every contradiction is anchored to a
+ * A reviewable forensic report (Part IX). Every reported indicator is anchored to a
  * person, a page number and an applicable law/statute.
  */
 @Serializable

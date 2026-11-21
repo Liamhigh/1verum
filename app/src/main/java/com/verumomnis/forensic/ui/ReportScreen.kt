@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.io.File
 import com.verumomnis.forensic.engine.contradiction.FindingsJsonEmitter
 import com.verumomnis.forensic.ui.theme.Cormorant
 import com.verumomnis.forensic.ui.theme.JetBrainsMono
@@ -213,9 +215,10 @@ private fun G3CandidateCard(state: UiState, viewModel: VerumViewModel) {
 fun ReportScreen(
     state: UiState,
     viewModel: VerumViewModel,
-    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
+    onSharePdf: (File) -> String? = { null },
     onNewScan: () -> Unit = {}
 ) {
+    var shareError by remember(state.report?.reference) { mutableStateOf("") }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -232,25 +235,50 @@ fun ReportScreen(
             VoGoldRule()
         }
 
-        // Primary CTA: gold gradient (§3.4); siblings are blue outlines.
-        VerumPrimaryButton(
-            label = "Generate Sealed Report",
-            onClick = { viewModel.generateReport() },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (state.report == null) {
+            VerumPrimaryButton(
+                label = "Generate Sealed Report",
+                onClick = { viewModel.generateReport() },
+                enabled = state.scanResult != null,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            state.report?.let { rpt ->
-                VerumSecondaryButton(
-                    label = "Export Sealed PDF",
-                    onClick = { onExportReport(rpt) },
-                    modifier = Modifier.weight(1f)
-                )
+            state.report?.let {
+                when {
+                    state.reportPdfFile != null -> VerumSecondaryButton(
+                        label = "Share Sealed PDF",
+                        onClick = { shareError = onSharePdf(state.reportPdfFile) ?: "" },
+                        modifier = Modifier.weight(1f)
+                    )
+                    state.reportPdfGenerating -> {
+                        Text("Creating watermarked PDF…", color = VoTextMuted, fontSize = 12.sp)
+                    }
+                    else -> VerumSecondaryButton(
+                        label = "Retry PDF export",
+                        onClick = viewModel::retryReportPdf,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
             VerumSecondaryButton(
                 label = "New Scan",
                 onClick = onNewScan,
                 modifier = Modifier.weight(1f)
             )
+        }
+        if (state.reportPdfFile != null) {
+            Text(
+                "Saved in the vault: ${state.reportPdfFile.name}",
+                color = VoTextMuted,
+                fontSize = 11.sp
+            )
+        }
+        if (state.reportPdfError.isNotBlank()) {
+            Text(state.reportPdfError, color = VoRed, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+        if (shareError.isNotBlank()) {
+            Text(shareError, color = VoRed, fontSize = 12.sp, lineHeight = 18.sp)
         }
 
         // Candidates surface as soon as a scan has run — they must never wait
@@ -295,6 +323,26 @@ fun ReportScreen(
                 fontSize = 13.sp,
                 lineHeight = 20.sp
             )
+        }
+
+        VoCard(title = "SEALED REPORT BODY", icon = Icons.Filled.Description) {
+            Text(
+                "This text is the report body covered by the displayed SHA-512 seal. Automated screening " +
+                    "results are indicators for human review, not proven facts or legal findings.",
+                color = VoTextMuted,
+                fontSize = 11.sp,
+                lineHeight = 17.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            SelectionContainer {
+                Text(
+                    report.body,
+                    color = VoTextPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp
+                )
+            }
         }
 
         VoCard(

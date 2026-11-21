@@ -94,7 +94,7 @@ private const val DEBUG_SHOW_DEVICE_TIER = false
 fun VerumApp(
     viewModel: VerumViewModel,
     onCaptureLocation: () -> Unit = {},
-    onExportReport: (com.verumomnis.forensic.model.ForensicReport) -> Unit = {},
+    onSharePdf: (java.io.File) -> String? = { null },
     onExportEmail: (com.verumomnis.forensic.model.SealedEmail) -> Unit = {},
     onReadConstitution: () -> Unit = {},
     onStorySeen: () -> Unit = {},
@@ -323,7 +323,7 @@ fun VerumApp(
                             Screen.REPORT -> ReportScreen(
                                 state = state,
                                 viewModel = viewModel,
-                                onExportReport = onExportReport,
+                                onSharePdf = onSharePdf,
                                 onNewScan = { confirmNewScan = true }
                             )
                             Screen.EMAIL -> EmailScreen(state, viewModel, onExportEmail)
@@ -423,6 +423,12 @@ fun VerumApp(
             state.guardianBlock?.let { assessment ->
                 GuardianBlockScreen(
                     assessment = assessment,
+                    report = state.report,
+                    reportPdfFile = state.reportPdfFile,
+                    reportPdfGenerating = state.reportPdfGenerating,
+                    reportPdfError = state.reportPdfError,
+                    onRetryPdf = viewModel::retryReportPdf,
+                    onSharePdf = onSharePdf,
                     onClearCase = {
                         viewModel.clearCase()
                         viewModel.clearGuardianBlock()

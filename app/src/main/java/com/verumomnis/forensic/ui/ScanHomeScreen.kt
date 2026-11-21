@@ -86,6 +86,7 @@ fun ScanHomeScreen(
     val hasFile = pending != null
     val isScanning = state.sealStage != SealStage.IDLE && state.sealStage != SealStage.DONE && state.sealStage != SealStage.ERROR
     val scanDone = state.sealStage == SealStage.DONE || state.report != null
+    val scanFailed = state.sealStage == SealStage.ERROR && state.report == null
 
     if (confirmNewScan) {
         VoConfirmDialog(
@@ -124,7 +125,7 @@ fun ScanHomeScreen(
         Spacer(Modifier.height(8.dp))
         Text(
             "Select a document and let the Nine-Brain engine seal, analyse and " +
-                "anchor the evidence before generating a court-ready report.",
+                "anchor the evidence before generating a sealed report for human review.",
             color = VoTextMuted,
             fontSize = 14.sp,
             lineHeight = 21.sp,
@@ -225,7 +226,7 @@ fun ScanHomeScreen(
         }
 
         // Progress / result card
-        if (isScanning || scanDone) {
+        if (isScanning || scanDone || scanFailed) {
             Spacer(Modifier.height(20.dp))
             Column(
                 modifier = Modifier
@@ -246,6 +247,15 @@ fun ScanHomeScreen(
                 // stage shows a spinner while active and a green check once done, so
                 // the user can see exactly what the engine is doing.
                 SealPipeline(currentStage = state.sealStage)
+                if (scanFailed) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        state.scanLog.ifBlank { "The scan did not finish. Select the evidence again and retry." },
+                        color = VoTextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
+                    )
+                }
                 if (scanDone && state.report != null) {
                     Spacer(Modifier.height(14.dp))
                     VerumPrimaryButton(
@@ -392,7 +402,7 @@ private val VO_PIPELINE = listOf(
     VoStep(SealStage.SCANNING, "Nine-Brain forensic scan", "Flagging contradiction indicators for review"),
     VoStep(SealStage.SEALING, "SHA-512 seal", "Applying the tamper-evident seal"),
     VoStep(SealStage.ANCHORING, "OpenTimestamps", "Anchoring the hash to the Bitcoin blockchain"),
-    VoStep(SealStage.DONE, "Report ready", "Court-ready sealed report generated")
+    VoStep(SealStage.DONE, "Report ready", "Reviewable sealed report generated")
 )
 
 /**

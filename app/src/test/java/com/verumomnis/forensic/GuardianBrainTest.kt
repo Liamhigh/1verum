@@ -37,6 +37,29 @@ class GuardianBrainTest {
     }
 
     @Test
+    fun `quoted terms from attached hard-stop screenshot are reported as screening indicators`() {
+        // The original uploaded case file was not supplied. This documents the
+        // lexical rule visible in the screenshot, not the context of that case.
+        val assessment = GuardianBrain.analyze(
+            documents = listOf(
+                doc("The record quotes “lethal targeting”, “battlefield”, “warfare”, “armed conflict”, and “ied”.")
+            ),
+            now = Instant.parse("2024-01-15T10:00:00Z")
+        )
+
+        val matches = assessment.violations.filter {
+            it.type == GuardianViolationType.ARTICLE_X_WEAPONIZATION
+        }
+        assertTrue(assessment.hardStopRequired)
+        assertEquals(
+            setOf("lethal targeting", "battlefield", "warfare", "armed conflict", "ied"),
+            matches.map { it.trigger }.toSet()
+        )
+        assertTrue(matches.all { it.description.contains("screening indicator") })
+        assertTrue(matches.all { it.description.contains("does not establish intent") })
+    }
+
+    @Test
     fun `coercion language is flagged`() {
         val assessment = GuardianBrain.analyze(
             documents = listOf(doc("Keep your mouth shut or else you'll regret it.")),

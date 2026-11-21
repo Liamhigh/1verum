@@ -60,7 +60,8 @@ object GuardianBrain {
                     violations += GuardianViolation(
                         type = GuardianViolationType.ARTICLE_X_WEAPONIZATION,
                         severity = Severity.CRITICAL,
-                        description = "Article X anti-weaponization keyword detected: \"$keyword\"",
+                        description = "Article X screening indicator: keyword \"$keyword\" matched in evidence text. " +
+                            "A keyword match alone does not establish intent or wrongdoing.",
                         evidenceId = evidenceId,
                         trigger = keyword,
                         timestamp = now.toString()

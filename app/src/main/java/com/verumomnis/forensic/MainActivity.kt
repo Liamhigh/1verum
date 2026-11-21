@@ -68,7 +68,13 @@ class MainActivity : ComponentActivity() {
                 VerumApp(
                     viewModel,
                     onCaptureLocation = ::captureLocation,
-                    onExportReport = { report -> runCatching { pdfExporter.share(pdfExporter.exportReport(report)) } },
+                    onSharePdf = { file ->
+                        runCatching { pdfExporter.share(file) }
+                            .fold(
+                                onSuccess = { null },
+                                onFailure = { "The PDF is saved, but Android could not open the sharing menu." }
+                            )
+                    },
                     onExportEmail = { email -> runCatching { pdfExporter.share(pdfExporter.exportEmail(email)) } },
                     onReadConstitution = ::openConstitution,
                     onStorySeen = { prefs.edit().putBoolean(KEY_STORY_SEEN, true).apply() },

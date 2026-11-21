@@ -41,7 +41,7 @@ object ConstitutionalPrompt {
     /** Prompt tailored for Gemma 3, the forensic report writer. */
     fun reportWriter(): String =
         preamble("Gemma 3", "forensic report writer") +
-            "\nSPECIALISE AS REPORT WRITER: produce court-ready reports with contradiction matrices, chronologies, legal frameworks, offence matrices, and per-page SHA-512 seals."
+            "\nSPECIALISE AS REPORT WRITER: produce review-ready reports with contradiction indicators, chronologies, legal frameworks, and per-page SHA-512 seals. Distinguish automated screening results from proven facts or legal findings."
 
     /** Prompt tailored for Phi-3, the standard-device communicator. */
     fun communicatorStandard(): String =

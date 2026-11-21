@@ -8,6 +8,7 @@ import com.verumomnis.forensic.engine.EvidenceDocument
 import com.verumomnis.forensic.engine.FindingsJsonEmitter
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.ReportGenerator
+import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.vault.EvidenceVault
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,11 +39,20 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
         const val PROGRESS_PERCENT = "percent"
 
         const val OUTPUT_REFERENCE = "report_reference"
+        const val OUTPUT_PDF_PATH = "report_pdf_path"
+        const val OUTPUT_REPORT_PATH = "report_path"
         const val OUTPUT_CONTRADICTIONS = "contradiction_count"
         const val OUTPUT_SHORTCODE = "seal_shortcode"
     }
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        try {
+            performScan()
+        } catch (_: Exception) {
+            Result.failure(failure("Scan incomplete. The report and sealed PDF could not both be saved."))
+        }
+
+    private suspend fun performScan(): Result {
         val caseName = inputData.getString(INPUT_CASE_NAME) ?: "Matter"
         val count = inputData.getInt(INPUT_EVIDENCE_COUNT, 0)
         if (count == 0) return Result.failure(failure("No evidence items provided"))
@@ -54,9 +64,10 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
                 val base = "$PREFIX_FILENAME$index"
                 val fileName = inputData.getString(base + SUFFIX_FILENAME) ?: "evidence_$index.txt"
                 val textFilePath = inputData.getString(base + SUFFIX_TEXT_FILE) ?: ""
-                val text = if (textFilePath.isNotBlank()) {
-                    runCatching { java.io.File(textFilePath).readText() }.getOrDefault("")
-                } else ""
+                require(textFilePath.isNotBlank()) { "Evidence text was not staged for background scan." }
+                val textFile = java.io.File(textFilePath)
+                require(textFile.isFile) { "Staged evidence text is missing." }
+                val text = textFile.readText()
                 val sha512 = inputData.getString(base + SUFFIX_SHA512) ?: ""
                 val type = inputData.getString(base + SUFFIX_TYPE) ?: "document"
                 add(
@@ -74,10 +85,14 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
         setProgress(progress("B1-B9", "Running Nine-Brain forensic analysis", 35))
         val now = Instant.now()
         val vault = EvidenceVault(applicationContext)
-        val scanResult = ForensicService.scan(documents, now = now, vault = vault, caseName = caseName)
+        // The uploader already vaulted the original bytes. Do not re-store the
+        // extracted text here: that used to replace derived evidence artifacts
+        // under the same name on a second scan.
+        val scanResult = ForensicService.scan(documents, now = now)
 
         setProgress(progress("Report", "Generating sealed forensic report", 75))
-        val findingsJsonPath = java.io.File(vault.findings, FindingsJsonEmitter.findingsFileName(caseName, now)).absolutePath
+        val findingsName = FindingsJsonEmitter.findingsFileName(caseName, now)
+        val findingsJsonPath = java.io.File(vault.findings, findingsName).absolutePath
         val report = ReportGenerator.generate(
             scanResult.findings, caseName, now,
             findingsJsonPath = findingsJsonPath,
@@ -85,12 +100,16 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
         )
 
         setProgress(progress("Vault", "Sealing findings and report", 95))
-        vault.storeFinding("${report.reference}.json", Json.encodeToString(scanResult.findings))
-        vault.storeFinding("${report.reference}_report.txt", report.body)
+        val reportPath = vault.storeReport(report)
+        vault.storeFinding(findingsName, Json.encodeToString(scanResult.findings))
+        vault.storeFinding("${report.reference}_${now.toEpochMilli()}_report.txt", report.body)
+        val pdfFile = SealedPdfExporter(applicationContext).exportReport(report)
 
         return Result.success(
             Data.Builder()
                 .putString(OUTPUT_REFERENCE, report.reference)
+                .putString(OUTPUT_REPORT_PATH, reportPath.absolutePath)
+                .putString(OUTPUT_PDF_PATH, pdfFile.absolutePath)
                 .putInt(OUTPUT_CONTRADICTIONS, report.contradictions.size)
                 .putString(OUTPUT_SHORTCODE, report.seal.shortcode)
                 .build()

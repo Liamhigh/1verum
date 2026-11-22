@@ -215,6 +215,7 @@ fun SealDocumentScreen(
                     onShareReport = { state.reportPdfFile?.let { com.verumomnis.forensic.pdf.SealedPdfExporter(context).share(it) } },
                     onRetryReport = viewModel::retryReportPdf)
             }
+            PdfPageReviewCard(state, viewModel)
             state.sealResult?.let { result ->
                 Spacer(Modifier.height(24.dp))
                 ResultsCard(result = result, documentName = state.sealPdfName, viewModel = viewModel, context = context, onVerifyClick = { openWebsiteVerify(context) })

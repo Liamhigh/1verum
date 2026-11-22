@@ -64,6 +64,8 @@ class DocumentSealFlowTest {
         coverage: PdfExtractionCoverage? = null
     ) = VerumViewModel(
         application = app, identityService = IdentityService(app, InMemoryIdentityKeyStore()),
+        vault = com.verumomnis.forensic.vault.EvidenceVault(File(app.filesDir, "vault"),
+            masterKeyProvider = { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 7 }, "AES") }),
         blockchainService = offline, reportPdfWriter = writer,
         documentSealServices = DocumentSealServices(
             seal = { bytes, options ->

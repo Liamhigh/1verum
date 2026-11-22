@@ -31,8 +31,11 @@ object ReportGenerator {
         narrativeWriter: ReportWriter = DeterministicReportWriter,
         judicialFindings: List<Contradiction> = emptyList()
     ): ForensicReport {
-        val reference = "VO-${caseName.uppercase().take(6).replace(" ", "")}-${now.toString().take(10).replace("-", "")}-FOR"
-        val title = "Forensic Analysis Report — $caseName"
+        val retryIds = findings.extractionCoverage.mapNotNull { it.coverage.retryAttempt?.id }
+        val reference = "VO-${caseName.uppercase().take(6).replace(" ", "")}-${now.toString().take(10).replace("-", "")}-FOR" +
+            retryIds.firstOrNull()?.let { "-OCR-$it" }.orEmpty()
+        val title = if (retryIds.isNotEmpty()) "NEW PDF-only OCR Retry Report — $caseName"
+            else "Forensic Analysis Report — $caseName"
         val classification = "CONFIDENTIAL — LAW ENFORCEMENT SENSITIVE"
 
         // Doctrine: only council-ACCEPTED contradictions may be sealed as findings.

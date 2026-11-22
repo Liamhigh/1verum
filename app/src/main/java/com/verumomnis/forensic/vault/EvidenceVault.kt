@@ -211,16 +211,87 @@ class EvidenceVault(
     }
 
     /** Preserve coverage even if no readable text exists and the forensic scan cannot start. */
+    @Synchronized
     fun storePdfExtraction(
         evidenceId: String,
         fileName: String,
         sha512: String,
         coverage: com.verumomnis.forensic.model.PdfExtractionCoverage
     ) {
-        val record = com.verumomnis.forensic.model.DocumentExtractionCoverage(evidenceId, fileName, sha512, coverage)
-        storeFinding("pdf_extraction_${sha512}.json", Json { encodeDefaults = true }.encodeToString(
+        initialize()
+        require(sha512.matches(Regex("[a-fA-F0-9]{128}")))
+        val existing = listPdfExtractions().filter { it.sha512 == sha512 }
+        val revision = existing.maxOfOrNull { it.revision }?.plus(1) ?: 0
+        val record = com.verumomnis.forensic.model.DocumentExtractionCoverage(
+            evidenceId, fileName, sha512, coverage, revision, clock().toString()
+        )
+        val original = File(findings, "pdf_extraction_${sha512}.json")
+        // Re-import may repair unknown counts or legacy missing page text. Keep both
+        // snapshots instead of silently discarding the repair or rewriting history.
+        val target = if (!original.exists()) original
+            else File(findings, "pdf_extraction_${sha512}_${java.util.UUID.randomUUID()}.json")
+        writePdfCoverage(target, record)
+    }
+
+    private fun writePdfCoverage(target: File, record: com.verumomnis.forensic.model.DocumentExtractionCoverage) {
+        val json = Json { encodeDefaults = true }.encodeToString(
             com.verumomnis.forensic.model.DocumentExtractionCoverage.serializer(), record
-        ))
+        )
+        check(target.createNewFile()) { "Extraction attempt already exists." }
+        try { target.writeText(json) } catch (e: Exception) { target.delete(); throw e }
+    }
+
+    @Synchronized
+    fun storePdfRetry(record: com.verumomnis.forensic.model.DocumentExtractionCoverage): com.verumomnis.forensic.model.DocumentExtractionCoverage {
+        initialize()
+        val id = requireNotNull(record.coverage.retryAttempt).id
+        require(id.matches(Regex("[A-Za-z0-9-]+")) && record.sha512.matches(Regex("[a-fA-F0-9]{128}")))
+        val revision = (listPdfExtractions().filter { it.sha512 == record.sha512 }.maxOfOrNull { it.revision } ?: -1) + 1
+        val saved = record.copy(revision = revision, recordedAt = clock().toString())
+        writePdfCoverage(File(findings, "pdf_retry_${record.sha512}_$id.json"), saved)
+        return saved
+    }
+
+    fun listPdfExtractions(): List<com.verumomnis.forensic.model.DocumentExtractionCoverage> =
+        findings.listFiles { f -> f.isFile && (f.name.startsWith("pdf_extraction_") || f.name.startsWith("pdf_retry_")) && f.extension == "json" }
+            .orEmpty().mapNotNull { file ->
+                runCatching {
+                    Json { ignoreUnknownKeys = true }.decodeFromString(
+                        com.verumomnis.forensic.model.DocumentExtractionCoverage.serializer(), file.readText()
+                    )
+                }.getOrNull()
+            }.sortedWith(compareByDescending<com.verumomnis.forensic.model.DocumentExtractionCoverage> { it.revision }
+                .thenByDescending { it.recordedAt ?: it.coverage.retryAttempt?.createdAt.orEmpty() })
+
+    /** Hash-addressed encrypted source copy; repeat extraction never replaces an existing source. */
+    @Synchronized
+    fun preservePdfSource(bytes: ByteArray): String {
+        val hash = Sha512.hash(bytes)
+        val name = "pdf_source_$hash.pdf"
+        if (!evidenceFile(name).exists()) storeEvidence(name, bytes)
+        return hash
+    }
+
+    @Synchronized
+    fun preservePdfSource(file: File): String {
+        val hash = Sha512.hash(file)
+        val name = "pdf_source_$hash.pdf"
+        if (!evidenceFile(name).exists()) {
+            check(storeEvidenceStreaming(name, file.inputStream()).second == hash)
+        }
+        return hash
+    }
+
+    /** Materialise only into private cache and refuse filename collisions or changed originals. */
+    fun materializePdfSource(record: com.verumomnis.forensic.model.DocumentExtractionCoverage, destination: File): File {
+        require(record.sha512.matches(Regex("[a-fA-F0-9]{128}")))
+        val pinned = "pdf_source_${record.sha512}.pdf"
+        val source = if (evidenceFile(pinned).isFile) pinned else record.fileName
+        materializeEvidence(source, destination)
+        check(Sha512.hash(destination).equals(record.sha512, ignoreCase = true)) {
+            "Original PDF fingerprint does not match. Retry stopped; evidence was not changed."
+        }
+        return destination
     }
 
     /** Load the persisted page-text provenance for an uploaded PDF, keyed by its source hash. */

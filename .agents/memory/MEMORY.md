@@ -6,3 +6,4 @@
 - [Storage client compatibility](storage-client-compatibility.md) — verify sidecar authentication before upgrading Google storage client major versions.
 - [Verum brand preference](download-brand-preference.md) — the user prefers the website appearance and restrained gold.
 - [Simple document sealing](sealing-flow-intent.md) — the user wants one seal flow, with forensic reporting as an explicit option, not a separate scan journey.
+- [PDF retry scope](pdf-retry-scope.md) — retries are explicitly PDF-only; never imply that they revise an earlier sealed mixed-evidence case.

@@ -282,6 +282,8 @@ fun ReportScreen(
             Text(shareError, color = VoRed, fontSize = 12.sp, lineHeight = 18.sp)
         }
 
+        PdfPageReviewCard(state, viewModel)
+
         // Candidates surface as soon as a scan has run — they must never wait
         // on (or be buried inside) the sealed report.
         if (state.g3Candidates.isNotEmpty()) {

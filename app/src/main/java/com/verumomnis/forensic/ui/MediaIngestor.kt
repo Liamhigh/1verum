@@ -166,6 +166,7 @@ class MediaIngestor(
             when {
                 mime.startsWith("text") -> plainFile.readText(Charsets.UTF_8)
                 mime.startsWith("application/pdf") -> {
+                    vault.preservePdfSource(plainFile)
                     val extracted = pdfExtractor.extractWithCoverage(plainFile)
                     coverage = extracted.coverage
                     extracted.text.trim()

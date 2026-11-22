@@ -146,6 +146,15 @@ class PdfOcrExtractor(
         }
     }
 
+    /** Fresh bounded attempt on verified original bytes, off the UI thread. */
+    fun retryPages(
+        file: File,
+        previous: com.verumomnis.forensic.model.PdfExtractionCoverage,
+        attempt: com.verumomnis.forensic.model.PdfRetryAttempt
+    ): PdfExtractionResult = retryPdfPages(previous, attempt, maxOcrPages) {
+        ocrSource?.invoke(file) ?: openDeviceOcr(file)
+    }
+
     private fun renderPageAndRecognise(renderer: PdfRenderer, index: Int, recognizer: com.google.mlkit.vision.text.TextRecognizer): String {
         val page = renderer.openPage(index)
         try {

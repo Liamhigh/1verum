@@ -105,6 +105,35 @@ class PdfCoverageIntegrationTest {
         assertTrue(fromBytes.text.contains("page 6"))
     }
 
+    @Test fun retryUsesTheOriginalPdfFileButOnlyRecognisesSelectedRemainingPages() {
+        val bytes = mixedPdf()
+        val file = File.createTempFile("synthetic-retry-", ".pdf", app.cacheDir)
+        try {
+            file.writeBytes(bytes)
+            val extractor = extractor()
+            val original = extractor.extractWithCoverage(file)
+            val calls = mutableListOf<Int>()
+            extractor.ocrSource = {
+                object : PdfOcrPages {
+                    override val pageCount = 6
+                    override fun recognise(index: Int): String {
+                        calls += index
+                        return "Synthetic retry text from original page ${index + 1}."
+                    }
+                    override fun close() {}
+                }
+            }
+            val result = extractor.retryPages(file, original.coverage,
+                PdfRetryAttempt("synthetic-native-boundary", now.toString(), listOf(3, 5)))
+            assertEquals(listOf(2, 4), calls)
+            assertEquals(listOf(PageReadStatus.TEXT_LAYER, PageReadStatus.OCR, PageReadStatus.OCR,
+                PageReadStatus.FAILED, PageReadStatus.OCR, PageReadStatus.TEXT_LAYER),
+                result.coverage.pages.map { it.status })
+            assertEquals(original.coverage.pages[5], result.coverage.pages[5])
+            assertArrayEquals(bytes, file.readBytes())
+        } finally { file.delete() }
+    }
+
     @Test fun ingestFindingsAndVaultedReportPreserveCoverageAndWarnings() {
         val bytes = mixedPdf()
         val uri = Uri.parse("content://synthetic/mixed.pdf")

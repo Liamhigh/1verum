@@ -6,6 +6,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class PageReadStatus { TEXT_LAYER, OCR, UNREAD, FAILED, SKIPPED }
 
+/** A derivative extraction, never a replacement for the source or an earlier report. */
+@Serializable
+data class PdfRetryAttempt(
+    val id: String,
+    val createdAt: String,
+    val selectedPages: List<Int>,
+    val parentAttemptId: String? = null,
+    val priorReportReference: String? = null
+)
+
 @Serializable
 data class PageExtraction(
     val page: Int,
@@ -26,12 +36,22 @@ data class PdfExtractionCoverage(
     val pages: List<PageExtraction> = emptyList(),
     val ocrPageLimit: Int = 200,
     val thinPageChars: Int = 30,
-    val documentFailure: String? = null
+    val documentFailure: String? = null,
+    val retryAttempt: PdfRetryAttempt? = null
 ) {
+    val remainingPages: List<PageExtraction> get() = pages.filter {
+        it.status == PageReadStatus.UNREAD || it.status == PageReadStatus.FAILED || it.status == PageReadStatus.SKIPPED
+    }
+
     val incomplete: Boolean get() = documentFailure != null || totalPages == null || totalPages == 0 ||
         pages.size != totalPages || pages.any { it.status !in setOf(PageReadStatus.TEXT_LAYER, PageReadStatus.OCR) }
 
     fun summary(): String = buildString {
+        retryAttempt?.let {
+            append("NEW OCR RETRY ATTEMPT ${it.id} at ${it.createdAt}; selected original pages: ${it.selectedPages.joinToString(", ")}. ")
+            append("PDF-only derivative analysis; other case evidence was not re-analysed. Earlier sealed reports remain unchanged. ")
+            it.priorReportReference?.let { ref -> append("Prior report: $ref. ") }
+        }
         append(if (incomplete) "WARNING — incomplete PDF coverage. " else "PDF extraction coverage. ")
         append("Pages: ${totalPages ?: "unknown"}; ")
         append("text layer: ${pages.count { it.status == PageReadStatus.TEXT_LAYER }}; ")
@@ -51,5 +71,8 @@ data class DocumentExtractionCoverage(
     val evidenceId: String,
     val fileName: String,
     val sha512: String,
-    val coverage: PdfExtractionCoverage
+    val coverage: PdfExtractionCoverage,
+    /** Monotonic per source hash, across both full re-imports and selective retries. */
+    val revision: Int = 0,
+    val recordedAt: String? = null
 )

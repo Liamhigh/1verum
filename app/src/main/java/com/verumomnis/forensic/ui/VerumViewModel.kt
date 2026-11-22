@@ -180,6 +180,10 @@ data class VerifyResult(
 )
 
 data class UiState(
+    val pdfReviewRecords: List<com.verumomnis.forensic.model.DocumentExtractionCoverage> = emptyList(),
+    val pdfRetryBusy: Boolean = false,
+    val pdfRetryMessage: String = "",
+    val pdfRetryResult: com.verumomnis.forensic.engine.PdfRetryResult? = null,
     val deviceRamGb: Int = 6,
     val deviceTier: DeviceTier = DeviceTier.STANDARD,
     val models: List<Llm> = emptyList(),
@@ -289,7 +293,9 @@ class VerumViewModel(
     private val reportPdfWriter: (ForensicReport, String?) -> File = { report, sourceName ->
         SealedPdfExporter(application).exportReport(report, sourceName)
     },
-    private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application)
+    private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application),
+    private val pdfPageRetry: (File, com.verumomnis.forensic.model.PdfExtractionCoverage, com.verumomnis.forensic.model.PdfRetryAttempt) -> com.verumomnis.forensic.engine.PdfExtractionResult =
+        { file, previous, attempt -> com.verumomnis.forensic.engine.PdfOcrExtractor(application).retryPages(file, previous, attempt) }
 ) : AndroidViewModel(application) {
 
     /** Constructor used by Android's default ViewModelProvider factory. */
@@ -951,6 +957,56 @@ class VerumViewModel(
         _state.update { it.copy(pendingFiles = emptyList(), sealStage = SealStage.IDLE) }
     }
 
+    /** Saved gaps also remain available after a restart or an all-unread ingest. */
+    fun loadPdfPageReview() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _state.update { it.copy(pdfReviewRecords = vault.listPdfExtractions()) }
+        }
+    }
+
+    @Synchronized
+    fun retryPdfPages(source: com.verumomnis.forensic.model.DocumentExtractionCoverage, pages: List<Int>) {
+        val current = _state.value
+        if (current.pdfRetryBusy || current.sealBusy || current.scanning || current.reportPdfGenerating) return
+        _state.update { it.copy(pdfRetryBusy = true, pdfRetryMessage = "Reading selected original pages on this device…", pdfRetryResult = null) }
+        val priorReference = current.report?.takeIf { report ->
+            report.extractionCoverage.any { it.sha512 == source.sha512 }
+        }?.reference ?: source.coverage.retryAttempt?.priorReportReference
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = com.verumomnis.forensic.engine.PdfRetryService(
+                    vault, getApplication<Application>().cacheDir, pdfPageRetry, reportPdfWriter,
+                    signReport = { it.copy(seal = signAndUpdateSeal(it.seal)) }
+                ).retry(source, pages, priorReference)
+                _state.update { it.copy(pdfRetryResult = result, pdfRetryMessage = result.message) }
+            } catch (e: Exception) {
+                _state.update { it.copy(pdfRetryMessage =
+                    "Page retry did not complete. ${e.message.orEmpty()} Earlier reports and original evidence were not changed.") }
+            } finally {
+                _state.update { it.copy(pdfRetryBusy = false, pdfReviewRecords = vault.listPdfExtractions()) }
+                refreshVaultStats()
+            }
+        }
+    }
+
+    fun retryPdfReviewExport() {
+        val result = _state.value.pdfRetryResult ?: return
+        val report = result.report ?: return
+        if (_state.value.pdfRetryBusy) return
+        _state.update { it.copy(pdfRetryBusy = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val file = reportPdfWriter(report, result.record.fileName)
+                check(file.isFile && file.length() > 0)
+                _state.update { it.copy(pdfRetryResult = result.copy(reportFile = file), pdfRetryMessage = "New OCR retry PDF saved. Earlier reports are unchanged.") }
+            } catch (_: Exception) {
+                _state.update { it.copy(pdfRetryMessage = "New retry PDF export failed. Check storage and try again.") }
+            } finally {
+                _state.update { it.copy(pdfRetryBusy = false) }
+            }
+        }
+    }
+
     private fun websiteSealDir(): File =
         File(getApplication<Application>().filesDir, "vault/reports/sealed").apply { mkdirs() }
 
@@ -1240,8 +1296,10 @@ class VerumViewModel(
                 // sealed forensic report is generated for human review.
                 if (forensic) {
                     updatePipelineStep("Forensic report", SealPipelineStepStatus.PROCESSING, "Reading evidence and running Nine-Brain analysis")
+                    vault.preservePdfSource(bytes)
                     val extraction = documentSealServices.extractPdf(bytes)
                     vault.storePdfExtraction("DOC001", name, sha512ForAnchor, extraction.coverage)
+                    loadPdfPageReview()
                     val text = extraction.text.trim()
                     check(text.isNotBlank()) {
                         "No readable text was extracted. Analysis did not complete; this is not a clean result. ${extraction.coverage.summary()}"

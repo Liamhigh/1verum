@@ -184,6 +184,8 @@ data class UiState(
     val pdfRetryBusy: Boolean = false,
     val pdfRetryMessage: String = "",
     val pdfRetryResult: com.verumomnis.forensic.engine.PdfRetryResult? = null,
+    /** Recovered retry states from durable page-coverage and report snapshots. */
+    val pdfRetryRecoveries: List<com.verumomnis.forensic.engine.PdfRetryResult> = emptyList(),
     val deviceRamGb: Int = 6,
     val deviceTier: DeviceTier = DeviceTier.STANDARD,
     val models: List<Llm> = emptyList(),
@@ -959,10 +961,46 @@ class VerumViewModel(
 
     /** Saved gaps also remain available after a restart or an all-unread ingest. */
     fun loadPdfPageReview() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _state.update { it.copy(pdfReviewRecords = vault.listPdfExtractions()) }
+        viewModelScope.launch(Dispatchers.IO) { refreshPdfRetrySnapshot(clearBusy = false) }
+    }
+
+    /** Loads retry provenance/report state together so disk errors cannot leave recovery busy forever. */
+    private fun refreshPdfRetrySnapshot(clearBusy: Boolean) {
+        try {
+            val records = vault.listPdfExtractions()
+            val retryRecords = records.filter { it.coverage.retryAttempt != null }
+            val savedReports = vault.listReports()
+            val service = pdfRetryService()
+            val recoveries = retryRecords.mapNotNull { record ->
+                runCatching { service.recoverSaved(record, savedReports) }.getOrNull()
+            }
+            _state.update { current ->
+                val activeAttempt = current.pdfRetryResult?.record?.coverage?.retryAttempt?.id
+                current.copy(
+                    pdfRetryBusy = if (clearBusy) false else current.pdfRetryBusy,
+                    pdfReviewRecords = records,
+                    pdfRetryRecoveries = recoveries,
+                    pdfRetryResult = if (activeAttempt == null) current.pdfRetryResult else
+                        recoveries.firstOrNull { it.record.coverage.retryAttempt?.id == activeAttempt }
+                )
+            }
+        } catch (_: Exception) {
+            _state.update {
+                it.copy(
+                    pdfRetryBusy = if (clearBusy) false else it.pdfRetryBusy,
+                    pdfRetryMessage = "Saved OCR retry status could not be reloaded. The saved page data and earlier reports were not changed; check storage and reopen this screen."
+                )
+            }
         }
     }
+
+    private fun pdfRetryService() = com.verumomnis.forensic.engine.PdfRetryService(
+        vault,
+        getApplication<Application>().cacheDir,
+        pdfPageRetry,
+        reportPdfWriter,
+        signReport = { it.copy(seal = signAndUpdateSeal(it.seal)) }
+    )
 
     @Synchronized
     fun retryPdfPages(source: com.verumomnis.forensic.model.DocumentExtractionCoverage, pages: List<Int>) {
@@ -974,35 +1012,70 @@ class VerumViewModel(
         }?.reference ?: source.coverage.retryAttempt?.priorReportReference
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val result = com.verumomnis.forensic.engine.PdfRetryService(
-                    vault, getApplication<Application>().cacheDir, pdfPageRetry, reportPdfWriter,
-                    signReport = { it.copy(seal = signAndUpdateSeal(it.seal)) }
-                ).retry(source, pages, priorReference)
-                _state.update { it.copy(pdfRetryResult = result, pdfRetryMessage = result.message) }
+                val result = pdfRetryService().retry(source, pages, priorReference)
+                _state.update {
+                    it.copy(
+                        pdfRetryResult = result,
+                        pdfRetryMessage = result.message,
+                        pdfRetryRecoveries = (it.pdfRetryRecoveries.filterNot { existing ->
+                            existing.record.coverage.retryAttempt?.id == result.record.coverage.retryAttempt?.id
+                        } + result)
+                    )
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(pdfRetryMessage =
                     "Page retry did not complete. ${e.message.orEmpty()} Earlier reports and original evidence were not changed.") }
             } finally {
-                _state.update { it.copy(pdfRetryBusy = false, pdfReviewRecords = vault.listPdfExtractions()) }
+                refreshPdfRetrySnapshot(clearBusy = true)
                 refreshVaultStats()
             }
         }
     }
 
-    fun retryPdfReviewExport() {
-        val result = _state.value.pdfRetryResult ?: return
-        val report = result.report ?: return
-        if (_state.value.pdfRetryBusy) return
+    /** Resume findings/report generation from saved page text; never re-runs OCR. */
+    fun resumePdfRetryReport(record: com.verumomnis.forensic.model.DocumentExtractionCoverage) {
+        runPdfRetryRecovery(record, resumeReport = true)
+    }
+
+    /** Retry exporting a report snapshot already persisted for this OCR attempt. */
+    fun retryPdfReviewExport(record: com.verumomnis.forensic.model.DocumentExtractionCoverage) {
+        runPdfRetryRecovery(record, resumeReport = false)
+    }
+
+    private fun runPdfRetryRecovery(
+        record: com.verumomnis.forensic.model.DocumentExtractionCoverage,
+        resumeReport: Boolean
+    ) {
+        if (_state.value.pdfRetryBusy || _state.value.sealBusy || _state.value.scanning ||
+            _state.value.reportPdfGenerating
+        ) return
         _state.update { it.copy(pdfRetryBusy = true) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val file = reportPdfWriter(report, result.record.fileName)
-                check(file.isFile && file.length() > 0)
-                _state.update { it.copy(pdfRetryResult = result.copy(reportFile = file), pdfRetryMessage = "New OCR retry PDF saved. Earlier reports are unchanged.") }
+                val service = pdfRetryService()
+                val result = if (resumeReport) service.resumeReport(record)
+                    else service.retryReportPdf(record)
+                _state.update {
+                    it.copy(
+                        pdfRetryResult = result,
+                        pdfRetryMessage = result.message,
+                        pdfRetryRecoveries = (it.pdfRetryRecoveries.filterNot { existing ->
+                            existing.record.coverage.retryAttempt?.id ==
+                                result.record.coverage.retryAttempt?.id
+                        } + result)
+                    )
+                }
             } catch (_: Exception) {
-                _state.update { it.copy(pdfRetryMessage = "New retry PDF export failed. Check storage and try again.") }
+                _state.update {
+                    it.copy(pdfRetryMessage = if (resumeReport) {
+                        "Saved page text remains available, but report recovery failed. Check storage and resume again. Earlier reports and original evidence were unchanged."
+                    } else {
+                        "The saved retry report remains unchanged, but its PDF could not be exported. Check storage and retry export."
+                    })
+                }
             } finally {
-                _state.update { it.copy(pdfRetryBusy = false) }
+                refreshPdfRetrySnapshot(clearBusy = true)
+                refreshVaultStats()
             }
         }
     }

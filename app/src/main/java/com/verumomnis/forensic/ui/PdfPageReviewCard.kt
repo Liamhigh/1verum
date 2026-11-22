@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.engine.PdfOcrExtractor
+import com.verumomnis.forensic.engine.PdfRetryRecoveryStage
 import com.verumomnis.forensic.model.DocumentExtractionCoverage
 import com.verumomnis.forensic.pdf.SealedPdfExporter
 import com.verumomnis.forensic.ui.theme.*
@@ -23,19 +24,31 @@ import com.verumomnis.forensic.ui.theme.*
 fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     LaunchedEffect(state.pendingFiles.size, state.sealBusy) { viewModel.loadPdfPageReview() }
     var review by remember { mutableStateOf<DocumentExtractionCoverage?>(null) }
-    var showReport by remember(state.pdfRetryResult?.report?.reference) { mutableStateOf(false) }
+    var expandedReports by remember { mutableStateOf(emptySet<String>()) }
     var shareError by remember { mutableStateOf("") }
     val context = LocalContext.current
     val latest = state.pdfReviewRecords.groupBy { it.sha512 }.values.map { records ->
         records.maxWithOrNull(compareBy<DocumentExtractionCoverage> { it.revision }
             .thenBy { it.recordedAt ?: it.coverage.retryAttempt?.createdAt.orEmpty() })!!
     }
+    // Keep earlier attempts actionable even when a later re-import becomes the
+    // latest extraction snapshot for the same source PDF.
+    val visibleRecords = (latest + state.pdfReviewRecords.filter { it.coverage.retryAttempt != null })
+        .distinctBy { record ->
+            record.coverage.retryAttempt?.id?.let { "retry:$it" } ?: "${record.sha512}:${record.revision}"
+        }
     if (latest.isEmpty() && state.pdfRetryMessage.isBlank()) return
     val busy = state.pdfRetryBusy || state.sealBusy || state.scanning || state.reportPdfGenerating
     VoCard(title = "PDF PAGE REVIEW & RETRY", icon = Icons.Filled.Description) {
         Text("Review original page numbers and extraction gaps. A retry creates a new, labelled PDF-only analysis; it does not revise earlier sealed reports or re-analyse other case evidence.",
             color = VoTextMuted, fontSize = 12.sp)
-        latest.forEach { record ->
+        visibleRecords.forEach { record ->
+            val attempt = record.coverage.retryAttempt
+            val recovery = attempt?.let { id ->
+                state.pdfRetryRecoveries.firstOrNull {
+                    it.record.coverage.retryAttempt?.id == id.id
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(record.fileName, color = VoTextPrimary, fontSize = 14.sp)
             Text("${record.coverage.remainingPages.size} remaining page(s) · ${record.coverage.totalPages ?: "unknown"} total · SHA-512 ${record.sha512.take(16)}…",
@@ -45,30 +58,73 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
             }
             VerumSecondaryButton(label = "Review pages: ${record.fileName}", enabled = !busy,
                 onClick = { review = record }, modifier = Modifier.fillMaxWidth())
+            if (attempt != null) {
+                val stage = recovery?.stage ?: PdfRetryRecoveryStage.EXTRACTION_ONLY
+                val stageLabel = when (stage) {
+                    PdfRetryRecoveryStage.EXTRACTION_ONLY -> "OCR pages saved · report not generated"
+                    PdfRetryRecoveryStage.FINDINGS_READY -> "Findings and report saved · PDF export pending"
+                    PdfRetryRecoveryStage.PDF_READY -> "Retry PDF ready"
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(stageLabel, color = VoGold, fontSize = 11.sp)
+                when (stage) {
+                    PdfRetryRecoveryStage.EXTRACTION_ONLY -> {
+                        if (recovery?.canResumeReport == true) {
+                            VerumSecondaryButton(
+                                "Resume report generation",
+                                enabled = !busy,
+                                onClick = { viewModel.resumePdfRetryReport(record) }
+                            )
+                        } else {
+                            Text(
+                                "No saved page text is available to resume. Choose pages for another OCR retry.",
+                                color = VoTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    PdfRetryRecoveryStage.FINDINGS_READY -> {
+                        VerumSecondaryButton(
+                            "Retry new PDF export",
+                            enabled = !busy,
+                            onClick = { viewModel.retryPdfReviewExport(record) }
+                        )
+                    }
+                    PdfRetryRecoveryStage.PDF_READY -> {
+                        val file = recovery?.reportFile
+                        if (file != null) {
+                            VerumSecondaryButton("Share new retry PDF", onClick = {
+                                shareError = try {
+                                    SealedPdfExporter(context).share(file)
+                                    ""
+                                } catch (_: Exception) {
+                                    "The new PDF could not be shared. It is still saved in the vault."
+                                }
+                            })
+                        }
+                    }
+                }
+                recovery?.report?.let { report ->
+                    Text("NEW OCR RETRY REPORT · ${report.reference}", color = VoGold, fontSize = 12.sp)
+                    Text("Source SHA-512: ${record.sha512}", color = VoTextMuted, fontSize = 10.sp)
+                    TextButton(onClick = {
+                        val id = attempt.id
+                        expandedReports = if (id in expandedReports) expandedReports - id else expandedReports + id
+                    }) {
+                        Text(
+                            if (attempt.id in expandedReports) "Hide new report" else "Read new retry report",
+                            color = VoAccentBlue
+                        )
+                    }
+                    if (attempt.id in expandedReports) {
+                        Text(report.body, color = VoTextPrimary, fontSize = 12.sp)
+                    }
+                }
+            }
         }
         if (state.pdfRetryMessage.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(state.pdfRetryMessage, color = VoTextPrimary, fontSize = 12.sp)
-        }
-        state.pdfRetryResult?.let { result ->
-            result.report?.let { report ->
-                Text("NEW OCR RETRY REPORT · ${report.reference}", color = VoGold, fontSize = 12.sp)
-                Text("Source SHA-512: ${result.record.sha512}", color = VoTextMuted, fontSize = 10.sp)
-                TextButton(onClick = { showReport = !showReport }) {
-                    Text(if (showReport) "Hide new report" else "Read new retry report", color = VoAccentBlue)
-                }
-                if (showReport) Text(report.body, color = VoTextPrimary, fontSize = 12.sp)
-                if (result.reportFile != null) {
-                    VerumSecondaryButton("Share new retry PDF", onClick = {
-                        shareError = try {
-                            SealedPdfExporter(context).share(result.reportFile)
-                            ""
-                        } catch (_: Exception) { "The new PDF could not be shared. It is still saved in the vault." }
-                    })
-                } else {
-                    VerumSecondaryButton("Retry new PDF export", enabled = !busy, onClick = viewModel::retryPdfReviewExport)
-                }
-            }
         }
         if (shareError.isNotBlank()) Text(shareError, color = VoRed, fontSize = 12.sp)
     }

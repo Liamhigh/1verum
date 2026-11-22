@@ -237,7 +237,7 @@ class EvidenceVault(
         val json = Json { encodeDefaults = true }.encodeToString(
             com.verumomnis.forensic.model.DocumentExtractionCoverage.serializer(), record
         )
-        check(target.createNewFile()) { "Extraction attempt already exists." }
+        if (!target.createNewFile()) throw java.nio.file.FileAlreadyExistsException(target.path)
         try { target.writeText(json) } catch (e: Exception) { target.delete(); throw e }
     }
 
@@ -309,6 +309,33 @@ class EvidenceVault(
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)
+    }
+
+    /** Store a finding snapshot without replacing an earlier file of the same name. */
+    fun storeFindingUnique(fileName: String, json: String): File {
+        initialize()
+        require(
+            fileName.isNotBlank() && File(fileName).name == fileName &&
+                !fileName.contains('\\') && fileName !in setOf(".", "..") &&
+                fileName.endsWith(".json", ignoreCase = true)
+        ) { "Finding filename must be a safe JSON filename." }
+        val base = fileName.substringBeforeLast('.')
+        var collision = 1
+        while (true) {
+            val suffix = if (collision == 1) "" else "_$collision"
+            val target = File(findings, "$base$suffix.json")
+            if (!target.createNewFile()) {
+                collision++
+                continue
+            }
+            try {
+                target.writeText(json)
+                return target
+            } catch (error: Exception) {
+                target.delete()
+                throw error
+            }
+        }
     }
 
     fun storeSeal(name: String, json: String) {

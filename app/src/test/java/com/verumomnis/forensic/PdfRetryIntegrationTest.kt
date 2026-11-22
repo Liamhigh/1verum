@@ -4,6 +4,7 @@ import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.engine.*
 import com.verumomnis.forensic.model.*
 import com.verumomnis.forensic.model.PageReadStatus.*
+import com.verumomnis.forensic.pdf.SealedOutputNames
 import com.verumomnis.forensic.vault.EvidenceVault
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
@@ -46,10 +47,12 @@ class PdfRetryIntegrationTest {
                     override fun close() {}
                 }
             }
-        }, writePdf = { report, _ ->
+        }, writePdf = { report, sourceName ->
             if (failExport) error("Synthetic export boundary failure")
-            File(vault.reportsSealed, "${report.reference}.pdf").apply {
-                check(createNewFile())
+            SealedOutputNames.createUniqueFile(
+                vault.reportsSealed,
+                SealedOutputNames.forensicReport(sourceName, report.reference)
+            ).apply {
                 writeText("%PDF-1.4 synthetic native writer boundary\n${report.body}")
             }
         })
@@ -109,6 +112,181 @@ class PdfRetryIntegrationTest {
         assertTrue(vault.listReports().any { it.reference == result.report!!.reference })
         assertEquals(2, vault().listPdfExtractions().size)
         assertTrue(result.message.contains("could not be exported"))
+        val recovered = service(vault).recoverSaved(result.record)
+        assertEquals(PdfRetryRecoveryStage.FINDINGS_READY, recovered.stage)
+        assertEquals(result.report!!.reference, recovered.report!!.reference)
+    }
+
+    @Test fun interruptedExtractionCanResumeAfterReloadWithoutRepeatingOcr() {
+        val vault = vault()
+        val source = source(vault)
+        val attempt = PdfRetryAttempt(
+            id = "resume-attempt-123",
+            createdAt = now.toString(),
+            selectedPages = listOf(2),
+            priorReportReference = "prior-report"
+        )
+        val savedCoverage = coverage.copy(
+            pages = coverage.pages.map { page ->
+                if (page.page == 2) page.copy(
+                    status = OCR,
+                    reason = "on_device_ocr_retry",
+                    extractedChars = 33,
+                    extractedText = "Recovered text from original page two.",
+                    ocrAttempted = true
+                ) else page
+            },
+            retryAttempt = attempt
+        )
+        val savedRecord = vault.storePdfRetry(source.copy(coverage = savedCoverage))
+        val ocrCalls = java.util.concurrent.atomic.AtomicInteger()
+        val recoveredService = PdfRetryService(
+            vault = vault,
+            cacheDir = app.cacheDir,
+            extract = { _, _, _ -> ocrCalls.incrementAndGet(); error("OCR must not run during recovery.") },
+            writePdf = { report, name ->
+                SealedOutputNames.createUniqueFile(
+                    vault.reportsSealed,
+                    SealedOutputNames.forensicReport(name, report.reference)
+                ).apply { writeText("%PDF-1.4 recovered retry PDF") }
+            }
+        )
+
+        val extractionOnly = recoveredService.recoverSaved(vault.listPdfExtractions().first())
+        assertEquals(PdfRetryRecoveryStage.EXTRACTION_ONLY, extractionOnly.stage)
+        assertTrue(extractionOnly.canResumeReport)
+        assertTrue(extractionOnly.message.contains("OCR will not run again"))
+
+        val ready = recoveredService.resumeReport(savedRecord)
+        assertEquals(PdfRetryRecoveryStage.PDF_READY, ready.stage)
+        assertEquals(0, ocrCalls.get())
+        assertEquals(attempt.id, ready.report!!.extractionCoverage.single().coverage.retryAttempt!!.id)
+        assertTrue(ready.report!!.title.contains("NEW PDF-only OCR Retry Report"))
+        assertTrue(File(ready.report!!.findingsJsonPath).isFile)
+        assertTrue(ready.reportFile!!.name.startsWith("original_forensic_report_"))
+        assertEquals(2, vault.listPdfExtractions().size)
+    }
+
+    @Test fun duplicateRetryCoverageWriteFailureDoesNotReplaceSavedAttempt() {
+        val vault = vault()
+        val source = source(vault)
+        val attempted = source.copy(coverage = coverage.copy(
+            retryAttempt = PdfRetryAttempt("duplicate-attempt", now.toString(), listOf(2))
+        ))
+        val first = vault.storePdfRetry(attempted)
+        val before = File(vault.findings, "pdf_retry_${source.sha512}_duplicate-attempt.json").readBytes()
+
+        assertThrows(java.nio.file.FileAlreadyExistsException::class.java) {
+            vault.storePdfRetry(attempted.copy(coverage = attempted.coverage.copy(
+                pages = attempted.coverage.pages.map { it.copy(extractedText = "changed") }
+            )))
+        }
+        assertEquals(first, vault.listPdfExtractions().first())
+        assertArrayEquals(before, File(vault.findings, "pdf_retry_${source.sha512}_duplicate-attempt.json").readBytes())
+        assertArrayEquals(bytes, vault.readEvidence("pdf_source_${source.sha512}.pdf"))
+    }
+
+    @Test fun findingsRetryRecoveryNeverOverwritesAnEarlierJsonSnapshot() {
+        val vault = vault()
+        val first = vault.storeFindingUnique("ocr_retry_attempt_findings.json", """{"version":1}""")
+        val second = vault.storeFindingUnique("ocr_retry_attempt_findings.json", """{"version":2}""")
+        assertEquals("ocr_retry_attempt_findings.json", first.name)
+        assertEquals("ocr_retry_attempt_findings_2.json", second.name)
+        assertEquals("""{"version":1}""", first.readText())
+        assertEquals("""{"version":2}""", second.readText())
+        assertThrows(IllegalArgumentException::class.java) {
+            vault.storeFindingUnique("../escape.json", """{}""")
+        }
+    }
+
+    @Test fun viewModelRecoversSavedTextAndPdfExportAfterProcessRecreation() {
+        val vault = vault()
+        val original = source(vault)
+        val attempt = PdfRetryAttempt(
+            id = "process-recovery-42",
+            createdAt = now.toString(),
+            selectedPages = listOf(2),
+            priorReportReference = "older-sealed-report"
+        )
+        val savedCoverage = coverage.copy(
+            pages = coverage.pages.map { page ->
+                if (page.page == 2) page.copy(
+                    status = OCR,
+                    reason = "on_device_ocr_retry",
+                    extractedChars = 29,
+                    extractedText = "Saved recognition from page two.",
+                    ocrAttempted = true
+                ) else page
+            },
+            retryAttempt = attempt
+        )
+        val retryRecord = vault.storePdfRetry(original.copy(coverage = savedCoverage))
+        var failPdfWrite = true
+        val ocrCalls = java.util.concurrent.atomic.AtomicInteger()
+
+        fun createViewModel() = com.verumomnis.forensic.ui.VerumViewModel(
+            application = app,
+            identityService = com.verumomnis.forensic.identity.IdentityService(
+                app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
+            ),
+            vault = vault,
+            reportPdfWriter = { report, sourceName ->
+                if (failPdfWrite) error("Simulated low-storage failure")
+                SealedOutputNames.createUniqueFile(
+                    vault.reportsSealed,
+                    SealedOutputNames.forensicReport(sourceName, report.reference)
+                ).apply { writeText("%PDF-1.4 recovered after restart") }
+            },
+            pdfPageRetry = { _, _, _ ->
+                ocrCalls.incrementAndGet()
+                error("Saved retry recovery must not repeat OCR.")
+            }
+        )
+
+        fun awaitRecovery(vm: com.verumomnis.forensic.ui.VerumViewModel) {
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20)
+            while (
+                vm.state.value.pdfRetryRecoveries.none {
+                    it.record.coverage.retryAttempt?.id == attempt.id
+                } && System.nanoTime() < deadline
+            ) Thread.sleep(10)
+            assertTrue(vm.state.value.pdfRetryRecoveries.any {
+                it.record.coverage.retryAttempt?.id == attempt.id
+            })
+        }
+
+        val firstProcess = createViewModel()
+        firstProcess.loadPdfPageReview()
+        awaitRecovery(firstProcess)
+        assertEquals(PdfRetryRecoveryStage.EXTRACTION_ONLY, firstProcess.state.value.pdfRetryRecoveries.single().stage)
+        firstProcess.resumePdfRetryReport(retryRecord)
+        val firstDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20)
+        while (firstProcess.state.value.pdfRetryBusy && System.nanoTime() < firstDeadline) Thread.sleep(10)
+        assertEquals(PdfRetryRecoveryStage.FINDINGS_READY, firstProcess.state.value.pdfRetryRecoveries.single().stage)
+        val savedReport = requireNotNull(firstProcess.state.value.pdfRetryRecoveries.single().report)
+        val snapshotFile = vault.reportsSealed.listFiles()!!.single { it.name.endsWith(".json") }
+        val snapshotBytes = snapshotFile.readBytes()
+
+        // A second ViewModel represents process recreation; it reloads both saved artifacts.
+        val restartedProcess = createViewModel()
+        restartedProcess.loadPdfPageReview()
+        awaitRecovery(restartedProcess)
+        val reloaded = restartedProcess.state.value.pdfRetryRecoveries.single()
+        assertEquals(PdfRetryRecoveryStage.FINDINGS_READY, reloaded.stage)
+        assertEquals(savedReport.reference, reloaded.report!!.reference)
+        assertTrue(reloaded.message.contains("PDF can be exported again"))
+
+        failPdfWrite = false
+        restartedProcess.retryPdfReviewExport(retryRecord)
+        val secondDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20)
+        while (restartedProcess.state.value.pdfRetryBusy && System.nanoTime() < secondDeadline) Thread.sleep(10)
+        val completed = restartedProcess.state.value.pdfRetryRecoveries.single()
+        assertEquals(PdfRetryRecoveryStage.PDF_READY, completed.stage)
+        assertEquals(savedReport.reference, completed.report!!.reference)
+        assertTrue(completed.reportFile!!.isFile)
+        assertEquals(0, ocrCalls.get())
+        assertArrayEquals(snapshotBytes, snapshotFile.readBytes())
+        assertEquals(1, vault.listReports().size)
     }
 
     @Test fun sourceFingerprintMismatchStopsBeforeOcrOrNewFindings() {
@@ -176,8 +354,11 @@ class PdfRetryIntegrationTest {
         val vm = com.verumomnis.forensic.ui.VerumViewModel(
             app, com.verumomnis.forensic.identity.IdentityService(app,
                 com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()), vault = vault,
-            reportPdfWriter = { report, _ ->
-                File(vault.reportsSealed, "${report.reference}.pdf").apply { writeText("Synthetic PDF writer boundary") }
+            reportPdfWriter = { report, sourceName ->
+                SealedOutputNames.createUniqueFile(
+                    vault.reportsSealed,
+                    SealedOutputNames.forensicReport(sourceName, report.reference)
+                ).apply { writeText("Synthetic PDF writer boundary") }
             },
             pdfPageRetry = { _, previous, attempt ->
                 calls.incrementAndGet()

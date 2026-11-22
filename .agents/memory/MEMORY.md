@@ -2,6 +2,7 @@
 - [Signing diagnostic privacy](signing-diagnostics.md) — signing failures can echo secret-supplied labels; report allowlisted error categories, not raw logs.
 - [Moved reference assets](moved-reference-assets.md) — environment-wide Git ignores can hide previously tracked uploads after a workspace move.
 - [Native test boundaries](native-test-memory.md) — isolate Robolectric classes for memory; local PDF replay cannot establish phone OCR parity.
+- [Compose UI test visibility](compose-ui-test-visibility.md) — scroll off-screen nodes into view before clicking them in Compose UI tests.
 - [Storage client compatibility](storage-client-compatibility.md) — verify sidecar authentication before upgrading Google storage client major versions.
 - [Verum brand preference](download-brand-preference.md) — the user prefers the website appearance and restrained gold.
 - [Simple document sealing](sealing-flow-intent.md) — the user wants one seal flow, with forensic reporting as an explicit option, not a separate scan journey.

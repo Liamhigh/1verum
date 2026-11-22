@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -300,7 +301,9 @@ fun ReportScreen(
             return@Column
         }
 
-        val showAllContradictions = remember(report.reference) { mutableStateOf(false) }
+        // The async report generator can replace its reference after the preview.
+        // Keep the expanded state across that update.
+        val showAllContradictions = rememberSaveable { mutableStateOf(false) }
         val visibleContradictions = if (showAllContradictions.value) {
             report.contradictions
         } else {
@@ -386,15 +389,22 @@ fun ReportScreen(
                             letterSpacing = 0.5.sp
                         )
                     }
-                    Text("Person: ${c.respondent}", color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Person: ${c.respondent} · ${c.personLinkStatus}", color = VoTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
-                    Text("A: \"${c.claimA.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
-                    Text("   ${c.claimA.source} · p${c.claimA.page} · ln${c.claimA.line}", color = VoTextMuted, fontSize = 11.sp)
-                    Text("B: \"${c.claimB.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
-                    Text("   ${c.claimB.source} · p${c.claimB.page} · ln${c.claimB.line}", color = VoTextMuted, fontSize = 11.sp)
+                    Text("Evidence A: \"${c.claimA.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text("   ${c.claimA.source} · ${if (c.claimA.page > 0) "p${c.claimA.page}" else "page unknown"} · ${if (c.claimA.line > 0) "ln${c.claimA.line}" else "line unknown"}", color = VoTextMuted, fontSize = 11.sp)
+                    Text("Evidence B: \"${c.claimB.text}\"", color = VoTextPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text("   ${c.claimB.source} · ${if (c.claimB.page > 0) "p${c.claimB.page}" else "page unknown"} · ${if (c.claimB.line > 0) "ln${c.claimB.line}" else "line unknown"}", color = VoTextMuted, fontSize = 11.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("Statute: ${c.applicableLaw.joinToString("; ")}", color = VoTextPrimary, fontSize = 12.sp)
-                    Text(c.legalSignificance, color = VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
+                    if (c.legalReferences.isEmpty()) {
+                        Text("Legal review required: no verified statute mapping for ${c.jurisdiction}.", color = VoTextMuted, fontSize = 12.sp)
+                    } else {
+                        c.legalReferences.forEach { legal ->
+                            Text("Legal hypothesis: ${legal.citation} (${legal.jurisdiction})", color = VoTextPrimary, fontSize = 12.sp)
+                            Text("Official source: ${legal.authoritativeUrl}", color = VoTextMuted, fontSize = 11.sp)
+                        }
+                    }
+                    Text("Automated interpretation, not a legal finding: ${c.legalSignificance}", color = VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)
                 }
             }
         }

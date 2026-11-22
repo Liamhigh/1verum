@@ -26,6 +26,7 @@
     "source_bundle": {
       "type": "string"
     },
+    "jurisdiction": { "type": "string" },
     "case_ids": {
       "type": "array",
       "items": {
@@ -81,7 +82,8 @@
                     "textLayerChars": { "type": "integer", "minimum": 0 },
                     "extractedChars": { "type": "integer", "minimum": 0 },
                     "ocrAttempted": { "type": "boolean" },
-                    "textLayerFailed": { "type": "boolean" }
+                    "textLayerFailed": { "type": "boolean" },
+                    "extractedText": { "type": ["string", "null"] }
                   }
                 }
               }
@@ -140,6 +142,19 @@
         "proposition_a_actor",
         "proposition_b_actor",
         "conflict_description",
+        "respondent",
+        "person_link_status",
+        "jurisdiction",
+        "claim_a_source",
+        "claim_a_page",
+        "claim_a_line",
+        "claim_a_quote",
+        "claim_b_source",
+        "claim_b_page",
+        "claim_b_line",
+        "claim_b_quote",
+        "applicable_law",
+        "legal_references",
         "verification_status"
       ],
       "properties": {
@@ -210,6 +225,38 @@
             "object",
             "null"
           ]
+        },
+        "respondent": { "type": "string" },
+        "person_link_status": {
+          "enum": [
+            "IDENTIFIED_FROM_EXPLICIT_SOURCE_ATTRIBUTION",
+            "UNCERTAIN_MENTION_ONLY",
+            "UNIDENTIFIED"
+          ]
+        },
+        "jurisdiction": { "type": "string" },
+        "claim_a_source": { "type": "string" },
+        "claim_a_page": { "type": "integer", "minimum": 0 },
+        "claim_a_line": { "type": "integer", "minimum": 0 },
+        "claim_a_quote": { "type": "string" },
+        "claim_b_source": { "type": "string" },
+        "claim_b_page": { "type": "integer", "minimum": 0 },
+        "claim_b_line": { "type": "integer", "minimum": 0 },
+        "claim_b_quote": { "type": "string" },
+        "applicable_law": { "type": "array", "items": { "type": "string" } },
+        "legal_references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["citation", "jurisdiction", "authoritativeUrl"],
+            "properties": {
+              "citation": { "type": "string" },
+              "jurisdiction": { "type": "string" },
+              "authoritativeUrl": { "type": "string", "format": "uri" },
+              "requiresHumanReview": { "type": "boolean" },
+              "reviewNote": { "type": "string" }
+            }
+          }
         },
         "verification_status": {
           "anyOf": [

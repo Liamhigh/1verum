@@ -46,6 +46,7 @@ class ContradictionEngineTest {
                     "AllFuels demanded R3.8M extension fee and drafted a clause forcing Gary to forfeit goodwill.\n" +
                     "AllFuels collected rent under the binding MOU terms for 7 years.\n" +
                     "The lease was presented as binding to Gary.\n" +
+                    "Witness: Gary Highcock\n" +
                     "There was no Section 12B referral to Gary Highcock.\n" +
                     "Gary was non-committal and negotiated for more time; three executives removed his only witness.\n"
                 ).toByteArray(),
@@ -70,8 +71,9 @@ class ContradictionEngineTest {
         val contradictions = ContradictionExtractor.extract(allFuelsDocs(), now)
         contradictions.forEach { c ->
             assertTrue("person", c.respondent.isNotBlank())
-            assertTrue("page", c.claimA.page > 0 && c.claimB.page > 0)
-            assertTrue("statute", c.applicableLaw.isNotEmpty())
+            assertEquals("Unknown pages in plain text must remain unknown", 0, c.claimA.page)
+            assertEquals("Unknown pages in plain text must remain unknown", 0, c.claimB.page)
+            assertTrue("No jurisdiction was supplied to this extractor", c.applicableLaw.isEmpty())
             assertEquals("B1-ContradictionBrain", c.brainSource)
         }
     }

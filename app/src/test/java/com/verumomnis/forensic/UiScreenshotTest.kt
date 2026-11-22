@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.verumomnis.forensic.identity.IdentityService
@@ -111,7 +112,7 @@ class UiScreenshotTest {
             VerumOmnisTheme { VerumApp(vm, initialScreen = "REPORT") }
         }
 
-        composeRule.onNodeWithText("Show all 14 findings").performClick()
+        composeRule.onNodeWithText("Show all 14 findings").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Show fewer findings").fetchSemanticsNode()
     }

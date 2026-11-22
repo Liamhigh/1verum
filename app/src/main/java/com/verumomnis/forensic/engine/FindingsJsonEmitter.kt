@@ -2,8 +2,10 @@ package com.verumomnis.forensic.engine
 
 import com.verumomnis.forensic.model.Contradiction
 import com.verumomnis.forensic.model.ForensicFindings
+import com.verumomnis.forensic.model.LegalReference
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -40,6 +42,7 @@ object FindingsJsonEmitter {
         val case_id: String = "",
         val case_ids: List<String> = emptyList(),
         val corpus_sha512: String = "",
+        val jurisdiction: String = "",
         val engine_verified_count: Int = 0,
         val g3_candidate_count: Int = 0,
         val supplement_date: String? = null,
@@ -71,7 +74,20 @@ object FindingsJsonEmitter {
         val detected_fact: JsonElement? = null,
         val logical_pattern: JsonElement? = null,
         val legal_hypothesis: JsonElement? = null,
-        val verification_status: String
+        val verification_status: String,
+        val respondent: String = "Unidentified person",
+        val person_link_status: String = "UNIDENTIFIED",
+        val jurisdiction: String = "",
+        val claim_a_source: String = "",
+        val claim_a_page: Int = 0,
+        val claim_a_line: Int = 0,
+        val claim_a_quote: String = "",
+        val claim_b_source: String = "",
+        val claim_b_page: Int = 0,
+        val claim_b_line: Int = 0,
+        val claim_b_quote: String = "",
+        val applicable_law: List<String> = emptyList(),
+        val legal_references: List<LegalReference> = emptyList()
     )
 
     /** Vault filename for the findings JSON artefact produced by a scan. */
@@ -105,6 +121,7 @@ object FindingsJsonEmitter {
             case_id = caseName,
             case_ids = listOf(caseName),
             corpus_sha512 = corpusSha512,
+            jurisdiction = findings.jurisdiction,
             engine_verified_count = records.size - candidateCount,
             g3_candidate_count = candidateCount,
             integrity_findings = emptyList(),
@@ -112,7 +129,7 @@ object FindingsJsonEmitter {
             extraction_coverage = findings.extractionCoverage,
             coverage_warnings = findings.extractionCoverage.map { "${it.fileName}: ${it.coverage.summary()}" }
         )
-        return Json.encodeToString(document)
+        return Json { encodeDefaults = true }.encodeToString(document)
     }
 
     /**
@@ -148,8 +165,8 @@ object FindingsJsonEmitter {
     /** Convert one deterministic-engine [Contradiction] into a findings JSON record. */
     fun contradictionToRecord(c: Contradiction): FindingsJsonRecord {
         val type = c.engineType.takeIf { it.isNotBlank() } ?: c.type.name
-        val actorA = c.respondent.takeIf { it.isNotBlank() } ?: c.claimA.source
-        val actorB = c.respondent.takeIf { it.isNotBlank() } ?: c.claimB.source
+        val actorA = c.respondent.takeIf { it.isNotBlank() } ?: "Unidentified person"
+        val actorB = actorA
 
         val detectedFact = buildJsonObject {
             put("fact_text", JsonPrimitive(c.description.ifBlank { c.claimA.text }))
@@ -190,8 +207,25 @@ object FindingsJsonEmitter {
             temporal_analysis = null,
             detected_fact = detectedFact,
             logical_pattern = logicalPattern,
-            legal_hypothesis = null,
-            verification_status = STATUS_ENGINE_VERIFIED
+            legal_hypothesis = buildJsonObject {
+                put("jurisdiction", JsonPrimitive(c.jurisdiction))
+                put("requires_human_review", JsonPrimitive(c.legalReferences.isEmpty()))
+                put("references", Json.encodeToJsonElement(ListSerializer(LegalReference.serializer()), c.legalReferences))
+            },
+            verification_status = STATUS_ENGINE_VERIFIED,
+            respondent = c.respondent,
+            person_link_status = c.personLinkStatus,
+            jurisdiction = c.jurisdiction,
+            claim_a_source = c.claimA.source,
+            claim_a_page = c.claimA.page,
+            claim_a_line = c.claimA.line,
+            claim_a_quote = c.claimA.text,
+            claim_b_source = c.claimB.source,
+            claim_b_page = c.claimB.page,
+            claim_b_line = c.claimB.line,
+            claim_b_quote = c.claimB.text,
+            applicable_law = c.applicableLaw,
+            legal_references = c.legalReferences
         )
     }
 

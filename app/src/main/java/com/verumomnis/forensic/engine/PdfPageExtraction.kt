@@ -64,8 +64,16 @@ internal fun extractPdfPages(
                     }
                 }
             }
-            provenance += PageExtraction(index + 1, status, reason, layer.length, output.length, attempted,
-                textLayerFailed = layers.getOrNull(index) == null)
+            provenance += PageExtraction(
+                page = index + 1,
+                status = status,
+                reason = reason,
+                textLayerChars = layer.length,
+                extractedChars = output.length,
+                ocrAttempted = attempted,
+                textLayerFailed = layers.getOrNull(index) == null,
+                extractedText = output.takeIf { it.isNotBlank() }
+            )
             text += if (status == PageReadStatus.OCR) "[OCR] $output" else output
         }
     } finally {

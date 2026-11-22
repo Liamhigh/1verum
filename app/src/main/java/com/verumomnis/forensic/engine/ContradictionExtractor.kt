@@ -24,8 +24,7 @@ object ContradictionExtractor {
         val category: ContradictionCategory,
         val type: ContradictionType,
         val severity: Severity,
-        val legalSignificance: String,
-        val applicableLaw: List<String>
+        val legalSignificance: String
     )
 
     private val EXPLICIT_RULES = listOf(
@@ -33,22 +32,19 @@ object ContradictionExtractor {
             Regex("""(deal|transaction)\s+(fell\s+through|did\s+not\s+proceed|collapsed)""", RegexOption.IGNORE_CASE),
             Regex("""(proceeded|went\s+ahead|completed|finalised|finalized)\s+(with\s+)?(the\s+)?(deal|transaction|export)""", RegexOption.IGNORE_CASE),
             ContradictionCategory.CONTRACT_VALIDITY, ContradictionType.IMPLIED_CONTRADICTION, Severity.CRITICAL,
-            "Fraud with consciousness of guilt: a claim was made that was known to be false.",
-            listOf("SA Common Law - Fraud", "UAE CCL Art.84")
+            "The extracted statements differ on whether the transaction proceeded; this is an automated indicator, not a finding of intent."
         ),
         ExplicitRule(
             Regex("""never\s+received\s+(any\s+)?payment|no\s+payment\s+was\s+(made|outstanding)""", RegexOption.IGNORE_CASE),
             Regex("""payment\s+(was\s+)?(made|received|transferred|paid)|paid\s+r""", RegexOption.IGNORE_CASE),
             ContradictionCategory.COMPENSATION, ContradictionType.DIRECT_NEGATION, Severity.VERY_HIGH,
-            "Contradictory statements regarding payment; possible concealment of funds.",
-            listOf("SA Common Law - Fraud", "Companies Act 71 of 2008")
+            "The extracted statements differ on whether payment occurred; this is an automated indicator, not a finding of concealment."
         ),
         ExplicitRule(
             Regex("""no\s+(knowledge|awareness)\s+of""", RegexOption.IGNORE_CASE),
             Regex("""(was\s+)?(aware|informed|notified|knew)\s+(of|about)""", RegexOption.IGNORE_CASE),
             ContradictionCategory.PERJURY, ContradictionType.DIRECT_NEGATION, Severity.HIGH,
-            "Denial of knowledge contradicted by evidence of awareness.",
-            listOf("SA Common Law - Fraud")
+            "The extracted statements differ about knowledge or awareness; context requires human review."
         )
     )
 
@@ -77,8 +73,8 @@ object ContradictionExtractor {
         for (rule in EXPLICIT_RULES) {
             val a = firstMatch(documents, rule.patternA) ?: continue
             val b = firstMatch(documents, rule.patternB) ?: continue
-            if (a.docIndex == b.docIndex && a.line == b.line) continue
-            val respondent = EntityExtractor.authorOf(b.doc) ?: EntityExtractor.authorOf(a.doc) ?: "Unknown Respondent"
+            if (a.docIndex == b.docIndex && a.page == b.page && a.line == b.line) continue
+            val respondent = EntityExtractor.authorOf(b.doc) ?: EntityExtractor.authorOf(a.doc) ?: "Unidentified person"
             results += Contradiction(
                 contradictionId = "C-000",
                 brainSource = "B1-ContradictionBrain",
@@ -90,7 +86,7 @@ object ContradictionExtractor {
                 severity = rule.severity,
                 description = "${a.text.trim()} ↔ ${b.text.trim()}",
                 legalSignificance = rule.legalSignificance,
-                applicableLaw = rule.applicableLaw,
+                applicableLaw = emptyList(),
                 confidence = Confidence.VERY_HIGH,
                 patternIndicator = false,
                 timestamp = now.toString()
@@ -99,17 +95,20 @@ object ContradictionExtractor {
         return results
     }
 
-    private data class LineHit(val docIndex: Int, val doc: EvidenceDocument, val line: Int, val text: String) {
+    private data class LineHit(val docIndex: Int, val doc: EvidenceDocument, val page: Int, val line: Int, val text: String) {
         fun toClaim(type: StatementType) = ContradictionClaim(
             text = text.trim(), source = doc.fileName, evidenceId = doc.evidenceId,
-            page = 1, line = line, sha512 = doc.sha512, statementType = type
+            page = page, line = line, sha512 = doc.sha512, statementType = type
         )
     }
 
     private fun firstMatch(documents: List<EvidenceDocument>, pattern: Regex): LineHit? {
-        documents.forEachIndexed { di, doc ->
-            doc.text.lines().forEachIndexed { li, line ->
-                if (pattern.containsMatchIn(line)) return LineHit(di, doc, li + 1, line)
+        EntityExtractor.statements(documents).forEach { statement ->
+            if (pattern.containsMatchIn(statement.text)) {
+                return LineHit(
+                    documents.indexOfFirst { it.evidenceId == statement.doc.evidenceId },
+                    statement.doc, statement.page, statement.line, statement.text
+                )
             }
         }
         return null
@@ -128,22 +127,22 @@ object ContradictionExtractor {
             val positives = group.filter { it.polarity > 0 }
             for (neg in negatives) {
                 for (pos in positives) {
-                    if (neg.line == pos.line && neg.doc.evidenceId == pos.doc.evidenceId) continue
+                    if (neg.page == pos.page && neg.line == pos.line && neg.doc.evidenceId == pos.doc.evidenceId) continue
                     val severity = severity(neg, pos)
                     val type = contradictionType(neg, pos)
-                    val respondent = EntityExtractor.authorOf(pos.doc) ?: EntityExtractor.authorOf(neg.doc) ?: "Unknown Respondent"
+                    val respondent = EntityExtractor.authorOf(pos.doc) ?: EntityExtractor.authorOf(neg.doc) ?: "Unidentified person"
                     results += Contradiction(
                         contradictionId = "C-000",
                         brainSource = "B1-ContradictionBrain",
                         category = subject,
                         type = type,
                         respondent = respondent,
-                        claimA = ContradictionClaim(neg.text, neg.doc.fileName, neg.doc.evidenceId, 1, neg.line, neg.doc.sha512, neg.statementType),
-                        claimB = ContradictionClaim(pos.text, pos.doc.fileName, pos.doc.evidenceId, 1, pos.line, pos.doc.sha512, pos.statementType),
+                        claimA = ContradictionClaim(neg.text, neg.doc.fileName, neg.doc.evidenceId, neg.page, neg.line, neg.doc.sha512, neg.statementType),
+                        claimB = ContradictionClaim(pos.text, pos.doc.fileName, pos.doc.evidenceId, pos.page, pos.line, pos.doc.sha512, pos.statementType),
                         severity = severity,
                         description = legalSignificanceFor(subject),
                         legalSignificance = legalSignificanceFor(subject),
-                        applicableLaw = lawsFor(subject),
+                        applicableLaw = emptyList(),
                         confidence = if (severity == Severity.CRITICAL) Confidence.VERY_HIGH else Confidence.HIGH,
                         patternIndicator = supportsRacketeering(neg, pos),
                         timestamp = now.toString()
@@ -208,14 +207,4 @@ object ContradictionExtractor {
         ContradictionCategory.OTHER -> "Material contradiction between two statements."
     }
 
-    private fun lawsFor(subject: ContradictionCategory): List<String> = when (subject) {
-        ContradictionCategory.GOODWILL_VALUE -> listOf("SA Common Law - Fraud", "Petroleum Products Act 120 of 1977 s.12B")
-        ContradictionCategory.CONTRACT_VALIDITY -> listOf("Contract Law - Common Law", "Companies Act 71 of 2008")
-        ContradictionCategory.SIGNATURE_STATUS -> listOf("Contract Law - Common Law", "ECT Act 25 of 2002")
-        ContradictionCategory.SECTION_12B -> listOf("Petroleum Products Act 120 of 1977 s.12B")
-        ContradictionCategory.COMPENSATION -> listOf("SA Common Law - Fraud")
-        ContradictionCategory.PERJURY -> listOf("SA Common Law - Perjury", "Constitution of RSA 1996 s.34")
-        ContradictionCategory.COERCION -> listOf("SA Common Law - Fraud", "Prevention of Organised Crime Act 121 of 1998")
-        ContradictionCategory.OTHER -> listOf("SA Common Law - Fraud")
-    }
 }

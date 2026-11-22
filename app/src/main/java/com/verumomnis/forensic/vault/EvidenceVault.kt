@@ -223,6 +223,18 @@ class EvidenceVault(
         ))
     }
 
+    /** Load the persisted page-text provenance for an uploaded PDF, keyed by its source hash. */
+    fun loadPdfExtraction(sha512: String): com.verumomnis.forensic.model.DocumentExtractionCoverage? {
+        val file = File(findings, "pdf_extraction_${sha512}.json")
+        if (!file.isFile) return null
+        return runCatching {
+            Json { ignoreUnknownKeys = true }.decodeFromString(
+                com.verumomnis.forensic.model.DocumentExtractionCoverage.serializer(),
+                file.readText()
+            )
+        }.getOrNull()
+    }
+
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)

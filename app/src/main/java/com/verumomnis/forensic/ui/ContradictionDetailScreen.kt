@@ -139,20 +139,37 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
 
         if (contradiction.description.isNotEmpty()) {
             Text(
-                contradiction.description,
+                "Automated interpretation (not a finding): ${contradiction.description}",
                 color = VoTextPrimary, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold
             )
         }
+        Text(
+            "Person: ${contradiction.respondent} · link ${contradiction.personLinkStatus}",
+            color = VoTextMuted, fontSize = 10.sp
+        )
 
         if (contradiction.legalSignificance.isNotEmpty()) {
             Text(
-                "Legal Significance",
+                "Automated Legal Hypothesis",
                 color = VoAccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontFamily = JetBrainsMono
             )
             Text(
                 contradiction.legalSignificance,
                 color = VoTextPrimary, fontSize = 11.sp, lineHeight = 14.sp
             )
+        }
+        if (contradiction.legalReferences.isEmpty()) {
+            Text(
+                "No verified statute mapping for ${contradiction.jurisdiction}; human legal review required.",
+                color = VoTextMuted, fontSize = 10.sp, lineHeight = 14.sp
+            )
+        } else {
+            contradiction.legalReferences.forEach { legal ->
+                Text(
+                    "${legal.citation} (${legal.jurisdiction})\nOfficial source: ${legal.authoritativeUrl}",
+                    color = VoTextMuted, fontSize = 10.sp, lineHeight = 14.sp
+                )
+            }
         }
 
         // Claim A
@@ -170,7 +187,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
                 color = VoTextPrimary, fontSize = 11.sp, lineHeight = 14.sp, fontStyle = FontStyle.Italic
             )
             Text(
-                "${contradiction.claimA.statementType.name} · Page ${contradiction.claimA.page}",
+                "${contradiction.claimA.statementType.name} · ${if (contradiction.claimA.page > 0) "Page ${contradiction.claimA.page}" else "Page unknown"} · ${contradiction.claimA.source}",
                 color = VoTextMuted, fontSize = 9.sp, fontFamily = JetBrainsMono
             )
         }
@@ -190,7 +207,7 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
                 color = VoTextPrimary, fontSize = 11.sp, lineHeight = 14.sp, fontStyle = FontStyle.Italic
             )
             Text(
-                "${contradiction.claimB.statementType.name} · Page ${contradiction.claimB.page}",
+                "${contradiction.claimB.statementType.name} · ${if (contradiction.claimB.page > 0) "Page ${contradiction.claimB.page}" else "Page unknown"} · ${contradiction.claimB.source}",
                 color = VoTextMuted, fontSize = 9.sp, fontFamily = JetBrainsMono
             )
         }

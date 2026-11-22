@@ -36,22 +36,23 @@ class ReportAndEmailTest {
     ).findings
 
     @Test
-    fun reportAnchorsContradictionToPersonPageAndStatute() {
+    fun reportLabelsUnknownPagesAndUnsupportedLawForReview() {
         val report = ReportGenerator.generate(findings(), "AllFuels", now)
         assertTrue(report.contradictions.isNotEmpty())
         val c = report.contradictions.first()
         // person
         assertEquals("Marius Nortje", c.respondent)
-        // page anchor
-        assertTrue(c.claimA.page > 0 && c.claimB.page > 0)
-        // statute
-        assertTrue(c.applicableLaw.isNotEmpty())
+        // Plain-text evidence has no original PDF page provenance.
+        assertEquals(0, c.claimA.page)
+        assertEquals(0, c.claimB.page)
+        // A broad issue/category match must not be presented as a validated statute.
+        assertTrue(c.legalReferences.isEmpty())
         // Rendered body contains all three anchors and is sealed. Council-ACCEPTED
         // contradictions appear in §3; unconfirmed ones only in the 3b appendix.
         if (c.councilStatus == "ACCEPTED") {
             assertTrue(report.body.contains("Respondent: Marius Nortje"))
-            assertTrue(report.body.contains("Applicable law:"))
-            assertTrue(report.body.contains("p${c.claimA.page}"))
+            assertTrue(report.body.contains("human legal review required"))
+            assertTrue(report.body.contains("page unknown"))
         } else {
             assertTrue(report.body.contains("NOT CONFIRMED — EXCLUDED FROM FINDINGS"))
         }
@@ -90,7 +91,7 @@ class ReportAndEmailTest {
             val row = report.offenceMatrix.first()
             assertEquals("Marius Nortje", row.person)
             assertTrue(row.applicableLaw.isNotEmpty())
-            assertTrue(row.evidenceAnchor.contains("p"))
+            assertTrue(row.evidenceAnchor.contains("page unknown"))
         }
     }
 

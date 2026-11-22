@@ -3,6 +3,7 @@ package com.verumomnis.forensic.engine
 import com.verumomnis.forensic.model.BehavioralAnalysis
 import com.verumomnis.forensic.model.Confidence
 import com.verumomnis.forensic.model.Contradiction
+import com.verumomnis.forensic.model.ContradictionCategory
 import com.verumomnis.forensic.model.EvidenceAtom
 import com.verumomnis.forensic.model.FinancialAnalysis
 import com.verumomnis.forensic.model.ForensicFindings
@@ -63,13 +64,13 @@ object NineBrainEngine {
         val hybridContradictions = runHybridEngine(allDocs, now)                      // B1 primary (hybrid v5.3.1c)
         val legacyContradictions = ContradictionExtractor.extract(allDocs, now)       // B1 legacy rule booster
         val rawContradictions = mergeAndRankContradictions(hybridContradictions, legacyContradictions)
-        val contradictions = attachPersonsAndStatutes(rawContradictions, extractedPersons, jurisdictionSource)
+        val contradictions = attachPersonsAndStatutes(rawContradictions, extractedPersons, jurisdictionSource, allDocs)
         val documentForensics = DocumentForensicsBrain.analyze(allDocs, media).signals // B2
         val timeline = reconstructTimeline(allDocs)                                   // B5
         val communications = communicationsBrain(timeline)                            // B3
         val behavioral = BehavioralBrain.analyze(allDocs)                             // B4
         val financial = analyzeFinancials(allDocs)                                    // B6
-        val legalMappings = jurisdictionSource.statutes + mapLegalFramework(allDocs, jurisdiction) // B7
+        val legalMappings = mapLegalFramework(allDocs, jurisdiction) // B7
         val guardianAssessment = GuardianBrain.analyze(                               // B9
             documents = allDocs,
             audioTranscripts = audio.mapNotNull { it.transcript },
@@ -142,11 +143,8 @@ object NineBrainEngine {
         )
     }
 
-    private fun jurisdictionFor(gps: com.verumomnis.forensic.model.GpsRecord): String = when {
-        gps.latitude in -35.0..-22.0 && gps.longitude in 16.0..33.0 -> "ZA-KZN"
-        gps.latitude in 22.0..26.5 && gps.longitude in 51.0..56.5 -> "UAE-RAKEZ"
-        else -> "INTL"
-    }
+    private fun jurisdictionFor(gps: com.verumomnis.forensic.model.GpsRecord): String =
+        JurisdictionService.resolve(gps).jurisdiction
 
     private fun audioVerdict(audio: List<AudioEvidence>, a: com.verumomnis.forensic.model.AudioAnalysis): String = when {
         audio.isEmpty() -> "N/A (no audio)"
@@ -195,14 +193,14 @@ object NineBrainEngine {
         val events = mutableListOf<TimelineEvent>()
         var counter = 1
         documents.forEach { doc ->
-            doc.text.lines().forEach { line ->
+            sourcePageLines(doc).forEach { (page, line) ->
                 DATE_REGEX.find(line)?.let { m ->
                     events += TimelineEvent(
                         eventId = "T-%03d".format(counter++),
                         dateTime = m.value,
                         description = line.trim().take(160),
                         evidenceId = doc.evidenceId,
-                        page = 1,
+                        page = page,
                         sha512 = doc.sha512,
                         gps = doc.gps,
                         severity = Severity.MODERATE
@@ -214,32 +212,22 @@ object NineBrainEngine {
     }
 
     private fun mapLegalFramework(documents: List<EvidenceDocument>, jurisdiction: String): List<String> {
-        val text = documents.joinToString("\n") { it.text }.lowercase()
-        val mappings = linkedSetOf<String>()
-        when {
-            jurisdiction.startsWith("ZA") -> mappings += "South African Common Law"
-            jurisdiction.startsWith("UAE") -> mappings += "UAE Federal Law (CCL, Cybercrime, Commercial Fraud)"
-            jurisdiction.startsWith("US") -> mappings += "United States Federal/Common Law"
-            jurisdiction.startsWith("EU") -> mappings += "European Union Law / PECL"
-            jurisdiction.startsWith("UK") -> mappings += "United Kingdom Common Law"
-            jurisdiction.startsWith("AU") -> mappings += "Australian Common Law / ACL"
-            jurisdiction.startsWith("CA") -> mappings += "Canadian Common Law"
-            jurisdiction.startsWith("IN") -> mappings += "Indian Common Law / Contract Act 1872"
-            else -> mappings += "International common-law fraud framework"
+        val supported = documents.flatMap { doc ->
+            val text = doc.text.lowercase()
+            buildList {
+                if (jurisdiction.startsWith("ZA") && Regex("""section\s*12b|s\.?\s*12b""").containsMatchIn(text)) {
+                    addAll(JurisdictionService.legalReferencesFor(jurisdiction, ContradictionCategory.SECTION_12B, text))
+                }
+                if (jurisdiction.startsWith("ZA") && Regex("""electronic|e-sign|signature|signed|unsigned""").containsMatchIn(text)) {
+                    addAll(JurisdictionService.legalReferencesFor(jurisdiction, ContradictionCategory.SIGNATURE_STATUS, text))
+                }
+            }
+        }.distinctBy { it.citation }
+        return if (supported.isEmpty()) {
+            listOf("No authoritative statute mapping was validated for jurisdiction $jurisdiction; human legal review required.")
+        } else {
+            supported.map { "${it.citation} — Official source: ${it.authoritativeUrl}" }
         }
-        if (Regex("petroleum|fuel|diesel|engen").containsMatchIn(text))
-            mappings += "Petroleum Products Act 120 of 1977, s.12B"
-        if (Regex("fraud|misrepresent|deceiv").containsMatchIn(text))
-            mappings += "Four Pillars of Fraud (common law fraud elements)"
-        if (Regex("shareholder|director|company|companies").containsMatchIn(text))
-            mappings += "Companies Act 71 of 2008 (oppression, fiduciary duty)"
-        if (Regex("racketeer|pattern of|enterprise").containsMatchIn(text))
-            mappings += "Prevention of Organised Crime Act 121 of 1998 (racketeering)"
-        if (text.contains("constitutional court"))
-            mappings += "Constitutional Court case database"
-        if (Regex("consumer|unfair|misleading").containsMatchIn(text))
-            mappings += "Consumer protection statutes"
-        return mappings.toList()
     }
 
     private fun analyzeFinancials(documents: List<EvidenceDocument>): FinancialAnalysis? {
@@ -259,17 +247,92 @@ object NineBrainEngine {
     private fun attachPersonsAndStatutes(
         contradictions: List<Contradiction>,
         persons: List<com.verumomnis.forensic.model.ExtractedPerson>,
-        jurisdictionSource: com.verumomnis.forensic.model.JurisdictionSource
+        jurisdictionSource: com.verumomnis.forensic.model.JurisdictionSource,
+        documents: List<EvidenceDocument>
     ): List<Contradiction> = contradictions.map { c ->
-        val person = persons.firstOrNull {
-            c.respondent.contains(it.name, ignoreCase = true) ||
-                it.name.contains(c.respondent, ignoreCase = true)
+        val claimA = anchorClaim(c.claimA, documents)
+        val claimB = anchorClaim(c.claimB, documents)
+        val claimDocs = listOf(claimA, claimB).mapNotNull { claim ->
+            documentsForSource(claim.source, claim.evidenceId, documents)
         }
-        val statutes = JurisdictionService.statutesFor(jurisdictionSource.jurisdiction, c.category)
+        val explicitAuthors = claimDocs.mapNotNull(EntityExtractor::authorOf).distinctBy { it.lowercase() }
+        // The detector's proposed actor must agree with an explicit source
+        // attribution; merely being the only named speaker in a file is not enough.
+        val personAuthor = explicitAuthors.firstOrNull { it.equals(c.respondent, ignoreCase = true) }
+        val person = personAuthor?.let { name -> persons.firstOrNull { it.name.equals(name, true) } }
+        val mentioned = persons.filter { candidate ->
+            listOf(claimA.text, claimB.text).any { text ->
+                Regex("""(?<![\p{L}\p{N}])${Regex.escape(candidate.name)}(?![\p{L}\p{N}])""", RegexOption.IGNORE_CASE)
+                    .containsMatchIn(text)
+            }
+        }.singleOrNull()
+        val legalReferences = JurisdictionService.legalReferencesFor(
+            jurisdictionSource.jurisdiction,
+            c.category,
+            "${claimA.text}\n${claimB.text}"
+        )
         c.copy(
             anchoredPerson = person,
-            applicableLaw = if (c.applicableLaw.isEmpty()) statutes else (c.applicableLaw + statutes).distinct()
+            respondent = person?.name ?: if (mentioned != null) "Unidentified person (possible reference: ${mentioned.name})" else "Unidentified person",
+            claimA = claimA,
+            claimB = claimB,
+            jurisdiction = jurisdictionSource.jurisdiction,
+            applicableLaw = legalReferences.map { it.citation },
+            legalReferences = legalReferences,
+            personLinkStatus = when {
+                person != null -> "IDENTIFIED_FROM_EXPLICIT_SOURCE_ATTRIBUTION"
+                mentioned != null -> "UNCERTAIN_MENTION_ONLY"
+                else -> "UNIDENTIFIED"
+            }
         )
+    }
+
+    private fun documentsForSource(
+        source: String,
+        evidenceId: String,
+        docs: List<EvidenceDocument>
+    ): EvidenceDocument? = docs.firstOrNull {
+        it.evidenceId == evidenceId || it.evidenceId == source || it.fileName == source
+    }
+
+    private fun anchorClaim(
+        claim: com.verumomnis.forensic.model.ContradictionClaim,
+        documents: List<EvidenceDocument>
+    ): com.verumomnis.forensic.model.ContradictionClaim {
+        val preferred = documentsForSource(claim.source, claim.evidenceId, documents)
+        val candidates = if (preferred != null) listOf(preferred) else documents
+        val match = candidates.firstNotNullOfOrNull { doc ->
+            val pageTexts = doc.extractionCoverage?.pages.orEmpty().mapNotNull { page ->
+                page.extractedText?.let { Triple(page.page, it, page.status) }
+            }
+            val spans = if (pageTexts.isNotEmpty()) {
+                pageTexts.flatMap { (page, text, _) -> text.lines().mapIndexed { index, line -> Triple(page, index + 1, line) } }
+            } else {
+                doc.text.lines().mapIndexed { index, line -> Triple(0, index + 1, line) }
+            }
+            val normalizedQuote = claim.text.replace(Regex("\\s+"), " ").trim()
+            spans.firstOrNull { (_, _, line) ->
+                normalizedQuote.isNotBlank() &&
+                    line.replace(Regex("\\s+"), " ").trim().contains(normalizedQuote, ignoreCase = true)
+            }?.let { span -> doc to span }
+        }
+        if (match == null) return claim.copy(page = 0, line = 0)
+        val (doc, span) = match
+        return claim.copy(
+            source = doc.fileName,
+            evidenceId = doc.evidenceId,
+            page = span.first,
+            line = span.second,
+            sha512 = doc.sha512
+        )
+    }
+
+    private fun sourcePageLines(doc: EvidenceDocument): List<Pair<Int, String>> {
+        val pages = doc.extractionCoverage?.pages.orEmpty().mapNotNull { page ->
+            page.extractedText?.let { page.page to it }
+        }
+        if (pages.isNotEmpty()) return pages.flatMap { (number, text) -> text.lines().map { number to it } }
+        return doc.text.lines().map { 0 to it }
     }
 
     /** Primary B1 contradiction path: hybrid v5.3.1c engine over raw text evidence. */

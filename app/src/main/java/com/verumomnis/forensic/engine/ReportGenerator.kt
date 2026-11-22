@@ -114,8 +114,12 @@ object ReportGenerator {
     private fun Contradiction.toOffenceRow(): OffenceRow = OffenceRow(
         offence = legalSignificance,
         person = respondent,
-        applicableLaw = applicableLaw,
-        evidenceAnchor = "${claimA.source} p${claimA.page} / ${claimB.source} p${claimB.page}",
+        applicableLaw = if (legalReferences.isEmpty()) {
+            listOf("No verified mapping; human review required for $jurisdiction")
+        } else {
+            legalReferences.map { "${it.citation} — Official source: ${it.authoritativeUrl}" }
+        },
+        evidenceAnchor = "${formatClaimLocation(claimA.source, claimA.page, claimA.line)} / ${formatClaimLocation(claimB.source, claimB.page, claimB.line)}",
         confidence = confidence
     )
 
@@ -125,8 +129,8 @@ object ReportGenerator {
         }
         append("This report presents the screening results of the Verum Omnis Nine-Brain forensic engine ")
         append("over ${findings.documentsAnalyzed} evidence item(s) within jurisdiction ${findings.jurisdiction}. ")
-        append("${findings.contradictions.size} potential contradiction indicator(s) were flagged, each anchored to a ")
-        append("person mentioned in the cited evidence, an evidence page, and a potentially relevant statute. ")
+        append("${findings.contradictions.size} potential contradiction indicator(s) were flagged. ")
+        append("A named person is shown only when an explicit source attribution supports that link; unknown links and page locations are labelled. ")
         findings.financial?.companyTax?.let {
             append("Estimated company tax exposure: R%,.2f. ".format(it.taxLiability))
         }
@@ -163,6 +167,8 @@ object ReportGenerator {
         appendLine()
         appendLine("1. EXECUTIVE SUMMARY")
         appendLine(buildExecutiveSummary(findings))
+        appendLine("Document quotations and source anchors are evidence; categories, conflict descriptions, severity and legal significance are automated interpretations.")
+        appendLine("This report does not determine guilt, intent, liability, or the truth of an allegation.")
         appendLine()
         if (findings.extractionCoverage.isNotEmpty()) {
             appendLine("PDF PAGE EXTRACTION PROVENANCE — original PDF page numbers")
@@ -190,32 +196,43 @@ object ReportGenerator {
             js.gps?.let { g ->
                 appendLine("   Coordinates: %.6f, %.6f".format(g.latitude, g.longitude))
             }
+            appendLine("   GPS identifies an approximate location only; it does not determine governing law or venue.")
             appendLine("   Statutes applied:")
-            js.statutes.forEach { appendLine("      - $it") }
+            if (js.statutes.isEmpty()) appendLine("      - No jurisdiction-validated statutes are attached to this source.")
+            else js.statutes.forEach { appendLine("      - $it") }
             appendLine()
         }
-        appendLine("2b. ACTOR PROFILES")
+        appendLine("2b. AUTOMATED CASE ASSOCIATION — NOT A GUILT OR CREDIBILITY ASSESSMENT")
         val actorProfiles = buildActorProfiles(findings)
         if (actorProfiles.isEmpty()) {
             appendLine("   No actor profiles available.")
         } else {
             actorProfiles.forEach { (person, score, flags) ->
-                appendLine("   - $person · Severity indicator (heuristic): ${"%.1f" .format(score)}/10 · Flags: ${flags.joinToString(", ")}")
+                appendLine("   - $person · Case-association indicator (heuristic only): ${"%.1f" .format(score)}/10 · Flags: ${flags.joinToString(", ")}")
             }
         }
         appendLine()
-        appendLine("3. CONTRADICTION MATRIX (person · page · statute) — council-ACCEPTED findings only")
+        appendLine("3. CONTRADICTION INDICATORS (person link · source page · legal review) — council-ACCEPTED only")
         if (acceptedContradictions.isEmpty()) {
             appendLine("   No council-confirmed contradictions detected in extracted text only. This is not assurance about unread material.")
         } else {
             acceptedContradictions.forEach { c ->
                 appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent}")
-                appendLine("      Claim A: \"${c.claimA.text}\"")
-                appendLine("               (${c.claimA.source}, p${c.claimA.page}, ln${c.claimA.line}, SHA-512 ${c.claimA.sha512.take(12)}…)")
-                appendLine("      Claim B: \"${c.claimB.text}\"")
-                appendLine("               (${c.claimB.source}, p${c.claimB.page}, ln${c.claimB.line}, SHA-512 ${c.claimB.sha512.take(12)}…)")
-                appendLine("      Legal significance: ${c.legalSignificance}")
-                appendLine("      Applicable law: ${c.applicableLaw.joinToString("; ")}")
+                appendLine("      Person link: ${c.personLinkStatus}")
+                appendLine("      Claim A evidence: \"${c.claimA.text}\"")
+                appendLine("               (${formatClaimLocation(c.claimA.source, c.claimA.page, c.claimA.line)}, SHA-512 ${c.claimA.sha512.take(12)}…)")
+                appendLine("      Claim B evidence: \"${c.claimB.text}\"")
+                appendLine("               (${formatClaimLocation(c.claimB.source, c.claimB.page, c.claimB.line)}, SHA-512 ${c.claimB.sha512.take(12)}…)")
+                appendLine("      Automated interpretation — conflict: ${c.description}")
+                appendLine("      Automated interpretation — legal significance: ${c.legalSignificance}")
+                if (c.legalReferences.isEmpty()) {
+                    appendLine("      Applicable law: no verified mapping for ${c.jurisdiction}; human legal review required.")
+                } else {
+                    c.legalReferences.forEach { legal ->
+                        appendLine("      Legal hypothesis: ${legal.citation} (${legal.jurisdiction})")
+                        appendLine("         Authoritative source: ${legal.authoritativeUrl}")
+                    }
+                }
                 appendLine("      Confidence: ${c.confidence} · Council: ACCEPTED (${c.confirmingBrains.joinToString(", ").ifEmpty { "B1 only" }})")
                 appendLine()
             }
@@ -237,6 +254,16 @@ object ReportGenerator {
             appendLine("   They are recorded for transparency only and are NOT findings of this report.")
             notConfirmed.forEach { c ->
                 appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent} — Council status: ${c.councilStatus}")
+                appendLine("      Person link: ${c.personLinkStatus} · Jurisdiction: ${c.jurisdiction}")
+                appendLine("      Claim A evidence: \"${c.claimA.text}\" (${formatClaimLocation(c.claimA.source, c.claimA.page, c.claimA.line)})")
+                appendLine("      Claim B evidence: \"${c.claimB.text}\" (${formatClaimLocation(c.claimB.source, c.claimB.page, c.claimB.line)})")
+                if (c.legalReferences.isEmpty()) {
+                    appendLine("      Legal review: no verified mapping for this jurisdiction.")
+                } else {
+                    c.legalReferences.forEach { legal ->
+                        appendLine("      Legal hypothesis: ${legal.citation} (${legal.jurisdiction}) — ${legal.authoritativeUrl}")
+                    }
+                }
             }
             appendLine()
         }
@@ -249,8 +276,8 @@ object ReportGenerator {
         appendLine()
         appendLine("6. POTENTIAL LEGAL HYPOTHESES — SCREENING INDICATORS, NOT LEGAL FINDINGS")
         offenceMatrix.forEach {
-            appendLine("   - ${it.person}: ${it.offence}")
-            appendLine("     Law: ${it.applicableLaw.joinToString("; ")} | Anchor: ${it.evidenceAnchor} | ${it.confidence}")
+            appendLine("   - ${it.person}: automated interpretation — ${it.offence}")
+            appendLine("     Legal hypothesis / review: ${it.applicableLaw.joinToString("; ")} | Evidence: ${it.evidenceAnchor} | ${it.confidence}")
         }
         appendLine()
         findings.financial?.let { fin ->
@@ -409,5 +436,11 @@ object ReportGenerator {
         Severity.HIGH -> 3
         Severity.MODERATE -> 2
         Severity.LOW -> 1
+    }
+
+    private fun formatClaimLocation(source: String, page: Int, line: Int): String = buildString {
+        append(source)
+        append(if (page > 0) ", page $page" else ", page unknown")
+        if (line > 0) append(", line $line")
     }
 }

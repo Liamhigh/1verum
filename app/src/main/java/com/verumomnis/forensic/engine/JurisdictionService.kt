@@ -3,6 +3,7 @@ package com.verumomnis.forensic.engine
 import com.verumomnis.forensic.model.ContradictionCategory
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.JurisdictionSource
+import com.verumomnis.forensic.model.LegalReference
 
 /**
  * Maps GPS coordinates to a jurisdiction and the statutes that apply to each
@@ -25,7 +26,9 @@ object JurisdictionService {
         Region(
             code = "ZA-KZN",
             label = "South Africa — KwaZulu-Natal",
-            contains = { it.latitude in -35.0..-22.0 && it.longitude in 16.0..33.0 },
+            // Approximate province bounds are deliberately narrower than South Africa;
+            // a country-level GPS fix must not be mislabeled as KwaZulu-Natal.
+            contains = { it.latitude in -31.2..-26.7 && it.longitude in 28.8..33.0 },
             statutes = mapOf(
                 ContradictionCategory.GOODWILL_VALUE to listOf(
                     "SA Common Law - Fraud",
@@ -59,7 +62,7 @@ object JurisdictionService {
         Region(
             code = "ZA-GP",
             label = "South Africa — Gauteng",
-            contains = { it.latitude in -35.0..-22.0 && it.longitude in 25.0..30.0 },
+            contains = { it.latitude in -26.7..-25.0 && it.longitude in 27.0..29.2 },
             statutes = mapOf(
                 ContradictionCategory.GOODWILL_VALUE to listOf(
                     "SA Common Law - Fraud",
@@ -87,6 +90,12 @@ object JurisdictionService {
                 ),
                 ContradictionCategory.OTHER to listOf("SA Common Law - Fraud")
             )
+        ),
+        Region(
+            code = "ZA",
+            label = "South Africa",
+            contains = { it.latitude in -35.0..-22.0 && it.longitude in 16.0..33.0 },
+            statutes = emptyMap()
         ),
         Region(
             code = "UAE-RAKEZ",
@@ -225,21 +234,55 @@ object JurisdictionService {
     /** Resolve a jurisdiction record from GPS, or return an international fallback. */
     fun resolve(gps: GpsRecord?): JurisdictionSource {
         gps ?: return JurisdictionSource("INTL")
-        val region = REGIONS.firstOrNull { it.contains(gps) }
+        val matches = REGIONS.filter { it.contains(gps) }
+        // These rectangles overlap across real borders. If a point fits both
+        // countries, do not guess which country's law governs the matter.
+        if (matches.any { it.code == "US" } && matches.any { it.code == "CA" }) {
+            return JurisdictionSource("INTL", gps)
+        }
+        val preferred = listOf("UAE-DIFC", "ZA-GP", "ZA-KZN", "UK", "CA")
+        val region = preferred.firstNotNullOfOrNull { code -> matches.firstOrNull { it.code == code } }
+            ?: matches.firstOrNull()
         return if (region != null) {
             JurisdictionSource(
                 jurisdiction = region.code,
                 gps = gps,
-                statutes = region.statutes.values.flatten().distinct()
+                // Category tables are legacy issue hints, not authoritative citations.
+                // Actual statute output is limited to legalReferencesFor().
+                statutes = emptyList()
             )
         } else {
             JurisdictionSource("INTL", gps)
         }
     }
 
-    /** Statutes that apply to a specific contradiction category in the resolved jurisdiction. */
-    fun statutesFor(jurisdictionCode: String, category: ContradictionCategory): List<String> {
-        val region = REGIONS.firstOrNull { it.code == jurisdictionCode }
-        return region?.statutes?.get(category) ?: listOf("International common-law fraud framework")
+    /**
+     * Returns only deliberately supported, official-source citations. Other jurisdiction /
+     * category combinations remain unmapped and must be reviewed by a qualified person.
+     */
+    fun legalReferencesFor(
+        jurisdictionCode: String,
+        category: ContradictionCategory,
+        supportingText: String = ""
+    ): List<LegalReference> {
+        val source = supportingText.lowercase()
+        val reference = when {
+            jurisdictionCode.startsWith("ZA") &&
+                category == ContradictionCategory.SECTION_12B &&
+                Regex("""petroleum products act|p\.?p\.?a\.?|section\s*12b|s\.?\s*12b""").containsMatchIn(source) ->
+                LegalReference(
+                    citation = "Petroleum Products Act 120 of 1977, section 12B",
+                    jurisdiction = jurisdictionCode,
+                    authoritativeUrl = "https://www.gov.za/documents/petroleum-products-act-16-apr-2015-1311"
+                )
+            jurisdictionCode.startsWith("ZA") && category == ContradictionCategory.SIGNATURE_STATUS ->
+                if (Regex("""electronic|e-sign|data message""").containsMatchIn(source)) LegalReference(
+                    citation = "Electronic Communications and Transactions Act 25 of 2002",
+                    jurisdiction = jurisdictionCode,
+                    authoritativeUrl = "https://www.gov.za/documents/electronic-communications-and-transactions-act"
+                ) else null
+            else -> null
+        }
+        return listOfNotNull(reference)
     }
 }

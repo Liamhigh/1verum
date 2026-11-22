@@ -14,7 +14,9 @@ data class PageExtraction(
     val textLayerChars: Int = 0,
     val extractedChars: Int = 0,
     val ocrAttempted: Boolean = false,
-    val textLayerFailed: Boolean = false
+    val textLayerFailed: Boolean = false,
+    /** Exact extracted text for this original page; null for legacy coverage records. */
+    val extractedText: String? = null
 )
 
 @Serializable

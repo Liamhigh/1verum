@@ -59,6 +59,7 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
 
         setProgress(progress("Ingest", "Reading $count evidence item(s)", 5))
 
+        val vault = EvidenceVault(applicationContext)
         val documents = buildList {
             repeat(count) { index ->
                 val base = "$PREFIX_FILENAME$index"
@@ -76,7 +77,8 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
                         fileName = fileName,
                         type = type,
                         text = text,
-                        sha512 = sha512
+                        sha512 = sha512,
+                        extractionCoverage = vault.loadPdfExtraction(sha512)?.coverage
                     )
                 )
             }
@@ -84,7 +86,6 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
 
         setProgress(progress("B1-B9", "Running Nine-Brain forensic analysis", 35))
         val now = Instant.now()
-        val vault = EvidenceVault(applicationContext)
         // The uploader already vaulted the original bytes. Do not re-store the
         // extracted text here: that used to replace derived evidence artifacts
         // under the same name on a second scan.

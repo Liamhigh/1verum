@@ -13,6 +13,7 @@ data class Statement(
     val text: String,
     val normalized: String,
     val doc: EvidenceDocument,
+    val page: Int,
     val line: Int,
     val statementType: StatementType,
     val date: LocalDate?,
@@ -34,9 +35,12 @@ data class ExtractedEntities(
  */
 object EntityExtractor {
 
-    private val PERSON_FROM = Regex("""(?im)^[ \t]*(?:from|respondent|by|witness|deponent)[ \t]*[:\-][ \t]*([A-Z][a-zA-Z.'-]+(?:[ \t]+[A-Z][a-zA-Z.'-]+){0,3})""")
-    private val PERSON_INLINE = Regex("""\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b""")
-    private val COMPANY = Regex("""\b([A-Z][A-Za-z&]+(?:\s+[A-Z][A-Za-z&]+)*\s+(?:\(Pty\)\s*Ltd|Ltd|LLC|FZ-LLC|Inc|CC|Holdings|Motors|Export|Petroleum|Fuels))\b""")
+    private val PERSON_FROM = Regex("""(?im)^[ \t]*(?:from|respondent|witness|deponent|deponent's name|signed by|prepared by)[ \t]*[:\-][ \t]*((?:Mr|Ms|Mrs|Dr|Adv)\.?\s+)?([A-Z][a-zA-Z.'-]+(?:[ \t]+[A-Z][a-zA-Z.'-]+){1,3})[ \t]*[.,;]?[ \t]*$""")
+    private val PERSON_INLINE = Regex("""(?im)^[ \t]*(?:I,\s*)?((?:Mr|Ms|Mrs|Dr|Adv)\.?\s+)?([A-Z][a-zA-Z.'-]+(?:[ \t]+[A-Z][a-zA-Z.'-]+){1,2})\s+(?:denies|states|said|testified|signed|admitted|swore|witnessed|wrote|confirmed|alleges)\b""")
+    private val COMPANY = Regex(
+        """\b([A-Z][A-Za-z&]+(?:\s+[A-Z][A-Za-z&]+)*\s+(?:\(Pty\)\s*Ltd|Ltd|LLC|FZ-LLC|Inc|CC|Holdings|Motors|Export|Petroleum|Fuels|Corporation|Corp|Company|Group|Foundation|University|Association|Trust|Bank|Government|Ministry|Department))\b""",
+        RegexOption.IGNORE_CASE
+    )
     private val AMOUNT = Regex("""R\s?([\d][\d.,\s]*)(million|m|k)?\b""", RegexOption.IGNORE_CASE)
     private val DATE_PATTERNS = listOf(
         Regex("""\b\d{4}-\d{2}-\d{2}\b"""),
@@ -60,8 +64,8 @@ object EntityExtractor {
     fun extractEntities(documents: List<EvidenceDocument>): ExtractedEntities {
         val text = documents.joinToString("\n") { it.text }
         val people = LinkedHashSet<String>()
-        PERSON_FROM.findAll(text).forEach { people += it.groupValues[1].trim() }
-        PERSON_INLINE.findAll(text).forEach { people += it.groupValues[1].trim() }
+        PERSON_FROM.findAll(text).mapNotNull { personName(it) }.forEach(people::add)
+        PERSON_INLINE.findAll(text).mapNotNull { personName(it) }.forEach(people::add)
         val companies = COMPANY.findAll(text).map { it.value.trim() }.toCollection(LinkedHashSet())
         val dates = DATE_PATTERNS.flatMap { p -> p.findAll(text).map { it.value } }.toCollection(LinkedHashSet())
         val amounts = AMOUNT.findAll(text).mapNotNull { m ->
@@ -81,8 +85,9 @@ object EntityExtractor {
         val persons = LinkedHashMap<String, ExtractedPerson>()
         documents.forEach { doc ->
             // Victim profiles: "Name -- Site (X Years)"
-            VICTIM_PROFILE.findAll(doc.text).forEach { m ->
+            VICTIM_PROFILE.findAll(doc.text).forEach profile@{ m ->
                 val name = m.groupValues[1].trim()
+                if (!isLikelyPersonName(name)) return@profile
                 val context = m.groupValues[2].trim()
                 val age = m.groupValues[3].toIntOrNull()
                 persons[name] = (persons[name] ?: ExtractedPerson(name = name)).copy(
@@ -93,8 +98,9 @@ object EntityExtractor {
             }
 
             // Age inline: "Name ... (X Years)" not caught above
-            AGE_PATTERN.findAll(doc.text).forEach { m ->
+            AGE_PATTERN.findAll(doc.text).forEach agePattern@{ m ->
                 val name = m.groupValues[1].trim()
+                if (!isLikelyPersonName(name)) return@agePattern
                 val age = m.groupValues[2].toIntOrNull()
                 if (!persons.containsKey(name)) {
                     persons[name] = ExtractedPerson(name = name, age = age)
@@ -132,11 +138,21 @@ object EntityExtractor {
             }
 
             // Named respondents / deponents from headers
-            PERSON_FROM.findAll(doc.text).forEach { m ->
-                val name = m.groupValues[1].trim()
-                if (!persons.containsKey(name)) {
-                    persons[name] = ExtractedPerson(name = name, role = inferRoleFromHeader(m.value))
-                }
+            PERSON_FROM.findAll(doc.text).forEach personHeader@{ m ->
+                val name = personName(m) ?: return@personHeader
+                val role = inferRoleFromHeader(m.value)
+                val existing = persons[name]
+                persons[name] = (existing ?: ExtractedPerson(name = name)).copy(
+                    role = if (existing?.role == null || existing.role == PersonRole.UNKNOWN) role else existing.role,
+                    context = (existing?.context.orEmpty().ifBlank { "Explicit source attribution" })
+                )
+            }
+            PERSON_INLINE.findAll(doc.text).forEach inlinePerson@{ m ->
+                val name = personName(m) ?: return@inlinePerson
+                persons.putIfAbsent(
+                    name,
+                    ExtractedPerson(name = name, context = "Named as the subject of a source statement")
+                )
             }
         }
         return persons.values.toList()
@@ -144,9 +160,31 @@ object EntityExtractor {
 
     private fun nearestPrecedingPerson(text: String, position: Int): String? {
         val before = text.substring(0, position)
-        PERSON_INLINE.findAll(before).lastOrNull()?.let { return it.groupValues[1].trim() }
-        PERSON_FROM.findAll(before).lastOrNull()?.let { return it.groupValues[1].trim() }
+        PERSON_INLINE.findAll(before).lastOrNull()?.let { return personName(it) }
+        PERSON_FROM.findAll(before).lastOrNull()?.let { return personName(it) }
         return null
+    }
+
+    private fun personName(match: MatchResult): String? {
+        val name = (match.groupValues.getOrNull(1).orEmpty() + " " +
+            match.groupValues.getOrNull(2).orEmpty()).trim()
+        if (name.isBlank()) return null
+        val lower = name.lowercase(Locale.ROOT)
+        if (lower in setOf("allfuels", "court", "constitutional court", "southbridge legal", "the respondent")) return null
+        if (!isLikelyPersonName(name)) return null
+        return name.replace(Regex("^(Mr|Ms|Mrs|Dr|Adv)\\.?\\s+", RegexOption.IGNORE_CASE), "").trim()
+            .takeIf { it.split(Regex("\\s+")).size >= 2 }
+    }
+
+    private fun isLikelyPersonName(rawName: String): Boolean {
+        val name = rawName.replace(Regex("^(Mr|Ms|Mrs|Dr|Adv)\\.?\\s+", RegexOption.IGNORE_CASE), "").trim()
+        if (name.split(Regex("\\s+")).size < 2 || COMPANY.containsMatchIn(name)) return false
+        val blockedWords = setOf(
+            "court", "company", "limited", "ltd", "llc", "inc", "legal", "department",
+            "ministry", "report", "analysis", "statement", "affidavit", "invoice",
+            "dear", "to", "from", "the", "witness", "respondent", "claimant"
+        )
+        return name.split(Regex("\\s+")).none { it.trim('.', ',').lowercase(Locale.ROOT) in blockedWords }
     }
 
     private fun inferRoleFromHeader(header: String): PersonRole = when {
@@ -171,16 +209,15 @@ object EntityExtractor {
         return expected == check
     }
 
-    fun authorOf(doc: EvidenceDocument): String? =
-        PERSON_FROM.find(doc.text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+    fun authorOf(doc: EvidenceDocument): String? = PERSON_FROM.find(doc.text)?.let(::personName)
 
     /** Split each document into sentence-level statements with metadata. */
     fun statements(documents: List<EvidenceDocument>): List<Statement> {
         val out = mutableListOf<Statement>()
         documents.forEach { doc ->
-            doc.text.lines().forEachIndexed { lineIdx, rawLine ->
+            sourceLines(doc).forEach sourceLine@{ (page, lineIdx, rawLine) ->
                 val line = rawLine.trim()
-                if (line.isEmpty()) return@forEachIndexed
+                if (line.isEmpty()) return@sourceLine
                 splitSentences(line).forEach sentence@{ sentence ->
                     val s = sentence.trim()
                     if (s.length < 4) return@sentence
@@ -189,7 +226,8 @@ object EntityExtractor {
                         text = s,
                         normalized = normalise(s),
                         doc = doc,
-                        line = lineIdx + 1,
+                        line = lineIdx,
+                        page = page,
                         statementType = statementType(s),
                         date = extractDate(s),
                         subject = subject,
@@ -199,6 +237,19 @@ object EntityExtractor {
             }
         }
         return out
+    }
+
+    private fun sourceLines(doc: EvidenceDocument): List<Triple<Int, Int, String>> {
+        val extractedPages = doc.extractionCoverage?.pages.orEmpty()
+            .mapNotNull { p -> p.extractedText?.let { Triple(p.page, it, p.status) } }
+        if (extractedPages.isNotEmpty()) {
+            return extractedPages.flatMap { (page, text, _) ->
+                text.lines().mapIndexed { index, line -> Triple(page, index + 1, line) }
+            }
+        }
+        // A flattened PDF has no trustworthy page boundary. Keep line citations,
+        // but represent the page as unknown rather than manufacturing page 1.
+        return doc.text.lines().mapIndexed { index, line -> Triple(0, index + 1, line) }
     }
 
     private fun splitSentences(line: String): List<String> =

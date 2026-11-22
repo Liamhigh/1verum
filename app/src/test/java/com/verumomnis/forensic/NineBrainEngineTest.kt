@@ -1,6 +1,7 @@
 package com.verumomnis.forensic
 
 import com.verumomnis.forensic.engine.ForensicService
+import com.verumomnis.forensic.engine.JurisdictionService
 import com.verumomnis.forensic.model.GpsRecord
 import com.verumomnis.forensic.model.Severity
 import org.junit.Assert.assertEquals
@@ -55,9 +56,25 @@ class NineBrainEngineTest {
         val result = ForensicService.scan(sampleDocs(), now)
         assertEquals("ZA-KZN", result.findings.jurisdiction)
         val mappings = result.findings.legalMappings
-        assertTrue(mappings.any { it.contains("Petroleum Products Act") })
-        assertTrue(mappings.any { it.contains("fraud", ignoreCase = true) })
-        assertTrue(mappings.any { it.contains("Companies Act") })
+        assertTrue(mappings.any { it.contains("human legal review required", ignoreCase = true) })
+        assertTrue(mappings.none { it.contains("Petroleum Products Act") })
+        assertTrue(mappings.none { it.contains("Companies Act") })
+    }
+
+    @Test
+    fun locationOverlapsDoNotGuessGoverningCountryOrSubregion() {
+        assertEquals(
+            "UK",
+            JurisdictionService.resolve(GpsRecord(51.5074, -0.1278, timestamp = now.toString())).jurisdiction
+        )
+        assertEquals(
+            "UAE-DIFC",
+            JurisdictionService.resolve(GpsRecord(25.2048, 55.2708, timestamp = now.toString())).jurisdiction
+        )
+        assertEquals(
+            "INTL",
+            JurisdictionService.resolve(GpsRecord(41.8781, -87.6298, timestamp = now.toString())).jurisdiction
+        )
     }
 
     @Test

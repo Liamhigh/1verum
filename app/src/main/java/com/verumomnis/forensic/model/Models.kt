@@ -89,6 +89,16 @@ data class ContradictionClaim(
     val statementType: StatementType = StatementType.CLAIM
 )
 
+/** A jurisdiction-checked legal citation, with an official source or explicit review status. */
+@Serializable
+data class LegalReference(
+    val citation: String,
+    val jurisdiction: String,
+    val authoritativeUrl: String = "",
+    val requiresHumanReview: Boolean = false,
+    val reviewNote: String = ""
+)
+
 /** Contradiction Model (spec 12.2 / build spec Section 9.4). */
 @Serializable
 data class Contradiction(
@@ -118,7 +128,11 @@ data class Contradiction(
     /** ACCEPTED | INDETERMINATE_DUE_TO_CONCEALMENT | INSUFFICIENT */
     val councilStatus: String = "INSUFFICIENT",
     /** Original v5.3.1c engine contradiction type, if produced by the B1-v5.3.1c engine. */
-    val engineType: String = ""
+    val engineType: String = "",
+    val jurisdiction: String = "",
+    val legalReferences: List<LegalReference> = emptyList(),
+    /** Speaker identity is established only by an explicit person attribution in source text. */
+    val personLinkStatus: String = "UNIDENTIFIED"
 )
 
 @Serializable

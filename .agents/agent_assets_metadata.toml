@@ -42,3 +42,17 @@ mtime_ms = 1795296914134
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/f0cb70da-8c97-4ebf-b8bf-597e12ef9a49/c66f8836-eddf-40bc-8079-8a8efe07b6da"
 storage_version_token = "1795296935225480"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "9eurFlODGP5D8CKKV-rbS"
+uri = "file://generated-artifacts/source-named-exports/verum-omnis-5.2.12.apk"
+type = "unspecified"
+title = "Verum Omnis 5.2.12 — Android APK"
+description = "Signed 93.61 MB Android update with source-based sealed PDF and forensic report filenames. This build fixes export names, not the forensic attribution defects. Install the .apk directly without extracting it."
+logical_id = "0d83e2a4-ef3b-4eca-912a-55d7f658bb83"
+content_hash = "sha256:e2d1e527bf34bb0f84f6d48c28ca94fe7f571b0caedf790dd2b81c3eb3f56f4f"
+size = 93607208
+mtime_ms = 1795379432591
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/0d83e2a4-ef3b-4eca-912a-55d7f658bb83/d45ddb54-6d06-417b-99e5-f26a46e51c5c"
+storage_version_token = "1795379451718439"
+content_type = "application/octet-stream"

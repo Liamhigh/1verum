@@ -224,5 +224,6 @@ data class ForensicFindings(
     val rndValidation: List<String> = emptyList(),
     val mediaExhibits: List<MediaExhibit> = emptyList(),
     val brainVerdicts: Map<String, String>,
-    val guardian: GuardianAssessment? = null
+    val guardian: GuardianAssessment? = null,
+    val extractionCoverage: List<DocumentExtractionCoverage> = emptyList()
 )

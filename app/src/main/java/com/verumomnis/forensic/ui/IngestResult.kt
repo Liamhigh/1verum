@@ -15,7 +15,8 @@ sealed class IngestResult {
         val mimeType: String,
         val text: String,
         val sha512: String,
-        val sizeBytes: Long
+        val sizeBytes: Long,
+        val extractionCoverage: com.verumomnis.forensic.model.PdfExtractionCoverage? = null
     ) : IngestResult()
 
     data class MediaSuccess(

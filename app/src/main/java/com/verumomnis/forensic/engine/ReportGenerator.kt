@@ -70,6 +70,7 @@ object ReportGenerator {
             financial = findings.financial,
             mediaExhibits = findings.mediaExhibits,
             findingsJsonPath = findingsJsonPath,
+            extractionCoverage = findings.extractionCoverage,
             jurisdictionSource = findings.jurisdictionSource,
             seal = seal,
             body = body,
@@ -119,6 +120,9 @@ object ReportGenerator {
     )
 
     private fun buildExecutiveSummary(findings: ForensicFindings): String = buildString {
+        findings.extractionCoverage.forEach {
+            append("${it.fileName}: ${it.coverage.summary()} ")
+        }
         append("This report presents the screening results of the Verum Omnis Nine-Brain forensic engine ")
         append("over ${findings.documentsAnalyzed} evidence item(s) within jurisdiction ${findings.jurisdiction}. ")
         append("${findings.contradictions.size} potential contradiction indicator(s) were flagged, each anchored to a ")
@@ -160,6 +164,17 @@ object ReportGenerator {
         appendLine("1. EXECUTIVE SUMMARY")
         appendLine(buildExecutiveSummary(findings))
         appendLine()
+        if (findings.extractionCoverage.isNotEmpty()) {
+            appendLine("PDF PAGE EXTRACTION PROVENANCE — original PDF page numbers")
+            findings.extractionCoverage.forEach { doc ->
+                appendLine("${doc.evidenceId} · ${doc.fileName} · SHA-512 ${doc.sha512}")
+                appendLine(doc.coverage.summary())
+                doc.coverage.pages.forEach { page ->
+                    appendLine("   Page ${page.page}: ${page.status} (${page.reason}); text-layer chars ${page.textLayerChars}; extracted chars ${page.extractedChars}; OCR attempted ${page.ocrAttempted}; text-layer failed ${page.textLayerFailed}")
+                }
+            }
+            appendLine()
+        }
         appendLine("2. EXTRACTED PERSONS")
         if (findings.extractedPersons.isEmpty()) {
             appendLine("   No structured person records extracted.")
@@ -191,7 +206,7 @@ object ReportGenerator {
         appendLine()
         appendLine("3. CONTRADICTION MATRIX (person · page · statute) — council-ACCEPTED findings only")
         if (acceptedContradictions.isEmpty()) {
-            appendLine("   No council-confirmed contradictions detected.")
+            appendLine("   No council-confirmed contradictions detected in extracted text only. This is not assurance about unread material.")
         } else {
             acceptedContradictions.forEach { c ->
                 appendLine("   ${c.contradictionId} [${c.severity}] ${c.category} / ${c.type} — Respondent: ${c.respondent}")

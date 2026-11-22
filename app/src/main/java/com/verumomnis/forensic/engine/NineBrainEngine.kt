@@ -81,12 +81,12 @@ object NineBrainEngine {
         val mediaExhibits = buildMediaExhibits(media, jurisdiction)                   // photographic/video evidence
 
         val brainVerdicts = linkedMapOf(
-            "B1-Contradiction" to if (contradictions.isEmpty()) "CLEAR" else "${contradictions.size} FOUND",
-            "B2-Document" to if (documentForensics.isEmpty()) "NO TAMPER" else "${documentForensics.size} SIGNALS",
-            "B3-Communications" to if (communications.isEmpty()) "NO GAPS" else "${communications.size} GAPS",
-            "B4-Behavioral" to if (behavioral.isEmpty()) "CLEAR" else "score ${"%.2f".format(behavioral.score)}",
+            "B1-Contradiction" to if (contradictions.isEmpty()) "NO INDICATORS IN EXTRACTED TEXT" else "${contradictions.size} FOUND",
+            "B2-Document" to if (documentForensics.isEmpty()) "NO TAMPER SIGNALS IN AVAILABLE INPUT" else "${documentForensics.size} SIGNALS",
+            "B3-Communications" to if (communications.isEmpty()) "NO GAPS DETECTED IN EXTRACTED TEXT" else "${communications.size} GAPS",
+            "B4-Behavioral" to if (behavioral.isEmpty()) "NO INDICATORS IN EXTRACTED TEXT" else "score ${"%.2f".format(behavioral.score)}",
             "B5-Timeline" to "${timeline.size} EVENTS",
-            "B6-Financial" to if (financial?.flaggedAnomalies.isNullOrEmpty()) "NO ANOMALIES" else "${financial!!.flaggedAnomalies.size} FLAGGED",
+            "B6-Financial" to if (financial?.flaggedAnomalies.isNullOrEmpty()) "NO ANOMALIES DETECTED IN EXTRACTED TEXT" else "${financial!!.flaggedAnomalies.size} FLAGGED",
             "B7-LegalMapping" to "${legalMappings.size} MAPPINGS",
             "B8-Audio" to audioVerdict(audio, audioAnalysis),
             "B9-Guardian" to when {

@@ -99,6 +99,8 @@ object Gemma3ReportWriter : ReportWriter {
         appendLine("CASE: $caseName")
         appendLine("JURISDICTION: ${findings.jurisdiction}")
         appendLine("DOCUMENTS ANALYZED: ${findings.documentsAnalyzed}")
+        appendLine("Conclusions apply only to extracted text. Never give clean-content assurance for unread material.")
+        findings.extractionCoverage.forEach { appendLine("${it.fileName}: ${it.coverage.summary()}") }
         appendLine("CONTRADICTIONS: ${findings.contradictions.size}")
         appendLine("PERSONS EXTRACTED:")
         findings.extractedPersons.take(12).forEach { p ->

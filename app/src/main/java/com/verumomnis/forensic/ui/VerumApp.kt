@@ -185,9 +185,13 @@ fun VerumApp(
                         mimeType = result.mimeType,
                         sizeBytes = result.sizeBytes,
                         sha512 = result.sha512,
-                        displayText = result.text.take(280) + if (result.text.length > 280) "…" else "",
+                        displayText = listOfNotNull(
+                            result.extractionCoverage?.summary(),
+                            result.text.take(280) + if (result.text.length > 280) "…" else ""
+                        ).joinToString("\n"),
                         isMedia = false,
-                        documentText = result.text
+                        documentText = result.text,
+                        extractionCoverage = result.extractionCoverage
                     )
                     is IngestResult.MediaSuccess -> previews += PendingFilePreview(
                         fileName = result.evidence.fileName,

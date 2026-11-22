@@ -15,6 +15,10 @@ import com.verumomnis.forensic.seal.OpenTimestampsClient
 import com.verumomnis.forensic.seal.SealMetadataCodec
 import com.verumomnis.forensic.ui.DocumentSealServices
 import com.verumomnis.forensic.ui.VerumViewModel
+import com.verumomnis.forensic.engine.PdfExtractionResult
+import com.verumomnis.forensic.model.PdfExtractionCoverage
+import com.verumomnis.forensic.model.PageExtraction
+import com.verumomnis.forensic.model.PageReadStatus
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,7 +60,8 @@ class DocumentSealFlowTest {
                 app.cacheDir, SealedOutputNames.forensicReport(sourceName, report.reference)
             ).apply { writeText("%PDF-1.4\nsynthetic report writer boundary") }
         },
-        inspectOptions: (DocumentSealer.SealOptions) -> Unit = {}
+        inspectOptions: (DocumentSealer.SealOptions) -> Unit = {},
+        coverage: PdfExtractionCoverage? = null
     ) = VerumViewModel(
         application = app, identityService = IdentityService(app, InMemoryIdentityKeyStore()),
         blockchainService = offline, reportPdfWriter = writer,
@@ -73,7 +78,11 @@ class DocumentSealFlowTest {
                 )
             },
             extractText = { extractionCalls.incrementAndGet(); text },
-            anchor = { OpenTimestampsClient.OtsResult.Failure("Offline fixture") }
+            anchor = { OpenTimestampsClient.OtsResult.Failure("Offline fixture") },
+            extractPdf = {
+                extractionCalls.incrementAndGet()
+                PdfExtractionResult(text, coverage ?: PdfExtractionCoverage(documentFailure = "Synthetic legacy extractor"))
+            }
         )
     )
 
@@ -157,8 +166,10 @@ class DocumentSealFlowTest {
         assertNotNull(vm.state.value.sealResult)
         assertTrue(vm.state.value.websiteSealedFile!!.isFile)
         assertTrue(vm.state.value.sealForensicError.contains("No readable text"))
+        assertTrue(vm.state.value.sealForensicError.contains("incomplete PDF coverage"))
         assertTrue(vm.state.value.sealReportReference.isBlank())
         assertNull(vm.state.value.report)
+        assertTrue(File(app.filesDir, "vault/findings/pdf_extraction_${Sha512.hash(input)}.json").isFile)
     }
 
     @Test fun reportWriteFailureKeepsDocumentAndSupportsPdfRetry() {
@@ -225,5 +236,38 @@ class DocumentSealFlowTest {
             assertEquals(12, observed!!.gpsAccuracyM)
             assertEquals(now.toEpochMilli(), observed!!.timestampMs)
         }
+    }
+
+    @Test fun forensicReportRetainsPartialCoverageThroughThePrimarySealFlow() {
+        val coverage = PdfExtractionCoverage(totalPages = 2, pages = listOf(
+            PageExtraction(1, PageReadStatus.TEXT_LAYER, "embedded_text", 50, 50),
+            PageExtraction(2, PageReadStatus.FAILED, "page_render_or_ocr_failed", ocrAttempted = true)
+        ))
+        val vm = vm(coverage = coverage)
+        vm.selectPdfForSealing(input, "synthetic-partial.pdf", input.size.toLong())
+        vm.setSealMode("forensic")
+        vm.sealDocument(now)
+        await { !vm.state.value.sealBusy }
+        assertTrue(vm.state.value.sealForensicError.isBlank())
+        assertEquals(coverage, vm.state.value.report!!.extractionCoverage.single().coverage)
+        assertTrue(vm.state.value.report!!.body.contains("Page 2: FAILED"))
+        assertTrue(vm.state.value.report!!.executiveSummary.contains("WARNING"))
+        assertTrue(vm.state.value.scanLog.contains("incomplete page coverage"))
+        assertTrue(vm.state.value.sealPipeline.last().detail.contains("incomplete page coverage"))
+    }
+
+    @Test fun previewConfirmationDoesNotLosePageProvenance() {
+        val coverage = PdfExtractionCoverage(totalPages = 1, pages = listOf(
+            PageExtraction(1, PageReadStatus.SKIPPED, "ocr_page_limit")
+        ))
+        val vm = vm()
+        vm.setPendingFiles(listOf(com.verumomnis.forensic.ui.PendingFilePreview(
+            "synthetic-preview.pdf", "application/pdf", 100, "a".repeat(128),
+            coverage.summary(), false, documentText = "", extractionCoverage = coverage
+        )))
+        vm.confirmAndSeal("SyntheticPreview", now)
+        await { vm.state.value.report != null }
+        assertEquals(coverage, vm.state.value.report!!.extractionCoverage.single().coverage)
+        assertTrue(vm.state.value.report!!.executiveSummary.contains("not a clean-content assurance"))
     }
 }

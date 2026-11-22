@@ -20,6 +20,19 @@ Actual report PDFs supplied from an Android device were readable and rendered
 with the watermark despite those JVM skips. Do not replace the device PDF writer
 solely to make unsupported Robolectric serialization pass.
 
+PDF text-layer replays and synthetic tests with substituted OCR do not establish
+parity with phone ML Kit recognition or an expected indicator count for real
+evidence. Page-coverage correctness, phone recognition accuracy, and final native
+PDF byte verification are separate claims.
+
+**Why:** The user explicitly distinguished incomplete-reading warnings from
+physical-device PDF verification; a local text-layer replay cannot validate
+device OCR.
+
+**How to apply:** Describe exactly which extraction boundary a test exercises.
+Use synthetic evidence for regression fixtures and keep OCR-accuracy/device
+verification claims separate from deterministic coverage tests.
+
 **How to apply:** Use an opt-in local Gradle test init configuration with
 `maxParallelForks = 1`, `forkEvery = 1`, and `maxHeapSize = "512m"`; a 1 GiB
 Gradle heap was sufficient. Keep host-only test limits separate from app

@@ -33,6 +33,7 @@ data class ForensicReport(
     val financial: FinancialAnalysis? = null,
     val mediaExhibits: List<MediaExhibit> = emptyList(),
     val findingsJsonPath: String = "",
+    val extractionCoverage: List<DocumentExtractionCoverage> = emptyList(),
     val seal: SealRecord,
     val body: String,
     val gemmaNarrative: String = "",

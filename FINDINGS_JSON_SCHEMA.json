@@ -49,6 +49,47 @@
         "type": "string"
       }
     },
+    "coverage_warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "extraction_coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["evidenceId", "fileName", "sha512", "coverage"],
+        "properties": {
+          "evidenceId": { "type": "string" },
+          "fileName": { "type": "string" },
+          "sha512": { "type": "string" },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "totalPages": { "type": ["integer", "null"], "minimum": 0 },
+              "ocrPageLimit": { "type": "integer", "minimum": 0 },
+              "thinPageChars": { "type": "integer", "minimum": 0 },
+              "documentFailure": { "type": ["string", "null"] },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["page", "status", "reason"],
+                  "properties": {
+                    "page": { "type": "integer", "minimum": 1 },
+                    "status": { "enum": ["TEXT_LAYER", "OCR", "UNREAD", "FAILED", "SKIPPED"] },
+                    "reason": { "type": "string" },
+                    "textLayerChars": { "type": "integer", "minimum": 0 },
+                    "extractedChars": { "type": "integer", "minimum": 0 },
+                    "ocrAttempted": { "type": "boolean" },
+                    "textLayerFailed": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "contradictions": {
       "type": "array",
       "items": {

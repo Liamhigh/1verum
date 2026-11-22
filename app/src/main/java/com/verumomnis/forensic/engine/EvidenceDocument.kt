@@ -15,5 +15,6 @@ data class EvidenceDocument(
     val expenses: Double? = null,
     /** Optional document metadata for B2 tamper detection. */
     val creatorTool: String? = null,
-    val documentKind: String? = null
+    val documentKind: String? = null,
+    val extractionCoverage: com.verumomnis.forensic.model.PdfExtractionCoverage? = null
 )

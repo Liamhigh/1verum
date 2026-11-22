@@ -111,7 +111,8 @@ data class PendingFilePreview(
     val displayText: String,
     val isMedia: Boolean,
     val mediaEvidence: MediaEvidence? = null,
-    val documentText: String = ""
+    val documentText: String = "",
+    val extractionCoverage: com.verumomnis.forensic.model.PdfExtractionCoverage? = null
 )
 
 enum class SealPipelineStepStatus { PENDING, PROCESSING, COMPLETE, ERROR }
@@ -460,6 +461,8 @@ class VerumViewModel(
             appendLine("forensic process, and the law, and may suggest sealing evidence first.")
         } else {
             appendLine("JURISDICTION: ${findings.jurisdiction}")
+            appendLine("Never give clean-content assurance; conclusions apply only to extracted text.")
+            findings.extractionCoverage.forEach { appendLine("${it.fileName}: ${it.coverage.summary()}") }
             appendLine("CONTRADICTIONS:")
             findings.contradictions.take(10).forEach { c ->
                 appendLine("- [${c.severity}] ${c.contradictionId}: \"${c.claimA.text}\" vs \"${c.claimB.text}\"")
@@ -805,8 +808,8 @@ class VerumViewModel(
      * Recomputes the landing tiles from what is actually in the vault.
      *
      * Sealed counts vaulted artifacts; flagged counts reports carrying
-     * contradictions; verified is the remainder — a sealed report the engine
-     * found nothing adverse in. Reading the vault rather than tracking counters
+     * contradictions; incomplete extraction must never count as verified.
+     * Reading the vault rather than tracking counters
      * means the tiles cannot drift from reality.
      */
     fun refreshVaultStats() {
@@ -821,8 +824,10 @@ class VerumViewModel(
                     RecentActivity(
                         id = r.reference,
                         name = r.title.ifBlank { r.reference },
-                        subtitle = if (r.contradictions.isEmpty()) {
-                            "Sealed · no contradictions detected"
+                        subtitle = if (r.extractionCoverage.any { it.coverage.incomplete }) {
+                            "Sealed · incomplete page coverage"
+                        } else if (r.contradictions.isEmpty()) {
+                            "Sealed · no indicators in extracted text"
                         } else {
                             "${r.contradictions.size} contradiction(s) flagged"
                         },
@@ -846,7 +851,9 @@ class VerumViewModel(
             _state.update {
                 it.copy(
                     vaultSealedCount = sealed,
-                    vaultVerifiedCount = (reports.size - flagged).coerceAtLeast(0),
+                    vaultVerifiedCount = reports.count { r ->
+                        r.contradictions.isEmpty() && r.extractionCoverage.none { it.coverage.incomplete }
+                    },
                     vaultFlaggedCount = flagged,
                     recentActivity = recent,
                     scanSets = sets
@@ -1233,9 +1240,11 @@ class VerumViewModel(
                 // sealed forensic report is generated for human review.
                 if (forensic) {
                     updatePipelineStep("Forensic report", SealPipelineStepStatus.PROCESSING, "Reading evidence and running Nine-Brain analysis")
-                    val text = documentSealServices.extractText(bytes).trim()
+                    val extraction = documentSealServices.extractPdf(bytes)
+                    vault.storePdfExtraction("DOC001", name, sha512ForAnchor, extraction.coverage)
+                    val text = extraction.text.trim()
                     check(text.isNotBlank()) {
-                        "No readable text was extracted. Analysis did not complete; this is not a clean result."
+                        "No readable text was extracted. Analysis did not complete; this is not a clean result. ${extraction.coverage.summary()}"
                     }
                     // Each selected document starts a fresh active case, rather
                     // than accidentally including previous uploads. Vault files stay.
@@ -1243,7 +1252,8 @@ class VerumViewModel(
                     _state.update { it.copy(reportPdfSourceName = name) }
                     addDocument(EvidenceDocument(
                         evidenceId = "DOC001", fileName = name, type = "pdf",
-                        text = text, sha512 = sha512ForAnchor, gps = gps
+                        text = text, sha512 = sha512ForAnchor, gps = gps,
+                        extractionCoverage = extraction.coverage
                     ))
                     sealCase(now, name.removeSuffix(".pdf"), awaitReportPdf = true)
                     val completed = _state.value
@@ -1252,7 +1262,9 @@ class VerumViewModel(
                     check(completed.reportPdfFile?.isFile == true && completed.reportPdfError.isBlank()) {
                         completed.reportPdfError.ifBlank { "The sealed forensic report PDF could not be saved." }
                     }
-                    updatePipelineStep("Forensic report", SealPipelineStepStatus.COMPLETE, "Sealed report PDF ready to save or share")
+                    updatePipelineStep("Forensic report", SealPipelineStepStatus.COMPLETE,
+                        if (extraction.coverage.incomplete) "Report saved with incomplete page coverage — review warnings"
+                        else "Sealed report PDF ready to save or share")
                 }
                 _state.update { it.copy(sealBusy = false, sealForensicRunning = false) }
             }.onFailure { e ->
@@ -1423,7 +1435,8 @@ class VerumViewModel(
                             },
                             text = preview.documentText,
                             sha512 = preview.sha512,
-                            gps = _state.value.gps
+                            gps = _state.value.gps,
+                            extractionCoverage = preview.extractionCoverage
                         )
                         addDocument(doc)
                     }
@@ -1514,7 +1527,7 @@ class VerumViewModel(
                 files = it.files + FileEntry(
                     name = doc.fileName,
                     type = doc.type,
-                    status = "queued",
+                    status = if (doc.extractionCoverage?.incomplete == true) "queued · incomplete page coverage" else "queued",
                     sha512 = doc.sha512,
                     gps = gpsLabel
                 ),
@@ -1566,12 +1579,19 @@ class VerumViewModel(
                 findingsJsonPath = findingsJsonPath,
                 g3Candidates = result.g3Registry?.allRecords() ?: emptyList(),
                 jurisdiction = result.findings.jurisdiction,
-                files = s.files.map { it.copy(status = "scanned") },
+                files = s.files.map { file ->
+                    file.copy(status = if (result.findings.extractionCoverage.any {
+                        it.fileName == file.name && it.coverage.incomplete
+                    }) "scanned · incomplete page coverage" else "scanned")
+                },
                 scanLog = buildString {
                     append("Scan complete · ${result.findings.documentsAnalyzed} documents · ")
                     append("${result.findings.contradictions.size} contradictions · ")
                     append("${result.findings.timeline.size} timeline events · ")
                     append("seal ${result.seal.shortcode}")
+                    if (result.findings.extractionCoverage.any { it.coverage.incomplete }) {
+                        append(" · WARNING: incomplete page coverage; see report")
+                    }
                     if (guardian?.hardStopRequired == true) append(" · GUARDIAN HARD STOP")
                 },
                 chat = s.chat + ChatMessage(
@@ -1579,7 +1599,8 @@ class VerumViewModel(
                     text = "Analyzed ${result.findings.documentsAnalyzed} documents. " +
                         "Detected ${result.findings.contradictions.size} contradiction(s) and " +
                         "${result.findings.legalMappings.size} legal mapping(s). " +
-                        "Evidence sealed: ${result.seal.sealFooter()}",
+                        "Evidence sealed: ${result.seal.sealFooter()} " +
+                        result.findings.extractionCoverage.joinToString(" ") { "${it.fileName}: ${it.coverage.summary()}" },
                     fromUser = false
                 )
             )
@@ -1892,7 +1913,8 @@ class VerumViewModel(
 
             // Original queries
             "contradict" in q -> if (findings.contradictions.isEmpty()) {
-                "No material contradictions detected. Confidence: HIGH."
+                "No material contradictions detected in extracted text only. This is not a clean-content assurance. " +
+                    findings.extractionCoverage.joinToString(" ") { "${it.fileName}: ${it.coverage.summary()}" }
             } else findings.contradictions.joinToString("\n") { c ->
                 "${c.contradictionId} [${c.severity}] ${c.claimA.text} ↔ ${c.claimB.text} " +
                     "(${c.claimA.source} p${c.claimA.page} / ${c.claimB.source} p${c.claimB.page}). " +

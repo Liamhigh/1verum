@@ -7,6 +7,17 @@ package com.verumomnis.forensic.engine
  * can supply a fake implementation, while the real Android app uses PDFBox.
  */
 interface PdfTextExtractor {
+    /** Legacy/text-only extractors cannot assert page coverage. */
+    fun extractWithCoverage(file: java.io.File): PdfExtractionResult =
+        PdfExtractionResult(extractText(file), com.verumomnis.forensic.model.PdfExtractionCoverage(
+            documentFailure = "Page-level extraction coverage unavailable"
+        ))
+
+    fun extractWithCoverage(bytes: ByteArray): PdfExtractionResult =
+        PdfExtractionResult(extractText(bytes), com.verumomnis.forensic.model.PdfExtractionCoverage(
+            documentFailure = "Page-level extraction coverage unavailable"
+        ))
+
     /** @return extracted text, or an empty string if no text could be extracted. */
     fun extractText(bytes: ByteArray): String
 
@@ -22,6 +33,11 @@ interface PdfTextExtractor {
      */
     fun extractText(file: java.io.File): String = extractText(file.readBytes())
 }
+
+data class PdfExtractionResult(
+    val text: String,
+    val coverage: com.verumomnis.forensic.model.PdfExtractionCoverage
+)
 
 /** Test/production fake that treats the bytes as UTF-8 text (useful for plain-text tests). */
 object PlainTextExtractor : PdfTextExtractor {

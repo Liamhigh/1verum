@@ -71,7 +71,11 @@ fun ContradictionDetailScreen(state: UiState) {
 
         if (report.contradictions.isEmpty()) {
             VoCard(title = "FINDINGS", icon = Icons.Filled.Difference) {
-                Text("No contradictions detected.", color = VoTextMuted, fontSize = 13.sp)
+                Text(
+                    "No contradictions detected in extracted text only. This is not a clean-content assurance. " +
+                        report.extractionCoverage.joinToString(" ") { "${it.fileName}: ${it.coverage.summary()}" },
+                    color = VoTextMuted, fontSize = 13.sp
+                )
             }
             return@Column
         }

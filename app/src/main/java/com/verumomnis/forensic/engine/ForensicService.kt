@@ -110,7 +110,22 @@ object ForensicService {
         vault: EvidenceVault? = null,
         caseName: String = ""
     ): ScanResult {
-        val findings = NineBrainEngine.analyze(documents, audio, media, now)
+        val findings = NineBrainEngine.analyze(documents, audio, media, now).copy(
+            extractionCoverage = documents.mapNotNull { doc ->
+                val coverage = doc.extractionCoverage ?: if (
+                    doc.type.equals("pdf", ignoreCase = true) ||
+                    doc.type.equals("application/pdf", ignoreCase = true) ||
+                    doc.fileName.endsWith(".pdf", ignoreCase = true)
+                ) {
+                    com.verumomnis.forensic.model.PdfExtractionCoverage(
+                        documentFailure = "Page-level extraction coverage unavailable"
+                    )
+                } else null
+                coverage?.let {
+                    com.verumomnis.forensic.model.DocumentExtractionCoverage(doc.evidenceId, doc.fileName, doc.sha512, it)
+                }
+            }
+        )
         val councilFindings = BrainCouncil.evaluate(findings)
         // Seal the deterministic fingerprint of the entire evidence set (docs + audio + media).
         val corpusFingerprint = (documents.map { it.sha512 } + audio.map { it.sha512 } + media.map { it.sha512 })

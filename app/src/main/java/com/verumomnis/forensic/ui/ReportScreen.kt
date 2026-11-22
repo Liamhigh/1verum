@@ -350,7 +350,8 @@ fun ReportScreen(
             icon = Icons.Filled.Person
         ) {
             if (report.contradictions.isEmpty()) {
-                Text("No contradictions detected.", color = VoTextMuted, fontSize = 13.sp)
+                Text("No contradictions detected in extracted text only. This is not a clean-content assurance.",
+                    color = VoTextMuted, fontSize = 13.sp)
             }
             if (report.contradictions.size > 3) {
                 TextButton(

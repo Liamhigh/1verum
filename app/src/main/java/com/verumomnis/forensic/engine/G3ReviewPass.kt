@@ -104,6 +104,8 @@ object G3ReviewPass {
     internal fun buildReviewPrompt(documents: List<EvidenceDocument>, findings: ForensicFindings): String = buildString {
         appendLine("You are the Gemma 3 vault reviewer in the Verum Omnis hybrid forensic pipeline.")
         appendLine("The deterministic engine has already run. Your ONLY job is to find contradictions it MISSED.")
+        appendLine("Only extracted text is available; never infer clean content from missing text or zero indicators.")
+        findings.extractionCoverage.forEach { appendLine("${it.fileName}: ${it.coverage.summary()}") }
         appendLine()
         appendLine("CONTRADICTIONS THE ENGINE ALREADY EMITTED (do NOT repeat these):")
         if (findings.contradictions.isEmpty()) appendLine("  (none)")

@@ -28,7 +28,8 @@ class MediaIngestor(
     private val context: Context,
     // Default extractor OCRs image-only pages on-device (ML Kit) and falls back
     // to the embedded text layer where present. Tests can inject a fake.
-    private val pdfExtractor: PdfTextExtractor = PdfOcrExtractor(context)
+    private val pdfExtractor: PdfTextExtractor = PdfOcrExtractor(context),
+    private val vault: EvidenceVault = EvidenceVault(context)
 ) {
 
     companion object {
@@ -49,8 +50,6 @@ class MediaIngestor(
          */
         private const val EICAR_PROBE_BYTES = 4096
     }
-
-    private val vault = EvidenceVault(context)
 
     fun ingest(uri: Uri, deviceGps: GpsRecord?, index: Int, now: Instant = Instant.now()): IngestResult {
         val resolver = context.contentResolver
@@ -162,19 +161,22 @@ class MediaIngestor(
             return IngestResult.Error.MalwareDetected()
         }
 
+        var coverage: com.verumomnis.forensic.model.PdfExtractionCoverage? = null
         val text = try {
             when {
                 mime.startsWith("text") -> plainFile.readText(Charsets.UTF_8)
                 mime.startsWith("application/pdf") -> {
-                    val extracted = pdfExtractor.extractText(plainFile).trim()
-                    if (extracted.isNotBlank()) extracted else "(PDF sealed and vaulted; no extractable text layer found.)"
+                    val extracted = pdfExtractor.extractWithCoverage(plainFile)
+                    coverage = extracted.coverage
+                    extracted.text.trim()
                 }
                 else -> "(Binary document sealed and vaulted; on-device text extraction pending for $mime.)"
             }
         } finally {
             plainFile.delete()
         }
-        return IngestResult.DocumentSuccess(fileName, mime, text, hash, vault.evidenceSize(fileName))
+        coverage?.let { vault.storePdfExtraction("", fileName, hash, it) }
+        return IngestResult.DocumentSuccess(fileName, mime, text, hash, vault.evidenceSize(fileName), coverage)
     }
 
     /** Compute SHA-512 of a picked file for seal verification. Streams; never resident. */

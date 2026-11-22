@@ -210,6 +210,19 @@ class EvidenceVault(
         return file.isFile && file.delete()
     }
 
+    /** Preserve coverage even if no readable text exists and the forensic scan cannot start. */
+    fun storePdfExtraction(
+        evidenceId: String,
+        fileName: String,
+        sha512: String,
+        coverage: com.verumomnis.forensic.model.PdfExtractionCoverage
+    ) {
+        val record = com.verumomnis.forensic.model.DocumentExtractionCoverage(evidenceId, fileName, sha512, coverage)
+        storeFinding("pdf_extraction_${sha512}.json", Json { encodeDefaults = true }.encodeToString(
+            com.verumomnis.forensic.model.DocumentExtractionCoverage.serializer(), record
+        ))
+    }
+
     fun storeFinding(name: String, json: String) {
         initialize()
         File(findings, name).writeText(json)

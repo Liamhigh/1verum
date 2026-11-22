@@ -46,7 +46,9 @@ object FindingsJsonEmitter {
         val new_contradictions: Int? = null,
         val re_anchored_known: Int? = null,
         val integrity_findings: List<String> = emptyList(),
-        val contradictions: List<FindingsJsonRecord>
+        val contradictions: List<FindingsJsonRecord>,
+        val extraction_coverage: List<com.verumomnis.forensic.model.DocumentExtractionCoverage> = emptyList(),
+        val coverage_warnings: List<String> = emptyList()
     )
 
     @Serializable
@@ -106,7 +108,9 @@ object FindingsJsonEmitter {
             engine_verified_count = records.size - candidateCount,
             g3_candidate_count = candidateCount,
             integrity_findings = emptyList(),
-            contradictions = records
+            contradictions = records,
+            extraction_coverage = findings.extractionCoverage,
+            coverage_warnings = findings.extractionCoverage.map { "${it.fileName}: ${it.coverage.summary()}" }
         )
         return Json.encodeToString(document)
     }

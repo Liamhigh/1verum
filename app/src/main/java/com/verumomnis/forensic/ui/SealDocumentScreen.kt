@@ -844,7 +844,7 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
                 label = "Download .OTS Proof",
                 primary = false,
                 modifier = Modifier.weight(1f),
-                onClick = { shareOtsProof(context, result) }
+                onClick = { shareOtsProof(context, result, documentName) }
             )
         }
         }
@@ -940,11 +940,15 @@ private fun DownloadButton(label: String, primary: Boolean, modifier: Modifier =
     }
 }
 
-private fun shareOtsProof(context: Context, result: SealResult) {
+private fun shareOtsProof(context: Context, result: SealResult, documentName: String) {
     result.otsProof?.let { proof ->
         val dir = File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
-        val file = File(dir, "sealed_${result.sealId}.ots")
-        file.writeBytes(proof)
+        val file = com.verumomnis.forensic.pdf.SealedOutputNames.createUniqueFile(
+            dir,
+            com.verumomnis.forensic.pdf.SealedOutputNames.timestampProof(
+                documentName, result.sealId, result.sealedAtMs
+            )
+        ).apply { writeBytes(proof) }
         com.verumomnis.forensic.pdf.SealedPdfExporter(context).share(file)
     }
 }

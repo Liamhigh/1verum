@@ -33,7 +33,7 @@ class ReportPdfStatusTest {
         val vm = VerumViewModel(
             application = app,
             identityService = IdentityService(app, InMemoryIdentityKeyStore()),
-            reportPdfWriter = { throw IllegalStateException("simulated PDF write failure") }
+            reportPdfWriter = { _, _ -> throw IllegalStateException("simulated PDF write failure") }
         )
         val now = Instant.parse("2026-11-21T16:00:00Z")
         vm.addDocument(

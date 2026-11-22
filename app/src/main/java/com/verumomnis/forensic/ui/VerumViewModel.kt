@@ -57,6 +57,7 @@ import com.verumomnis.forensic.model.Contradiction
 import com.verumomnis.forensic.trust.TrustEngine
 import com.verumomnis.forensic.trust.TrustScore
 import com.verumomnis.forensic.pdf.SealedPdfExporter
+import com.verumomnis.forensic.pdf.SealedOutputNames
 import com.verumomnis.forensic.security.SilenceLedger
 import com.verumomnis.forensic.seal.DocumentSealer
 import com.verumomnis.forensic.seal.OpenTimestampsClient
@@ -207,6 +208,8 @@ data class UiState(
     val reportPdfFile: File? = null,
     val reportPdfGenerating: Boolean = false,
     val reportPdfError: String = "",
+    /** Original upload name used for the matching report PDF export. */
+    val reportPdfSourceName: String = "",
     val emails: List<SealedEmail> = emptyList(),
     val emailStatus: String = "Draft a sealed forensic email. The sealed PDF is generated into the vault and handed to your mail app — you choose the recipient and press send yourself.",
     val otsResult: OtsAnchorResult? = null,
@@ -282,8 +285,8 @@ class VerumViewModel(
     private val blockchainService: BlockchainService = OpenTimestampsService,
     private val vault: EvidenceVault = EvidenceVault(application),
     seedSampleCase: Boolean = false,
-    private val reportPdfWriter: (ForensicReport) -> File = { report ->
-        SealedPdfExporter(application).exportReport(report)
+    private val reportPdfWriter: (ForensicReport, String?) -> File = { report, sourceName ->
+        SealedPdfExporter(application).exportReport(report, sourceName)
     },
     private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application)
 ) : AndroidViewModel(application) {
@@ -986,7 +989,10 @@ class VerumViewModel(
                         anchorToBlockchain = false
                     )
                 )
-                val outFile = File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.pdf")
+                val outFile = SealedOutputNames.createUniqueFile(
+                    websiteSealDir(),
+                    SealedOutputNames.sealedDocument(originalName, result.sealId, now.toEpochMilli())
+                )
                 outFile.writeBytes(result.sealedPdf)
                 _state.update {
                     it.copy(
@@ -1021,6 +1027,7 @@ class VerumViewModel(
                 sealForensicRunning = false,
                 sealForensicError = "",
                 sealReportReference = "",
+                reportPdfSourceName = "",
                 sealPipeline = UiState.defaultSealPipeline(),
                 websiteSealStatus = "Selected $name (${formatFileSize(size)})"
             )
@@ -1068,6 +1075,7 @@ class VerumViewModel(
                 sealForensicRunning = false,
                 sealForensicError = "",
                 sealReportReference = "",
+                reportPdfSourceName = "",
                 passwordProtect = false,
                 sealPassword = "",
                 sealPasswordConfirm = "",
@@ -1118,6 +1126,7 @@ class VerumViewModel(
                 sealBusy = true, sealError = "", sealResult = null,
                 sealForensicRequested = forensic, sealForensicRunning = forensic,
                 sealForensicError = "", sealReportReference = "",
+                reportPdfSourceName = name.takeIf { forensic }.orEmpty(),
                 sealPipeline = UiState.defaultSealPipeline() + if (forensic) listOf(
                     SealPipelineStep("Forensic report", "Forensic report", "Nine-Brain analysis and sealed PDF")
                 ) else emptyList()
@@ -1185,14 +1194,20 @@ class VerumViewModel(
                 updatePipelineStep("SHA-512", SealPipelineStepStatus.PROCESSING)
                 updatePipelineStep("SHA-512", SealPipelineStepStatus.COMPLETE, result.sha512.take(16) + "…")
 
-                val outFile = File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.pdf")
+                val outFile = SealedOutputNames.createUniqueFile(
+                    websiteSealDir(),
+                    SealedOutputNames.sealedDocument(name, result.sealId, now.toEpochMilli())
+                )
                 outFile.writeBytes(result.sealedPdf)
                 // The pipeline's own OTS result carries the pending proof
                 // (DocumentSealer ran with anchorToBlockchain = false, so
                 // result.ots is null by design — do not read it here).
                 val otsProofBytes = (ots as? OpenTimestampsClient.OtsResult.Success)?.proof
                 otsProofBytes?.let { proof ->
-                    File(websiteSealDir(), "sealed_${result.sealId}_${now.toEpochMilli()}.ots").apply { writeBytes(proof) }
+                    SealedOutputNames.createUniqueFile(
+                        websiteSealDir(),
+                        SealedOutputNames.timestampProof(name, result.sealId, now.toEpochMilli())
+                    ).apply { writeBytes(proof) }
                 }
 
                 _state.update {
@@ -1228,6 +1243,7 @@ class VerumViewModel(
                     // Each selected document starts a fresh active case, rather
                     // than accidentally including previous uploads. Vault files stay.
                     clearCase()
+                    _state.update { it.copy(reportPdfSourceName = name) }
                     addDocument(EvidenceDocument(
                         evidenceId = "DOC001", fileName = name, type = "pdf",
                         text = text, sha512 = sha512ForAnchor, gps = gps
@@ -1437,13 +1453,14 @@ class VerumViewModel(
             return
         }
         if (_state.value.reportPdfGenerating) return
+        val sourceFileName = _state.value.reportPdfSourceName
         _state.update { it.copy(reportPdfGenerating = true, reportPdfError = "", reportPdfFile = null) }
-        viewModelScope.launch(Dispatchers.IO) { createReportPdf(report) }
+        viewModelScope.launch(Dispatchers.IO) { createReportPdf(report, sourceFileName) }
     }
 
-    private fun createReportPdf(report: ForensicReport) {
+    private fun createReportPdf(report: ForensicReport, sourceFileName: String? = null) {
         try {
-            val file = reportPdfWriter(report)
+            val file = reportPdfWriter(report, sourceFileName)
             check(file.isFile && file.length() > 0) { "The report PDF was not saved." }
             _state.update {
                 it.copy(reportPdfFile = file, reportPdfGenerating = false, reportPdfError = "")
@@ -1478,6 +1495,7 @@ class VerumViewModel(
                 reportPdfFile = null,
                 reportPdfGenerating = false,
                 reportPdfError = "",
+                reportPdfSourceName = "",
                 pendingFiles = emptyList(),
                 sealStage = SealStage.IDLE,
                 scanLog = "Awaiting evidence. Select a case file to begin a forensic scan.",
@@ -1644,8 +1662,9 @@ class VerumViewModel(
             )
         }
         _state.update { it.copy(reportPdfGenerating = true, reportPdfError = "", reportPdfFile = null) }
-        if (awaitReportPdf) createReportPdf(signedReport)
-        else viewModelScope.launch(Dispatchers.IO) { createReportPdf(signedReport) }
+        val sourceFileName = _state.value.reportPdfSourceName
+        if (awaitReportPdf) createReportPdf(signedReport, sourceFileName)
+        else viewModelScope.launch(Dispatchers.IO) { createReportPdf(signedReport, sourceFileName) }
         computeTrustScore()
         anchorSealToBitcoin(auto = true)
     }

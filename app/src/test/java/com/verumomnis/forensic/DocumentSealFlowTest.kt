@@ -6,6 +6,7 @@ import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.identity.InMemoryIdentityKeyStore
 import com.verumomnis.forensic.model.*
+import com.verumomnis.forensic.pdf.SealedOutputNames
 import com.verumomnis.forensic.seal.DocumentSealer
 import com.verumomnis.forensic.seal.OpenTimestampsClient
 import com.verumomnis.forensic.seal.SealMetadataCodec
@@ -46,9 +47,11 @@ class DocumentSealFlowTest {
 
     private fun vm(
         text: String = "A neutral copied record was identified and verified.",
-        writer: (ForensicReport) -> File = { File.createTempFile("report-", ".pdf", app.cacheDir).apply {
-            writeText("%PDF-1.4\nsynthetic report writer boundary")
-        } },
+        writer: (ForensicReport, String?) -> File = { report, sourceName ->
+            SealedOutputNames.createUniqueFile(
+                app.cacheDir, SealedOutputNames.forensicReport(sourceName, report.reference)
+            ).apply { writeText("%PDF-1.4\nsynthetic report writer boundary") }
+        },
         inspectOptions: (DocumentSealer.SealOptions) -> Unit = {}
     ) = VerumViewModel(
         application = app, identityService = IdentityService(app, InMemoryIdentityKeyStore()),
@@ -84,6 +87,10 @@ class DocumentSealFlowTest {
         val state = vm.state.value
         assertNotNull(state.sealResult)
         assertTrue(state.websiteSealedFile!!.isFile)
+        assertEquals(
+            "original_sealed_fixture-seal_${now.toEpochMilli()}.pdf",
+            state.websiteSealedFile!!.name
+        )
         assertEquals(0, extractionCalls.get())
         assertFalse(state.sealForensicRequested)
         assertNull(state.report)
@@ -93,10 +100,12 @@ class DocumentSealFlowTest {
     @Test fun forensicChoiceWaitsForPdfAndIgnoresDoubleTapOrModeChanges() {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
-        val vm = vm(writer = {
+        val vm = vm(writer = { report, sourceName ->
             entered.countDown()
             check(release.await(15, TimeUnit.SECONDS))
-            File.createTempFile("report-", ".pdf", app.cacheDir).apply { writeText("%PDF-1.4\nfixture") }
+            SealedOutputNames.createUniqueFile(
+                app.cacheDir, SealedOutputNames.forensicReport(sourceName, report.reference)
+            ).apply { writeText("%PDF-1.4\nfixture") }
         })
         vm.selectPdfForSealing(input, "original.pdf", input.size.toLong())
         vm.setSealMode("forensic")
@@ -116,6 +125,7 @@ class DocumentSealFlowTest {
         assertEquals(1, extractionCalls.get())
         assertNotNull(state.report)
         assertTrue(state.reportPdfFile!!.isFile)
+        assertTrue(state.reportPdfFile!!.name.startsWith("original_forensic_report_"))
         assertEquals(state.report!!.reference, state.sealReportReference)
         assertTrue(state.sealForensicError.isBlank())
         assertNull(state.guardianBlock)
@@ -137,9 +147,11 @@ class DocumentSealFlowTest {
 
     @Test fun reportWriteFailureKeepsDocumentAndSupportsPdfRetry() {
         var fail = true
-        val vm = vm(writer = {
+        val vm = vm(writer = { report, sourceName ->
             if (fail) error("Simulated writer failure")
-            File.createTempFile("retry-", ".pdf", app.cacheDir).apply { writeText("%PDF-1.4\nretry") }
+            SealedOutputNames.createUniqueFile(
+                app.cacheDir, SealedOutputNames.forensicReport(sourceName, report.reference)
+            ).apply { writeText("%PDF-1.4\nretry") }
         })
         vm.selectPdfForSealing(input, "retry.pdf", input.size.toLong())
         vm.setSealMode("forensic")
@@ -163,6 +175,8 @@ class DocumentSealFlowTest {
         vm.sealDocument(now)
         await { !vm.state.value.sealBusy }
         val firstPdf = vm.state.value.reportPdfFile!!
+        assertTrue(firstPdf.name.startsWith("first_forensic_report_"))
+        assertTrue(vm.state.value.websiteSealedFile!!.name.startsWith("first_sealed_fixture-seal_"))
         val firstBytes = firstPdf.readBytes()
         vm.clearSealDocument()
         vm.selectPdfForSealing(input, "second.pdf", input.size.toLong())
@@ -171,6 +185,8 @@ class DocumentSealFlowTest {
         vm.setSealMode("forensic")
         vm.sealDocument(now.plusSeconds(2))
         await { !vm.state.value.sealBusy }
+        assertTrue(vm.state.value.reportPdfFile!!.name.startsWith("second_forensic_report_"))
+        assertTrue(vm.state.value.websiteSealedFile!!.name.startsWith("second_sealed_fixture-seal_"))
         assertEquals(listOf("second.pdf"), vm.state.value.files.map { it.name })
         assertArrayEquals(firstBytes, firstPdf.readBytes())
         assertEquals(2, extractionCalls.get())

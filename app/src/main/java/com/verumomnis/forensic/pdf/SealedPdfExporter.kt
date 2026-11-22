@@ -36,7 +36,7 @@ class SealedPdfExporter(
         BitmapFactory.decodeResource(context.resources, R.drawable.vo_badge)
     }
 
-    fun exportReport(report: ForensicReport): File {
+    fun exportReport(report: ForensicReport, sourceFileName: String? = null): File {
         val reportWatermark = requireNotNull(watermark) {
             "The report watermark asset is missing or could not be decoded."
         }
@@ -62,17 +62,15 @@ class SealedPdfExporter(
             logo,
             exhibitImages
         )
-        val safeReference = report.reference.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        var suffix = 1
+        val fileName = SealedOutputNames.forensicReport(sourceFileName, report.reference)
+        var collisionNumber = 1
         while (true) {
-            val suffixPart = if (suffix == 1) "" else "_$suffix"
-            val fileName = "${safeReference}_report$suffixPart.pdf"
-            val file = File(vault.reportsSealed, fileName)
+            val candidateName = SealedOutputNames.numbered(fileName, collisionNumber)
             try {
-                vault.storeSealedReport(fileName, bytes)
-                return file
+                vault.storeSealedReport(candidateName, bytes)
+                return File(vault.reportsSealed, candidateName)
             } catch (_: java.nio.file.FileAlreadyExistsException) {
-                suffix++
+                collisionNumber++
             }
         }
     }
@@ -90,6 +88,7 @@ class SealedPdfExporter(
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, file.nameWithoutExtension)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "Share sealed PDF").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

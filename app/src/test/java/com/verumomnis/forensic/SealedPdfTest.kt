@@ -226,10 +226,12 @@ class SealedPdfTest {
             renderedBytes
         }
 
-        val first = exporter.exportReport(report)
+        val first = exporter.exportReport(report, sourceFileName = "Matter Source.pdf")
         val firstSnapshot = first.readBytes()
-        val second = exporter.exportReport(report)
+        val second = exporter.exportReport(report, sourceFileName = "Matter Source.pdf")
 
+        assertEquals("Matter Source_forensic_report_${report.reference}.pdf", first.name)
+        assertEquals("Matter Source_forensic_report_${report.reference}_2.pdf", second.name)
         assertTrue(watermarkSeen)
         assertTrue(contentSeen!!.bodyLines.joinToString("\n").contains(report.body.take(80)))
         assertTrue(contentSeen!!.sealFooter.contains(report.seal.shortcode))

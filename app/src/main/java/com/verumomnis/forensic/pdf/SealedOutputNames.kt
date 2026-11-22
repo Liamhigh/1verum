@@ -5,20 +5,20 @@ import java.text.Normalizer
 
 /** Readable, filesystem-safe filenames for sealed originals and their reports. */
 object SealedOutputNames {
-    private const val MAX_SOURCE_STEM = 96
+    private const val MAX_SOURCE_BYTES = 120
 
     fun sourceStem(sourceName: String?): String {
         val leaf = sourceName.orEmpty()
             .substringAfterLast('/')
             .substringAfterLast('\\')
         val normalized = Normalizer.normalize(leaf, Normalizer.Form.NFC)
-        val withoutPdfExtensions = normalized.replace(Regex("(?i)(?:\\.pdf)+$"), "")
+        val withoutPdfExtensions = normalized.trim().replace(Regex("(?i)(?:\\.pdf)+$"), "")
         val safe = withoutPdfExtensions
-            .replace(Regex("[\\p{Cc}/\\\\:*?\"<>|]+"), "_")
+            .replace(Regex("[\\p{Cc}\\p{Cf}/\\\\:*?\"<>|]+"), "_")
             .replace(Regex("\\s+"), " ")
             .replace(Regex("_+"), "_")
             .trim(' ', '.', '_')
-            .takeCodePoints(MAX_SOURCE_STEM)
+            .takeUtf8Bytes(MAX_SOURCE_BYTES)
             .trimEnd(' ', '.', '_')
         val stem = safe.ifBlank { "document" }
         return if (WINDOWS_RESERVED_NAME.matches(stem)) "_$stem" else stem
@@ -39,17 +39,16 @@ object SealedOutputNames {
 
     /** Create without overwriting an earlier export; add a counter only on collision. */
     fun createUniqueFile(directory: File, requestedName: String): File {
-        require(requestedName.isNotBlank() && File(requestedName).name == requestedName) {
+        require(
+            requestedName.isNotBlank() && requestedName !in setOf(".", "..") &&
+                File(requestedName).name == requestedName && !requestedName.contains('\\')
+        ) {
             "Export filename must be a single file name."
         }
         directory.mkdirs()
-        val base = requestedName.substringBeforeLast('.', requestedName)
-        val extension = requestedName.substringAfterLast('.', "").takeIf { it.isNotEmpty() }
-            ?.let { ".$it" }.orEmpty()
         var suffix = 1
         while (true) {
-            val numbered = if (suffix == 1) "" else "_$suffix"
-            val candidate = File(directory, "$base$numbered$extension")
+            val candidate = File(directory, numbered(requestedName, suffix))
             if (candidate.createNewFile()) return candidate
             suffix++
         }
@@ -68,11 +67,24 @@ object SealedOutputNames {
         .replace(Regex("[^\\p{L}\\p{N}._-]+"), "_")
         .trim('.', '_', '-')
         .ifBlank { "seal" }
-        .take(80)
+        .takeUtf8Bytes(60)
 
-    private fun String.takeCodePoints(maximum: Int): String {
-        val points = codePoints().limit(maximum.toLong()).toArray()
-        return String(points, 0, points.size)
+    private fun String.takeUtf8Bytes(maximum: Int): String {
+        var end = 0
+        var bytes = 0
+        while (end < length) {
+            val point = codePointAt(end)
+            val width = when {
+                point <= 0x7f -> 1
+                point <= 0x7ff -> 2
+                point <= 0xffff -> 3
+                else -> 4
+            }
+            if (bytes + width > maximum) break
+            bytes += width
+            end += Character.charCount(point)
+        }
+        return substring(0, end)
     }
 
     private val WINDOWS_RESERVED_NAME =

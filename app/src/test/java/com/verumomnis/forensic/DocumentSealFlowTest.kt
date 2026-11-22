@@ -1,6 +1,9 @@
 package com.verumomnis.forensic
 
 import android.app.Application
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import com.verumomnis.forensic.blockchain.BlockchainService
 import com.verumomnis.forensic.crypto.Sha512
 import com.verumomnis.forensic.identity.IdentityService
@@ -17,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Instant
@@ -91,6 +95,18 @@ class DocumentSealFlowTest {
             "original_sealed_fixture-seal_${now.toEpochMilli()}.pdf",
             state.websiteSealedFile!!.name
         )
+        val sharedUri = FileProvider.getUriForFile(
+            app, "${app.packageName}.fileprovider", state.websiteSealedFile!!
+        )
+        // Robolectric starts with an empty MIME registry; Android includes PDF.
+        shadowOf(MimeTypeMap.getSingleton()).addExtensionMimeTypeMapping("pdf", "application/pdf")
+        assertEquals("application/pdf", app.contentResolver.getType(sharedUri))
+        app.contentResolver.query(
+            sharedUri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+        )!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(state.websiteSealedFile!!.name, cursor.getString(0))
+        }
         assertEquals(0, extractionCalls.get())
         assertFalse(state.sealForensicRequested)
         assertNull(state.report)
@@ -162,9 +178,12 @@ class DocumentSealFlowTest {
         assertTrue(vm.state.value.reportPdfError.isNotBlank())
         assertNull(vm.state.value.reportPdfFile)
         fail = false
+        // Merely choosing another input must not rename an already-created report.
+        vm.selectPdfForSealing(input, "newly-selected.pdf", input.size.toLong())
         vm.retryReportPdf()
         await { !vm.state.value.reportPdfGenerating }
         assertTrue(vm.state.value.reportPdfFile!!.isFile)
+        assertTrue(vm.state.value.reportPdfFile!!.name.startsWith("retry_forensic_report_"))
         assertTrue(vm.state.value.reportPdfError.isBlank())
     }
 

@@ -15,6 +15,7 @@ import com.verumomnis.forensic.pdf.SealedPdfGenerator
 import com.verumomnis.forensic.pdf.SealedPdfExporter
 import java.nio.file.Files
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue

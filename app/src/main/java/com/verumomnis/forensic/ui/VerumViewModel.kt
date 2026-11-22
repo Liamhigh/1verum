@@ -1027,7 +1027,6 @@ class VerumViewModel(
                 sealForensicRunning = false,
                 sealForensicError = "",
                 sealReportReference = "",
-                reportPdfSourceName = "",
                 sealPipeline = UiState.defaultSealPipeline(),
                 websiteSealStatus = "Selected $name (${formatFileSize(size)})"
             )
@@ -1075,7 +1074,6 @@ class VerumViewModel(
                 sealForensicRunning = false,
                 sealForensicError = "",
                 sealReportReference = "",
-                reportPdfSourceName = "",
                 passwordProtect = false,
                 sealPassword = "",
                 sealPasswordConfirm = "",
@@ -1126,7 +1124,6 @@ class VerumViewModel(
                 sealBusy = true, sealError = "", sealResult = null,
                 sealForensicRequested = forensic, sealForensicRunning = forensic,
                 sealForensicError = "", sealReportReference = "",
-                reportPdfSourceName = name.takeIf { forensic }.orEmpty(),
                 sealPipeline = UiState.defaultSealPipeline() + if (forensic) listOf(
                     SealPipelineStep("Forensic report", "Forensic report", "Nine-Brain analysis and sealed PDF")
                 ) else emptyList()

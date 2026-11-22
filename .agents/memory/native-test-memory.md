@@ -26,3 +26,9 @@ Gradle heap was sufficient. Keep host-only test limits separate from app
 behavior, release configuration, and the native inference library. Verify
 watermark drawing and vault persistence on the JVM, then test final PDF bytes
 on-device.
+
+Robolectric's MIME registry can be empty even for standard Android PDF types.
+**Why:** FileProvider returned the generic binary type in JVM tests despite a
+valid `.pdf` filename; this did not establish a device-side MIME defect.
+**How to apply:** Model the platform MIME registry explicitly in provider tests,
+and distinguish that fixture setup from production MIME behavior.

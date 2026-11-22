@@ -25,6 +25,18 @@ class SealedOutputNamesTest {
     }
 
     @Test
+    fun handlesUnicodeBlankAndReservedNamesWithinFilesystemLimits() {
+        assertEquals("document", SealedOutputNames.sourceStem("..."))
+        assertEquals("_CON", SealedOutputNames.sourceStem("CON.pdf"))
+        assertEquals("Café 証拠", SealedOutputNames.sourceStem("Cafe\u0301 証拠.PDF "))
+        assertEquals("Café_sealed_id_42.ots", SealedOutputNames.timestampProof("Café.pdf", "id", 42))
+        val filename = SealedOutputNames.forensicReport("証拠🧾".repeat(100) + ".pdf", "参照".repeat(100))
+        assertTrue(filename.toByteArray(Charsets.UTF_8).size < 255)
+        assertFalse(SealedOutputNames.sourceStem("🧾".repeat(100)).last().isHighSurrogate())
+        assertEquals("reference_forensic_report.pdf", SealedOutputNames.forensicReport(null, "reference"))
+    }
+
+    @Test
     fun reportAndSealNamesIncludeTheUploadAndCollisionSuffixDoesNotOverwrite() {
         val report = SealedOutputNames.forensicReport("Matter A.pdf", "VO-VAULT-123")
         assertEquals("Matter A_forensic_report_VO-VAULT-123.pdf", report)

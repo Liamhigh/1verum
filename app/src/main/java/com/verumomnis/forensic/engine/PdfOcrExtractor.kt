@@ -151,9 +151,11 @@ class PdfOcrExtractor(
         file: File,
         previous: com.verumomnis.forensic.model.PdfExtractionCoverage,
         attempt: com.verumomnis.forensic.model.PdfRetryAttempt,
-        isCancellationRequested: () -> Boolean = { false }
+        isCancellationRequested: () -> Boolean = { false },
+        onProgress: (PdfRetryProgress) -> Unit = {}
     ): PdfExtractionResult = retryPdfPages(
-        previous, attempt, maxOcrPages, isCancellationRequested = isCancellationRequested
+        previous, attempt, maxOcrPages, isCancellationRequested = isCancellationRequested,
+        onProgress = onProgress
     ) {
         ocrSource?.invoke(file) ?: openDeviceOcr(file)
     }

@@ -193,6 +193,8 @@ data class UiState(
     val pdfRetryBusy: Boolean = false,
     val pdfRetryCanCancel: Boolean = false,
     val pdfRetryCancelRequested: Boolean = false,
+    val pdfRetryProgress: com.verumomnis.forensic.engine.PdfRetryProgress? = null,
+    val pdfRetrySourceName: String = "",
     val pdfRetryMessage: String = "",
     val pdfRetryResult: com.verumomnis.forensic.engine.PdfRetryResult? = null,
     /** Recovered retry states from durable page-coverage and report snapshots. */
@@ -310,10 +312,10 @@ class VerumViewModel(
         SealedPdfExporter(application).exportReport(report, sourceName)
     },
     private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application),
-    private val pdfPageRetry: (File, com.verumomnis.forensic.model.PdfExtractionCoverage, com.verumomnis.forensic.model.PdfRetryAttempt, () -> Boolean) -> com.verumomnis.forensic.engine.PdfExtractionResult =
-        { file, previous, attempt, isCancellationRequested ->
+    private val pdfPageRetry: com.verumomnis.forensic.engine.PdfRetryExtraction =
+        { file, previous, attempt, isCancellationRequested, onProgress ->
             com.verumomnis.forensic.engine.PdfOcrExtractor(application)
-                .retryPages(file, previous, attempt, isCancellationRequested)
+                .retryPages(file, previous, attempt, isCancellationRequested, onProgress)
         }
 ) : AndroidViewModel(application) {
 
@@ -1040,6 +1042,8 @@ class VerumViewModel(
                 pdfRetryBusy = true,
                 pdfRetryCanCancel = true,
                 pdfRetryCancelRequested = false,
+                pdfRetryProgress = com.verumomnis.forensic.engine.PdfRetryProgress(0, pages.size),
+                pdfRetrySourceName = source.fileName,
                 pdfRetryMessage = "Reading selected original pages on this device. Cancel stops after the current page and saves only completed pages.",
                 pdfRetryResult = null
             )
@@ -1052,6 +1056,9 @@ class VerumViewModel(
                 val result = pdfRetryService().retry(
                     source, pages, priorReference,
                     isCancellationRequested = cancellation::get,
+                    onProgress = { progress ->
+                        _state.update { it.copy(pdfRetryProgress = progress) }
+                    },
                     onExtractionFinished = {
                         _state.update { it.copy(pdfRetryCanCancel = false, pdfRetryCancelRequested = false) }
                     }
@@ -1070,7 +1077,10 @@ class VerumViewModel(
                     "Page retry did not complete. ${e.message.orEmpty()} Earlier reports and original evidence were not changed.") }
             } finally {
                 activePdfRetryCancellation = null
-                _state.update { it.copy(pdfRetryCanCancel = false, pdfRetryCancelRequested = false) }
+                _state.update {
+                    it.copy(pdfRetryCanCancel = false, pdfRetryCancelRequested = false,
+                        pdfRetryProgress = null, pdfRetrySourceName = "")
+                }
                 refreshPdfRetrySnapshot(clearBusy = true)
                 refreshVaultStats()
             }

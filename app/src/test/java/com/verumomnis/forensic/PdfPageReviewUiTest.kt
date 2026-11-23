@@ -125,7 +125,7 @@ class PdfPageReviewUiTest {
                 com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
             ),
             vault = vault,
-            pdfPageRetry = { _, _, _, _ ->
+            pdfPageRetry = { _, _, _, _, _ ->
                 ocrCalls += 1
                 error("Previewing saved text must not rerun OCR")
             }
@@ -171,11 +171,11 @@ class PdfPageReviewUiTest {
                 app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
             ),
             vault = vault,
-            pdfPageRetry = { _, previous, attempt, isCancelled ->
+            pdfPageRetry = { _, previous, attempt, isCancelled, onProgress ->
                 enteredRetry.countDown()
                 check(finishRetrySetup.await(10, java.util.concurrent.TimeUnit.SECONDS))
                 com.verumomnis.forensic.engine.retryPdfPages(
-                    previous, attempt, 200, isCancellationRequested = isCancelled
+                    previous, attempt, 200, isCancellationRequested = isCancelled, onProgress = onProgress
                 ) { error("A cancelled retry must not open OCR.") }
             }
         )

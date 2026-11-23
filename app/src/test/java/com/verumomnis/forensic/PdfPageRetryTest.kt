@@ -143,4 +143,70 @@ class PdfPageRetryTest {
         assertFalse(result.coverage.summary().contains("Unprocessed selected pages remain"))
         assertTrue(ocr.closed)
     }
+
+    @Test fun progressKeepsOriginalNumbersAndCountsAPageOnlyAfterRecognitionFinishes() {
+        val updates = mutableListOf<PdfRetryProgress>()
+        val ocr = Ocr { index ->
+            val expectedCompleted = if (index == 1) 0 else 1
+            assertEquals(PdfRetryProgress(expectedCompleted, 2, index + 1), updates.last())
+            "Recovered original page ${index + 1}"
+        }
+        val result = retryPdfPages(
+            original, attempt(3, 2), 200, onProgress = updates::add
+        ) { ocr }
+        assertEquals(listOf(
+            PdfRetryProgress(0, 2),
+            PdfRetryProgress(0, 2, 2),
+            PdfRetryProgress(1, 2),
+            PdfRetryProgress(1, 2, 3),
+            PdfRetryProgress(2, 2)
+        ), updates)
+        assertEquals(listOf(2, 3), result.coverage.retryAttempt!!.processedPages)
+        assertEquals(UNREAD, original.pages[1].status)
+        assertNull(original.retryAttempt)
+    }
+
+    @Test fun failedAndBlankRecognitionFinishAttemptsButDoNotClaimReadablePages() {
+        val updates = mutableListOf<PdfRetryProgress>()
+        val ocr = Ocr { index ->
+            assertEquals(if (index == 1) 0 else 1, updates.last().completedPages)
+            if (index == 1) "" else throw java.io.IOException("Synthetic recognition failure")
+        }
+        val result = retryPdfPages(original, attempt(2, 3), 200, onProgress = updates::add) { ocr }
+        assertEquals(PdfRetryProgress(2, 2), updates.last())
+        assertEquals(UNREAD, result.coverage.pages[1].status)
+        assertEquals(FAILED, result.coverage.pages[2].status)
+        assertTrue(result.coverage.incomplete)
+    }
+
+    @Test fun cancellingFromCompletedPageProgressNeverStartsOrCountsTheNextPage() {
+        val cancellation = java.util.concurrent.atomic.AtomicBoolean(false)
+        val updates = mutableListOf<PdfRetryProgress>()
+        val ocr = Ocr { "Finished page ${it + 1}" }
+        val result = retryPdfPages(
+            original, attempt(2, 3, 4), 200, isCancellationRequested = cancellation::get,
+            onProgress = {
+                updates += it
+                if (it.completedPages == 1 && it.currentOriginalPage == null) cancellation.set(true)
+            }
+        ) { ocr }
+        assertEquals(listOf(PdfRetryProgress(0, 3), PdfRetryProgress(0, 3, 2), PdfRetryProgress(1, 3)), updates)
+        assertEquals(listOf(1), ocr.calls)
+        assertEquals(listOf(2), result.coverage.retryAttempt!!.processedPages)
+        assertTrue(result.coverage.retryAttempt!!.cancelled)
+        assertEquals(original.pages[2], result.coverage.pages[2])
+        assertTrue(ocr.closed)
+    }
+
+    @Test fun rendererFailureOrEarlyCancellationNeverPretendsAPageWasCompleted() {
+        for (cancelled in listOf(false, true)) {
+            val updates = mutableListOf<PdfRetryProgress>()
+            val result = retryPdfPages(
+                original, attempt(2, 3), 200,
+                isCancellationRequested = { cancelled }, onProgress = updates::add
+            ) { throw java.io.IOException("Synthetic renderer failure") }
+            assertEquals(listOf(PdfRetryProgress(0, 2)), updates)
+            assertTrue(result.coverage.retryAttempt!!.processedPages.isEmpty())
+        }
+    }
 }

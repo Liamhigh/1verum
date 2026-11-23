@@ -51,7 +51,7 @@ enum class PdfRetryRecoveryStage { EXTRACTION_ONLY, FINDINGS_READY, PDF_READY }
 class PdfRetryService(
     private val vault: EvidenceVault,
     private val cacheDir: File,
-    private val extract: (File, PdfExtractionCoverage, PdfRetryAttempt, () -> Boolean) -> PdfExtractionResult,
+    private val extract: PdfRetryExtraction,
     private val writePdf: (ForensicReport, String?) -> File,
     private val signReport: (ForensicReport) -> ForensicReport = { it }
 ) {
@@ -61,6 +61,7 @@ class PdfRetryService(
         priorReportReference: String?,
         now: Instant = Instant.now(),
         isCancellationRequested: () -> Boolean = { false },
+        onProgress: (PdfRetryProgress) -> Unit = {},
         onExtractionFinished: () -> Unit = {}
     ): PdfRetryResult {
         val attempt = PdfRetryAttempt(
@@ -72,7 +73,7 @@ class PdfRetryService(
         val temp = File.createTempFile("pdf-retry-", ".pdf", cacheDir)
         val extracted = try {
             vault.materializePdfSource(source, temp)
-            extract(temp, source.coverage, attempt, isCancellationRequested)
+            extract(temp, source.coverage, attempt, isCancellationRequested, onProgress)
         } finally { temp.delete() }
         check(extracted.coverage.retryAttempt?.copy(
             processedPages = emptyList(), cancelled = false

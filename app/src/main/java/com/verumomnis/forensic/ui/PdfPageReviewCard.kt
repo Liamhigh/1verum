@@ -45,6 +45,32 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     VoCard(title = "PDF PAGE REVIEW & RETRY", icon = Icons.Filled.Description) {
         Text("Review original page numbers and extraction gaps. A retry creates a new, labelled PDF-only analysis; it does not revise earlier sealed reports or re-analyse other case evidence.",
             color = VoTextMuted, fontSize = 12.sp)
+        if (state.pdfRetryBusy) {
+            state.pdfRetryProgress?.let { progress ->
+                Spacer(Modifier.height(8.dp))
+                Text("OCR retry · ${state.pdfRetrySourceName}", color = VoTextPrimary, fontSize = 13.sp)
+                Text(
+                    "Completed page attempts: ${progress.completedPages} of ${progress.selectedPageTotal}",
+                    color = VoAccentBlue, fontSize = 12.sp
+                )
+                Text(
+                    progress.currentOriginalPage?.let { "Reading original page $it" }
+                        ?: if (state.pdfRetryCanCancel) "Preparing selected pages…"
+                        else "Saving retry results and preparing the report…",
+                    color = VoTextPrimary, fontSize = 12.sp
+                )
+                LinearProgressIndicator(
+                    progress = if (progress.selectedPageTotal > 0) {
+                        progress.completedPages.toFloat() / progress.selectedPageTotal
+                    } else 0f,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    color = VoAccentBlue,
+                    trackColor = VoNavy2
+                )
+                Text("Finished attempts may still contain unread or failed pages.",
+                    color = VoTextMuted, fontSize = 11.sp)
+            }
+        }
         Spacer(Modifier.height(8.dp))
         VerumSecondaryButton(
             label = if (searchOpen) "Hide saved text search" else "Search saved page text",

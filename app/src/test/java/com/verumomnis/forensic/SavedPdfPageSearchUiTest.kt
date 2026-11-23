@@ -78,7 +78,7 @@ class SavedPdfPageSearchUiTest {
         var ocrCalls = 0
         val vm = VerumViewModel(
             app, IdentityService(app, InMemoryIdentityKeyStore()), vault = vault,
-            pdfPageRetry = { _, _, _, _ -> ocrCalls++; error("Search must never run OCR") }
+            pdfPageRetry = { _, _, _, _, _ -> ocrCalls++; error("Search must never run OCR") }
         )
         compose.setContent { VerumOmnisTheme {
             Column(Modifier.verticalScroll(rememberScrollState())) {

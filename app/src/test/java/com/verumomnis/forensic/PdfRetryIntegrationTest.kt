@@ -38,9 +38,9 @@ class PdfRetryIntegrationTest {
         return vault.loadPdfExtraction(hash)!!
     }
     private fun service(vault: EvidenceVault, recognised: String = "Synthetic recovered record on page two.", failExport: Boolean = false) =
-        PdfRetryService(vault, app.cacheDir, extract = { file, previous, attempt, isCancelled ->
+        PdfRetryService(vault, app.cacheDir, extract = { file, previous, attempt, isCancelled, onProgress ->
             assertEquals(Sha512.hash(bytes), Sha512.hash(file))
-            retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
+            retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled, onProgress = onProgress) {
                 object : PdfOcrPages {
                     override val pageCount = 3
                     override fun recognise(index: Int): String { assertTrue(index in listOf(1, 2)); return recognised }
@@ -252,7 +252,7 @@ class PdfRetryIntegrationTest {
         val recoveredService = PdfRetryService(
             vault = vault,
             cacheDir = app.cacheDir,
-            extract = { _, _, _, _ -> ocrCalls.incrementAndGet(); error("OCR must not run during recovery.") },
+            extract = { _, _, _, _, _ -> ocrCalls.incrementAndGet(); error("OCR must not run during recovery.") },
             writePdf = { report, name ->
                 SealedOutputNames.createUniqueFile(
                     vault.reportsSealed,
@@ -346,7 +346,7 @@ class PdfRetryIntegrationTest {
                     SealedOutputNames.forensicReport(sourceName, report.reference)
                 ).apply { writeText("%PDF-1.4 recovered after restart") }
             },
-            pdfPageRetry = { _, _, _, _ ->
+            pdfPageRetry = { _, _, _, _, _ ->
                 ocrCalls.incrementAndGet()
                 error("Saved retry recovery must not repeat OCR.")
             }
@@ -469,11 +469,11 @@ class PdfRetryIntegrationTest {
                     SealedOutputNames.forensicReport(sourceName, report.reference)
                 ).apply { writeText("Synthetic PDF writer boundary") }
             },
-            pdfPageRetry = { _, previous, attempt, isCancelled ->
+            pdfPageRetry = { _, previous, attempt, isCancelled, onProgress ->
                 calls.incrementAndGet()
                 entered.countDown()
                 check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
-                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
+                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled, onProgress = onProgress) {
                     object : PdfOcrPages {
                         override val pageCount = 3
                         override fun recognise(index: Int) = "Recovered synthetic original page ${index + 1}."
@@ -527,8 +527,8 @@ class PdfRetryIntegrationTest {
                 pdfWrites.incrementAndGet()
                 error("A cancelled OCR retry must not generate a report.")
             },
-            pdfPageRetry = { _, previous, attempt, isCancelled ->
-                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
+            pdfPageRetry = { _, previous, attempt, isCancelled, onProgress ->
+                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled, onProgress = onProgress) {
                     object : PdfOcrPages {
                         override val pageCount = 3
                         override fun recognise(index: Int): String {

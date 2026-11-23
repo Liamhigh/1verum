@@ -3,6 +3,18 @@ package com.verumomnis.forensic.engine
 import com.verumomnis.forensic.model.PageReadStatus
 import com.verumomnis.forensic.model.PdfExtractionCoverage
 import com.verumomnis.forensic.model.PdfRetryAttempt
+import java.io.File
+
+/** Finished attempts can still be unread/failed; this is not a count of verified readable pages. */
+data class PdfRetryProgress(
+    val completedPages: Int,
+    val selectedPageTotal: Int,
+    val currentOriginalPage: Int? = null
+)
+
+typealias PdfRetryExtraction = (
+    File, PdfExtractionCoverage, PdfRetryAttempt, () -> Boolean, (PdfRetryProgress) -> Unit
+) -> PdfExtractionResult
 
 /** Strictly selected OCR: never reparses/relabels good pages or spends work on unselected pages. */
 internal fun retryPdfPages(
@@ -10,6 +22,7 @@ internal fun retryPdfPages(
     attempt: PdfRetryAttempt,
     maxOcrPages: Int,
     isCancellationRequested: () -> Boolean = { false },
+    onProgress: (PdfRetryProgress) -> Unit = {},
     openOcr: () -> PdfOcrPages
 ): PdfExtractionResult {
     val count = requireNotNull(previous.totalPages) { "Page count is unknown. Re-import the original PDF." }
@@ -26,6 +39,7 @@ internal fun retryPdfPages(
         it.extractedChars > 0 && it.extractedText == null
     }) { "Saved page text is unavailable. Re-import the original PDF before retrying." }
 
+    onProgress(PdfRetryProgress(0, selected.size))
     var session: PdfOcrPages? = null
     var failure: String? = null
     var cancelled = isCancellationRequested()
@@ -60,6 +74,7 @@ internal fun retryPdfPages(
                 }
                 continue
             }
+            onProgress(PdfRetryProgress(processedPages.size, selected.size, page.page))
             pagesByNumber[page.page] = try {
                 val text = activeSession.recognise(page.page - 1).trim()
                 if (text.isBlank()) page.copy(
@@ -72,6 +87,8 @@ internal fun retryPdfPages(
                 page.copy(status = PageReadStatus.FAILED, reason = "retry_page_render_or_ocr_failed", ocrAttempted = true)
             }
             processedPages += page.page
+            // Recognition has returned or failed; never advance while a page is in flight.
+            onProgress(PdfRetryProgress(processedPages.size, selected.size))
             if (isCancellationRequested()) {
                 cancelled = true
                 break

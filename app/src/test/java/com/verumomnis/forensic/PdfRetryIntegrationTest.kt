@@ -38,9 +38,9 @@ class PdfRetryIntegrationTest {
         return vault.loadPdfExtraction(hash)!!
     }
     private fun service(vault: EvidenceVault, recognised: String = "Synthetic recovered record on page two.", failExport: Boolean = false) =
-        PdfRetryService(vault, app.cacheDir, extract = { file, previous, attempt ->
+        PdfRetryService(vault, app.cacheDir, extract = { file, previous, attempt, isCancelled ->
             assertEquals(Sha512.hash(bytes), Sha512.hash(file))
-            retryPdfPages(previous, attempt, 200) {
+            retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
                 object : PdfOcrPages {
                     override val pageCount = 3
                     override fun recognise(index: Int): String { assertTrue(index in listOf(1, 2)); return recognised }
@@ -143,7 +143,7 @@ class PdfRetryIntegrationTest {
         val recoveredService = PdfRetryService(
             vault = vault,
             cacheDir = app.cacheDir,
-            extract = { _, _, _ -> ocrCalls.incrementAndGet(); error("OCR must not run during recovery.") },
+            extract = { _, _, _, _ -> ocrCalls.incrementAndGet(); error("OCR must not run during recovery.") },
             writePdf = { report, name ->
                 SealedOutputNames.createUniqueFile(
                     vault.reportsSealed,
@@ -237,7 +237,7 @@ class PdfRetryIntegrationTest {
                     SealedOutputNames.forensicReport(sourceName, report.reference)
                 ).apply { writeText("%PDF-1.4 recovered after restart") }
             },
-            pdfPageRetry = { _, _, _ ->
+            pdfPageRetry = { _, _, _, _ ->
                 ocrCalls.incrementAndGet()
                 error("Saved retry recovery must not repeat OCR.")
             }
@@ -360,11 +360,11 @@ class PdfRetryIntegrationTest {
                     SealedOutputNames.forensicReport(sourceName, report.reference)
                 ).apply { writeText("Synthetic PDF writer boundary") }
             },
-            pdfPageRetry = { _, previous, attempt ->
+            pdfPageRetry = { _, previous, attempt, isCancelled ->
                 calls.incrementAndGet()
                 entered.countDown()
                 check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
-                retryPdfPages(previous, attempt, 200) {
+                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
                     object : PdfOcrPages {
                         override val pageCount = 3
                         override fun recognise(index: Int) = "Recovered synthetic original page ${index + 1}."
@@ -392,5 +392,73 @@ class PdfRetryIntegrationTest {
         assertEquals(prior.files, vm.state.value.files)
         assertEquals(prior.report, vm.state.value.report)
         assertEquals("another-case.txt", vm.state.value.files.single().name)
+    }
+
+    @Test fun userCancellationPersistsOnlyCompletedPagesWithoutChangingSourceOrEarlierReports() {
+        val vault = vault()
+        val source = source(vault)
+        val prior = ReportGenerator.generate(ForensicService.scan(listOf(EvidenceDocument(
+            "DOC001", source.fileName, "pdf", source.coverage.pages[0].extractedText!!, source.sha512,
+            extractionCoverage = source.coverage
+        )), now).findings, "Earlier report", now)
+        val priorFile = vault.storeReport(prior)
+        val priorBytes = priorFile.readBytes()
+        val sourceBefore = vault.readEvidence("pdf_source_${source.sha512}.pdf")
+        val enteredRecognition = java.util.concurrent.CountDownLatch(1)
+        val finishRecognition = java.util.concurrent.CountDownLatch(1)
+        val ocrClosed = java.util.concurrent.atomic.AtomicBoolean(false)
+        val pdfWrites = java.util.concurrent.atomic.AtomicInteger()
+        val vm = com.verumomnis.forensic.ui.VerumViewModel(
+            app,
+            com.verumomnis.forensic.identity.IdentityService(
+                app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
+            ),
+            vault = vault,
+            reportPdfWriter = { _, _ ->
+                pdfWrites.incrementAndGet()
+                error("A cancelled OCR retry must not generate a report.")
+            },
+            pdfPageRetry = { _, previous, attempt, isCancelled ->
+                retryPdfPages(previous, attempt, 200, isCancellationRequested = isCancelled) {
+                    object : PdfOcrPages {
+                        override val pageCount = 3
+                        override fun recognise(index: Int): String {
+                            enteredRecognition.countDown()
+                            check(finishRecognition.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                            return "Recovered synthetic text from original page ${index + 1}."
+                        }
+                        override fun close() { ocrClosed.set(true) }
+                    }
+                }
+            }
+        )
+
+        vm.retryPdfPages(source, listOf(2, 3))
+        assertTrue(enteredRecognition.await(10, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(vm.state.value.pdfRetryCanCancel)
+        vm.cancelPdfRetry()
+        assertTrue(vm.state.value.pdfRetryCancelRequested)
+        finishRecognition.countDown()
+
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20)
+        while (vm.state.value.pdfRetryBusy && System.nanoTime() < deadline) Thread.sleep(10)
+        assertFalse(vm.state.value.pdfRetryBusy)
+        assertFalse(vm.state.value.pdfRetryCanCancel)
+        val result = requireNotNull(vm.state.value.pdfRetryResult)
+        val cancelledAttempt = requireNotNull(result.record.coverage.retryAttempt)
+        assertTrue(cancelledAttempt.cancelled)
+        assertEquals(listOf(2), cancelledAttempt.processedPages)
+        assertEquals(OCR, result.record.coverage.pages[1].status)
+        assertEquals(SKIPPED, result.record.coverage.pages[2].status)
+        assertTrue(result.message.contains("Unprocessed pages remain unchanged"))
+        assertTrue(result.record.coverage.summary().contains("were not read"))
+        assertNull(result.report)
+        assertNull(result.reportFile)
+        assertTrue(ocrClosed.get())
+        assertEquals(0, pdfWrites.get())
+        assertArrayEquals(sourceBefore, vault.readEvidence("pdf_source_${source.sha512}.pdf"))
+        assertArrayEquals(priorBytes, priorFile.readBytes())
+        assertTrue(vault.listPdfExtractions().any { it == result.record })
+        assertEquals(2, vault.listPdfExtractions().size)
     }
 }

@@ -42,6 +42,22 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     VoCard(title = "PDF PAGE REVIEW & RETRY", icon = Icons.Filled.Description) {
         Text("Review original page numbers and extraction gaps. A retry creates a new, labelled PDF-only analysis; it does not revise earlier sealed reports or re-analyse other case evidence.",
             color = VoTextMuted, fontSize = 12.sp)
+        if (state.pdfRetryCanCancel) {
+            Spacer(Modifier.height(8.dp))
+            VerumSecondaryButton(
+                label = "Cancel OCR retry",
+                onClick = { viewModel.cancelPdfRetry() },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        if (state.pdfRetryCancelRequested) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Stopping after the current page. Unprocessed pages will not be marked as read.",
+                color = VoGold,
+                fontSize = 12.sp
+            )
+        }
         visibleRecords.forEach { record ->
             val attempt = record.coverage.retryAttempt
             val recovery = attempt?.let { id ->
@@ -54,13 +70,30 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
             Text("${record.coverage.remainingPages.size} remaining page(s) · ${record.coverage.totalPages ?: "unknown"} total · SHA-512 ${record.sha512.take(16)}…",
                 color = VoTextMuted, fontSize = 11.sp)
             record.coverage.retryAttempt?.let {
-                Text("Latest retry: ${it.createdAt} · ${it.id}", color = VoAccentBlue, fontSize = 10.sp)
+                val attemptLabel = if (it.cancelled) {
+                    "CANCELLED · ${it.processedPages.size}/${it.selectedPages.size} selected pages processed"
+                } else {
+                    "Latest retry: ${it.createdAt} · ${it.id}"
+                }
+                Text(attemptLabel, color = if (it.cancelled) VoGold else VoAccentBlue, fontSize = 10.sp)
             }
             VerumSecondaryButton(label = "Review pages: ${record.fileName}", enabled = !busy,
                 onClick = { review = record }, modifier = Modifier.fillMaxWidth())
             if (attempt != null) {
                 val stage = recovery?.stage ?: PdfRetryRecoveryStage.EXTRACTION_ONLY
-                val stageLabel = when (stage) {
+                val stageLabel = if (attempt.cancelled) {
+                    val progress = "${attempt.processedPages.size}/${attempt.selectedPages.size} selected pages processed"
+                    val hasUnprocessedPages = attempt.processedPages.size < attempt.selectedPages.size
+                    when (stage) {
+                        PdfRetryRecoveryStage.EXTRACTION_ONLY -> if (hasUnprocessedPages) {
+                            "CANCELLED · partial OCR saved · $progress"
+                        } else {
+                            "CANCELLED · OCR complete; report stopped · $progress"
+                        }
+                        PdfRetryRecoveryStage.FINDINGS_READY -> "CANCELLED · saved report · $progress"
+                        PdfRetryRecoveryStage.PDF_READY -> "CANCELLED · saved retry PDF · $progress"
+                    }
+                } else when (stage) {
                     PdfRetryRecoveryStage.EXTRACTION_ONLY -> "OCR pages saved · report not generated"
                     PdfRetryRecoveryStage.FINDINGS_READY -> "Findings and report saved · PDF export pending"
                     PdfRetryRecoveryStage.PDF_READY -> "Retry PDF ready"

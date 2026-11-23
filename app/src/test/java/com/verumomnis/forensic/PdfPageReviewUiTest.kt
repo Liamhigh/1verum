@@ -125,7 +125,7 @@ class PdfPageReviewUiTest {
                 com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
             ),
             vault = vault,
-            pdfPageRetry = { _, _, _ ->
+            pdfPageRetry = { _, _, _, _ ->
                 ocrCalls += 1
                 error("Previewing saved text must not rerun OCR")
             }
@@ -147,5 +147,58 @@ class PdfPageReviewUiTest {
         compose.onNodeWithText("Show full saved text").performScrollTo().performClick()
         compose.onNodeWithText(savedOcrText).assertExists()
         assertEquals(0, ocrCalls)
+    }
+
+    @Test fun activePdfRetryShowsCancelActionAndSavesAStoppedAttempt() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        val vault = com.verumomnis.forensic.vault.EvidenceVault(
+            java.io.File(app.cacheDir, "cancel-review-${UUID.randomUUID()}"),
+            masterKeyProvider = { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 5 }, "AES") }
+        )
+        val originalBytes = "%PDF synthetic cancel review fixture".toByteArray()
+        val hash = vault.preservePdfSource(originalBytes)
+        val coverage = PdfExtractionCoverage(2, listOf(
+            PageExtraction(1, PageReadStatus.TEXT_LAYER, "embedded_text", 42, 42,
+                extractedText = "Synthetic readable source page one."),
+            PageExtraction(2, PageReadStatus.UNREAD, "ocr_returned_no_text")
+        ))
+        vault.storePdfExtraction("DOC001", "cancel-review.pdf", hash, coverage)
+        val enteredRetry = java.util.concurrent.CountDownLatch(1)
+        val finishRetrySetup = java.util.concurrent.CountDownLatch(1)
+        val vm = com.verumomnis.forensic.ui.VerumViewModel(
+            app,
+            com.verumomnis.forensic.identity.IdentityService(
+                app, com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
+            ),
+            vault = vault,
+            pdfPageRetry = { _, previous, attempt, isCancelled ->
+                enteredRetry.countDown()
+                check(finishRetrySetup.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                com.verumomnis.forensic.engine.retryPdfPages(
+                    previous, attempt, 200, isCancellationRequested = isCancelled
+                ) { error("A cancelled retry must not open OCR.") }
+            }
+        )
+        compose.setContent { VerumOmnisTheme {
+            com.verumomnis.forensic.ui.PdfPageReviewCard(vm.state.collectAsState().value, vm)
+        } }
+
+        compose.waitUntil(10_000) { vm.state.value.pdfReviewRecords.any { it.sha512 == hash } }
+        compose.onNodeWithText("REVIEW PAGES: CANCEL-REVIEW.PDF").performClick()
+        compose.onNodeWithContentDescription("Select original page 2, UNREAD")
+            .performScrollTo().performClick()
+        compose.onNodeWithText("Start fresh OCR retry").performClick()
+        assertTrue(enteredRetry.await(10, java.util.concurrent.TimeUnit.SECONDS))
+        compose.onNodeWithText("CANCEL OCR RETRY").assertExists().performClick()
+        assertTrue(vm.state.value.pdfRetryCancelRequested)
+        finishRetrySetup.countDown()
+
+        compose.waitUntil(20_000) { !vm.state.value.pdfRetryBusy }
+        val result = requireNotNull(vm.state.value.pdfRetryResult)
+        assertTrue(result.record.coverage.retryAttempt?.cancelled == true)
+        assertTrue(result.record.coverage.retryAttempt?.processedPages.isNullOrEmpty())
+        assertNull(result.report)
+        assertTrue(result.record.coverage.summary().contains("were not read"))
+        assertArrayEquals(originalBytes, vault.readEvidence("pdf_source_$hash.pdf"))
     }
 }

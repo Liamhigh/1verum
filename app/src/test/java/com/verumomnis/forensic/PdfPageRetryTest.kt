@@ -82,4 +82,65 @@ class PdfPageRetryTest {
             retryPdfPages(original, attempt(2), 201) { error("must not open") }
         }
     }
+
+    @Test fun cancellationDuringRecognitionFinishesCurrentPageAndClosesOcrResources() {
+        val cancellation = java.util.concurrent.atomic.AtomicBoolean(false)
+        val ocr = Ocr { index ->
+            if (index == 1) cancellation.set(true)
+            "Recognised page ${index + 1}"
+        }
+
+        val result = retryPdfPages(
+            original,
+            attempt(2, 3),
+            200,
+            isCancellationRequested = cancellation::get
+        ) { ocr }
+
+        assertEquals(listOf(1), ocr.calls)
+        assertEquals(listOf(2), result.coverage.retryAttempt?.processedPages)
+        assertTrue(result.coverage.retryAttempt?.cancelled == true)
+        assertEquals(OCR, result.coverage.pages[1].status)
+        assertEquals(original.pages[2], result.coverage.pages[2])
+        assertTrue(result.coverage.summary().contains("Unprocessed selected pages remain"))
+        assertTrue(ocr.closed)
+        assertEquals(UNREAD, original.pages[1].status)
+    }
+
+    @Test fun cancellationBetweenPagesDoesNotMarkTheNextPageAsRead() {
+        val checks = java.util.concurrent.atomic.AtomicInteger()
+        val ocr = Ocr { "Recognised page ${it + 1}" }
+        // Checks occur before opening OCR, after opening, before each page,
+        // and after each recognition. Request cancellation before page 3 starts.
+        val result = retryPdfPages(
+            original,
+            attempt(2, 3),
+            200,
+            isCancellationRequested = { checks.incrementAndGet() >= 5 }
+        ) { ocr }
+
+        assertEquals(listOf(1), ocr.calls)
+        assertEquals(listOf(2), result.coverage.retryAttempt?.processedPages)
+        assertTrue(result.coverage.retryAttempt?.cancelled == true)
+        assertEquals(OCR, result.coverage.pages[1].status)
+        assertEquals(original.pages[2], result.coverage.pages[2])
+        assertTrue(ocr.closed)
+    }
+
+    @Test fun cancellationAfterTheLastSelectedPageLabelsTheStoppedReportWithoutCallingOcrPartial() {
+        val checks = java.util.concurrent.atomic.AtomicInteger()
+        val ocr = Ocr { "Recognised page ${it + 1}" }
+        val result = retryPdfPages(
+            original,
+            attempt(2),
+            200,
+            isCancellationRequested = { checks.incrementAndGet() >= 4 }
+        ) { ocr }
+
+        assertTrue(result.coverage.retryAttempt?.cancelled == true)
+        assertEquals(listOf(2), result.coverage.retryAttempt?.processedPages)
+        assertTrue(result.coverage.summary().contains("All selected pages finished before cancellation"))
+        assertFalse(result.coverage.summary().contains("Unprocessed selected pages remain"))
+        assertTrue(ocr.closed)
+    }
 }

@@ -150,8 +150,11 @@ class PdfOcrExtractor(
     fun retryPages(
         file: File,
         previous: com.verumomnis.forensic.model.PdfExtractionCoverage,
-        attempt: com.verumomnis.forensic.model.PdfRetryAttempt
-    ): PdfExtractionResult = retryPdfPages(previous, attempt, maxOcrPages) {
+        attempt: com.verumomnis.forensic.model.PdfRetryAttempt,
+        isCancellationRequested: () -> Boolean = { false }
+    ): PdfExtractionResult = retryPdfPages(
+        previous, attempt, maxOcrPages, isCancellationRequested = isCancellationRequested
+    ) {
         ocrSource?.invoke(file) ?: openDeviceOcr(file)
     }
 

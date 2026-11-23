@@ -9,6 +9,7 @@ internal fun retryPdfPages(
     previous: PdfExtractionCoverage,
     attempt: PdfRetryAttempt,
     maxOcrPages: Int,
+    isCancellationRequested: () -> Boolean = { false },
     openOcr: () -> PdfOcrPages
 ): PdfExtractionResult {
     val count = requireNotNull(previous.totalPages) { "Page count is unknown. Re-import the original PDF." }
@@ -27,22 +28,40 @@ internal fun retryPdfPages(
 
     var session: PdfOcrPages? = null
     var failure: String? = null
-    try {
-        session = openOcr()
-        check(session.pageCount == count) { "PDF page counts disagree" }
-    } catch (_: Exception) {
-        try { session?.close() } catch (_: Exception) { }
-        session = null
-        failure = "PDF rendering or OCR initialisation failed, or page counts disagree"
+    var cancelled = isCancellationRequested()
+    if (!cancelled) {
+        try {
+            session = openOcr()
+            check(session.pageCount == count) { "PDF page counts disagree" }
+            if (isCancellationRequested()) cancelled = true
+        } catch (_: Exception) {
+            try { session?.close() } catch (_: Exception) { }
+            session = null
+            failure = "PDF rendering or OCR initialisation failed, or page counts disagree"
+        }
     }
-    val pages = try {
-        previous.pages.sortedBy { it.page }.map { page ->
-            if (page.page !in selected) return@map page
-            if (session == null) return@map page.copy(
-                status = PageReadStatus.FAILED, reason = "retry_renderer_or_ocr_unavailable", ocrAttempted = false
-            )
-            try {
-                val text = session.recognise(page.page - 1).trim()
+    val pagesByNumber = previous.pages.associateBy { it.page }.toMutableMap()
+    val processedPages = mutableListOf<Int>()
+    try {
+        for (page in previous.pages.sortedBy { it.page }) {
+            if (page.page !in selected) continue
+            if (cancelled || isCancellationRequested()) {
+                cancelled = true
+                break
+            }
+            val activeSession = session
+            if (activeSession == null) {
+                if (failure != null) {
+                    pagesByNumber[page.page] = page.copy(
+                        status = PageReadStatus.FAILED,
+                        reason = "retry_renderer_or_ocr_unavailable",
+                        ocrAttempted = false
+                    )
+                }
+                continue
+            }
+            pagesByNumber[page.page] = try {
+                val text = activeSession.recognise(page.page - 1).trim()
                 if (text.isBlank()) page.copy(
                     status = PageReadStatus.UNREAD, reason = "retry_ocr_returned_no_text", ocrAttempted = true
                 ) else page.copy(
@@ -52,12 +71,19 @@ internal fun retryPdfPages(
             } catch (_: Exception) {
                 page.copy(status = PageReadStatus.FAILED, reason = "retry_page_render_or_ocr_failed", ocrAttempted = true)
             }
+            processedPages += page.page
+            if (isCancellationRequested()) {
+                cancelled = true
+                break
+            }
         }
     } finally {
         try { session?.close() } catch (_: Exception) { }
     }
+    val pages = previous.pages.sortedBy { it.page }.map { pagesByNumber.getValue(it.page) }
     val coverage = previous.copy(
-        pages = pages, ocrPageLimit = maxOcrPages, retryAttempt = attempt,
+        pages = pages, ocrPageLimit = maxOcrPages,
+        retryAttempt = attempt.copy(processedPages = processedPages, cancelled = cancelled),
         // Do not erase an unresolved parser/renderer disagreement from the original attempt.
         documentFailure = failure ?: previous.documentFailure
     )

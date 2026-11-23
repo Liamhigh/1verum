@@ -34,7 +34,7 @@ enum class PdfRetryRecoveryStage { EXTRACTION_ONLY, FINDINGS_READY, PDF_READY }
 class PdfRetryService(
     private val vault: EvidenceVault,
     private val cacheDir: File,
-    private val extract: (File, PdfExtractionCoverage, PdfRetryAttempt) -> PdfExtractionResult,
+    private val extract: (File, PdfExtractionCoverage, PdfRetryAttempt, () -> Boolean) -> PdfExtractionResult,
     private val writePdf: (ForensicReport, String?) -> File,
     private val signReport: (ForensicReport) -> ForensicReport = { it }
 ) {
@@ -42,7 +42,9 @@ class PdfRetryService(
         source: DocumentExtractionCoverage,
         selectedPages: List<Int>,
         priorReportReference: String?,
-        now: Instant = Instant.now()
+        now: Instant = Instant.now(),
+        isCancellationRequested: () -> Boolean = { false },
+        onExtractionFinished: () -> Unit = {}
     ): PdfRetryResult {
         val attempt = PdfRetryAttempt(
             UUID.randomUUID().toString(), now.toString(), selectedPages.sorted(),
@@ -53,10 +55,27 @@ class PdfRetryService(
         val temp = File.createTempFile("pdf-retry-", ".pdf", cacheDir)
         val extracted = try {
             vault.materializePdfSource(source, temp)
-            extract(temp, source.coverage, attempt)
+            extract(temp, source.coverage, attempt, isCancellationRequested)
         } finally { temp.delete() }
-        check(extracted.coverage.retryAttempt == attempt) { "OCR retry provenance was not recorded." }
+        check(extracted.coverage.retryAttempt?.copy(
+            processedPages = emptyList(), cancelled = false
+        ) == attempt) { "OCR retry provenance was not recorded." }
         val record = vault.storePdfRetry(source.copy(coverage = extracted.coverage))
+        onExtractionFinished()
+        val savedAttempt = requireNotNull(record.coverage.retryAttempt)
+        if (savedAttempt.cancelled) {
+            val unprocessed = savedAttempt.selectedPages.size - savedAttempt.processedPages.size
+            val status = if (unprocessed > 0) {
+                "Partial page coverage was saved. Unprocessed selected page(s) remain in their previous coverage state and were not read."
+            } else {
+                "All selected pages finished before cancellation; report generation was stopped."
+            }
+            return PdfRetryResult(
+                record,
+                message = "OCR retry cancelled after ${savedAttempt.processedPages.size} of ${savedAttempt.selectedPages.size} selected page(s). " +
+                    "$status No report was generated. Original PDF, hashes and earlier reports are unchanged."
+            )
+        }
         if (extracted.text.isBlank()) return PdfRetryResult(record,
             message = "Retry saved, but no readable text was extracted. No findings or report were generated. This is not a clean result.")
 
@@ -71,11 +90,20 @@ class PdfRetryService(
         requireSavedRetry(record)
         val report = findReport(record, savedReports)
         val file = report?.let { findReportPdf(record.fileName, it.reference) }
+        val retryAttempt = requireNotNull(record.coverage.retryAttempt)
         return PdfRetryResult(
             record = record,
             report = report,
             reportFile = file,
             message = when {
+                retryAttempt.cancelled && report == null -> {
+                    val unprocessed = retryAttempt.selectedPages.size - retryAttempt.processedPages.size
+                    if (unprocessed > 0) {
+                        "OCR retry was cancelled after ${retryAttempt.processedPages.size} of ${retryAttempt.selectedPages.size} selected page(s). Unprocessed pages remain unchanged and were not read. Partial page coverage is saved; no report was generated."
+                    } else {
+                        "All ${retryAttempt.selectedPages.size} selected pages finished before cancellation. Page coverage is saved; report generation was stopped."
+                    }
+                }
                 file != null -> "Retry report PDF is ready. This is a separate PDF-only analysis."
                 report != null -> "Retry findings and report are saved. The PDF can be exported again."
                 record.coverage.pages.any { !it.extractedText.isNullOrBlank() } ->

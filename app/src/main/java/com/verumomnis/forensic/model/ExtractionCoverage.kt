@@ -13,7 +13,11 @@ data class PdfRetryAttempt(
     val createdAt: String,
     val selectedPages: List<Int>,
     val parentAttemptId: String? = null,
-    val priorReportReference: String? = null
+    val priorReportReference: String? = null,
+    /** Original page numbers whose OCR call finished during this attempt. */
+    val processedPages: List<Int> = emptyList(),
+    /** True when the user stopped this attempt before it finished normally. */
+    val cancelled: Boolean = false
 )
 
 @Serializable
@@ -49,6 +53,15 @@ data class PdfExtractionCoverage(
     fun summary(): String = buildString {
         retryAttempt?.let {
             append("NEW OCR RETRY ATTEMPT ${it.id} at ${it.createdAt}; selected original pages: ${it.selectedPages.joinToString(", ")}. ")
+            if (it.cancelled) {
+                append("CANCELLED: OCR finished for ${it.processedPages.size} of ${it.selectedPages.size} selected page(s). ")
+                val unprocessed = it.selectedPages.filterNot { page -> page in it.processedPages }
+                if (unprocessed.isNotEmpty()) {
+                    append("Unprocessed selected pages remain in their prior coverage state and were not read. ")
+                } else {
+                    append("All selected pages finished before cancellation; report generation was stopped. ")
+                }
+            }
             append("PDF-only derivative analysis; other case evidence was not re-analysed. Earlier sealed reports remain unchanged. ")
             it.priorReportReference?.let { ref -> append("Prior report: $ref. ") }
         }

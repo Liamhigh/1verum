@@ -80,6 +80,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class FileEntry(
     val name: String,
@@ -190,6 +191,8 @@ data class VerifyResult(
 data class UiState(
     val pdfReviewRecords: List<com.verumomnis.forensic.model.DocumentExtractionCoverage> = emptyList(),
     val pdfRetryBusy: Boolean = false,
+    val pdfRetryCanCancel: Boolean = false,
+    val pdfRetryCancelRequested: Boolean = false,
     val pdfRetryMessage: String = "",
     val pdfRetryResult: com.verumomnis.forensic.engine.PdfRetryResult? = null,
     /** Recovered retry states from durable page-coverage and report snapshots. */
@@ -307,8 +310,11 @@ class VerumViewModel(
         SealedPdfExporter(application).exportReport(report, sourceName)
     },
     private val documentSealServices: DocumentSealServices = DocumentSealServices.onDevice(application),
-    private val pdfPageRetry: (File, com.verumomnis.forensic.model.PdfExtractionCoverage, com.verumomnis.forensic.model.PdfRetryAttempt) -> com.verumomnis.forensic.engine.PdfExtractionResult =
-        { file, previous, attempt -> com.verumomnis.forensic.engine.PdfOcrExtractor(application).retryPages(file, previous, attempt) }
+    private val pdfPageRetry: (File, com.verumomnis.forensic.model.PdfExtractionCoverage, com.verumomnis.forensic.model.PdfRetryAttempt, () -> Boolean) -> com.verumomnis.forensic.engine.PdfExtractionResult =
+        { file, previous, attempt, isCancellationRequested ->
+            com.verumomnis.forensic.engine.PdfOcrExtractor(application)
+                .retryPages(file, previous, attempt, isCancellationRequested)
+        }
 ) : AndroidViewModel(application) {
 
     /** Constructor used by Android's default ViewModelProvider factory. */
@@ -322,6 +328,7 @@ class VerumViewModel(
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+    @Volatile private var activePdfRetryCancellation: AtomicBoolean? = null
 
     private val documents = mutableListOf<EvidenceDocument>()
     private val audios = mutableListOf<AudioEvidence>()
@@ -1026,13 +1033,29 @@ class VerumViewModel(
     fun retryPdfPages(source: com.verumomnis.forensic.model.DocumentExtractionCoverage, pages: List<Int>) {
         val current = _state.value
         if (current.pdfRetryBusy || current.sealBusy || current.scanning || current.reportPdfGenerating) return
-        _state.update { it.copy(pdfRetryBusy = true, pdfRetryMessage = "Reading selected original pages on this device…", pdfRetryResult = null) }
+        val cancellation = AtomicBoolean(false)
+        activePdfRetryCancellation = cancellation
+        _state.update {
+            it.copy(
+                pdfRetryBusy = true,
+                pdfRetryCanCancel = true,
+                pdfRetryCancelRequested = false,
+                pdfRetryMessage = "Reading selected original pages on this device. Cancel stops after the current page and saves only completed pages.",
+                pdfRetryResult = null
+            )
+        }
         val priorReference = current.report?.takeIf { report ->
             report.extractionCoverage.any { it.sha512 == source.sha512 }
         }?.reference ?: source.coverage.retryAttempt?.priorReportReference
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val result = pdfRetryService().retry(source, pages, priorReference)
+                val result = pdfRetryService().retry(
+                    source, pages, priorReference,
+                    isCancellationRequested = cancellation::get,
+                    onExtractionFinished = {
+                        _state.update { it.copy(pdfRetryCanCancel = false, pdfRetryCancelRequested = false) }
+                    }
+                )
                 _state.update {
                     it.copy(
                         pdfRetryResult = result,
@@ -1046,8 +1069,24 @@ class VerumViewModel(
                 _state.update { it.copy(pdfRetryMessage =
                     "Page retry did not complete. ${e.message.orEmpty()} Earlier reports and original evidence were not changed.") }
             } finally {
+                activePdfRetryCancellation = null
+                _state.update { it.copy(pdfRetryCanCancel = false, pdfRetryCancelRequested = false) }
                 refreshPdfRetrySnapshot(clearBusy = true)
                 refreshVaultStats()
+            }
+        }
+    }
+
+    /** Stops OCR cooperatively after the current page; it never cancels persistence or closes a live renderer. */
+    fun cancelPdfRetry() {
+        val cancellation = activePdfRetryCancellation ?: return
+        if (cancellation.compareAndSet(false, true)) {
+            _state.update {
+                it.copy(
+                    pdfRetryCanCancel = false,
+                    pdfRetryCancelRequested = true,
+                    pdfRetryMessage = "Stopping after the current OCR page. Completed page text will be saved; unprocessed pages will remain unchanged."
+                )
             }
         }
     }

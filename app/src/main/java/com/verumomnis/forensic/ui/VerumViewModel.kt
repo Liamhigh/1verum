@@ -48,6 +48,7 @@ import kotlinx.serialization.json.Json
 import com.verumomnis.forensic.model.HarassmentVerdict
 import com.verumomnis.forensic.model.OtsAnchorResult
 import com.verumomnis.forensic.model.OtsStatus
+import com.verumomnis.forensic.model.OtsVerifyResult
 import com.verumomnis.forensic.model.SealedEmail
 import com.verumomnis.forensic.core.SettingsRepository
 import com.verumomnis.forensic.ojrs.DeepResearchEngine

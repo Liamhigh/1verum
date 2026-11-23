@@ -32,7 +32,7 @@ class PdfPageReviewUiTest {
     @Test fun selectionContainsOnlyExplicitlyChosenRemainingPages() {
         var chosen: List<Int>? = null
         compose.setContent { VerumOmnisTheme {
-            PdfPageReviewDialog(record, false, {}, { chosen = it })
+            PdfPageReviewDialog(record, false, {}, onRetry = { chosen = it })
         } }
         compose.onNodeWithText("Start fresh OCR retry").assertIsNotEnabled()
         val checkboxes = compose.onAllNodes(isToggleable())
@@ -48,7 +48,7 @@ class PdfPageReviewUiTest {
 
     @Test fun unknownPageCountExplainsReimportRatherThanAllowingAnUnboundedRetry() {
         compose.setContent { VerumOmnisTheme {
-            PdfPageReviewDialog(record.copy(coverage = PdfExtractionCoverage()), false, {}, { error("must not retry") })
+            PdfPageReviewDialog(record.copy(coverage = PdfExtractionCoverage()), false, {}, onRetry = { error("must not retry") })
         } }
         compose.onNodeWithText("Re-import the original PDF", substring = true).assertExists()
         compose.onNodeWithText("Start fresh OCR retry").assertIsNotEnabled()

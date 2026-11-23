@@ -53,3 +53,16 @@ descriptor with `InaccessibleObjectException`; this was not an Android sharing f
 **How to apply:** Verify provider display names and URI grants separately from
 the staged file bytes, or explicitly open the required JDK module in the host
 test configuration when descriptor lifecycle testing is necessary.
+
+Robolectric 4.13 does not implement Android's `PdfRenderer`; even a valid PDF
+reports zero pages on this host. Opening `java.io` for JDK reflection removes
+an earlier file-descriptor error but does not provide rendering support.
+
+**Why:** Direct preview tests with synthetic, PDFBox-readable originals reached
+the platform renderer but could not obtain a page count. This is a host-test
+boundary, not evidence that the original PDF is unreadable on Android.
+
+**How to apply:** Keep vault materialisation, fingerprint checks, and stored-page
+mapping real in host tests; substitute only the rasterisation boundary. Do not
+claim these tests validate Android-rendered pixels. Verify actual rendering,
+including rotated/cropped pages, on a physical Android device.

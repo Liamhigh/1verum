@@ -231,7 +231,7 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
         PdfPageReviewDialog(record, busy, onDismiss = { review = null }, onRetry = { pages ->
             viewModel.retryPdfPages(record, pages)
             review = null
-        }, initialPage = reviewPage)
+        }, loadPreview = viewModel::loadPdfPagePreview, initialPage = reviewPage)
     }
 }
 
@@ -241,11 +241,18 @@ internal fun PdfPageReviewDialog(
     busy: Boolean,
     onDismiss: () -> Unit,
     onRetry: (List<Int>) -> Unit,
+    loadPreview: (suspend (DocumentExtractionCoverage, Int) -> android.graphics.Bitmap)? = null,
     initialPage: Int? = null
 ) {
     var selected by remember(record) { mutableStateOf(setOf<Int>()) }
     var expandedTextPages by remember(record, initialPage) {
         mutableStateOf(initialPage?.let { setOf(it) } ?: emptySet<Int>())
+    }
+    var comparison by remember(record) { mutableStateOf<com.verumomnis.forensic.model.PageExtraction?>(null) }
+    val comparedPage = comparison
+    if (comparedPage != null && loadPreview != null) {
+        PdfPageComparisonDialog(record, comparedPage, loadPreview, onDismiss = { comparison = null })
+        return
     }
     val coverage = record.coverage
     val sortedPages = remember(record) { coverage.pages.sortedBy { it.page } }
@@ -302,6 +309,11 @@ internal fun PdfPageReviewDialog(
                                 }
                                 Text("Text source: $textSource", color = VoAccentBlue, fontSize = 11.sp)
                                 Text(page.reason.replace('_', ' '), color = VoTextMuted, fontSize = 11.sp)
+                                if (loadPreview != null) {
+                                    TextButton(onClick = { comparison = page }) {
+                                        Text("Compare original page ${page.page}", color = VoAccentBlue, fontSize = 11.sp)
+                                    }
+                                }
                                 val savedText = page.extractedText
                                 if (!savedText.isNullOrBlank()) {
                                     val expanded = page.page in expandedTextPages

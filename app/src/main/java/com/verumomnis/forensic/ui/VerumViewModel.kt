@@ -316,7 +316,9 @@ class VerumViewModel(
         { file, previous, attempt, isCancellationRequested, onProgress ->
             com.verumomnis.forensic.engine.PdfOcrExtractor(application)
                 .retryPages(file, previous, attempt, isCancellationRequested, onProgress)
-        }
+        },
+    private val pdfPagePreview: com.verumomnis.forensic.pdf.PdfPagePreview =
+        com.verumomnis.forensic.pdf.PdfPagePreview(vault, application.cacheDir)
 ) : AndroidViewModel(application) {
 
     /** Constructor used by Android's default ViewModelProvider factory. */
@@ -991,6 +993,14 @@ class VerumViewModel(
     /** Saved gaps also remain available after a restart or an all-unread ingest. */
     fun loadPdfPageReview() {
         viewModelScope.launch(Dispatchers.IO) { refreshPdfRetrySnapshot(clearBusy = false) }
+    }
+
+    /** Rendering the original is independent of extraction and never starts a retry. */
+    suspend fun loadPdfPagePreview(
+        record: com.verumomnis.forensic.model.DocumentExtractionCoverage,
+        pageNumber: Int
+    ): android.graphics.Bitmap = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        pdfPagePreview.load(record, pageNumber)
     }
 
     /** Loads retry provenance/report state together so disk errors cannot leave recovery busy forever. */

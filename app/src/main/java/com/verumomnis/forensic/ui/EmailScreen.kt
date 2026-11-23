@@ -28,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -43,6 +42,7 @@ import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurfaceAlt
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import com.verumomnis.forensic.ui.theme.JetBrainsMono
 
 @Composable
 fun EmailScreen(
@@ -140,7 +140,7 @@ fun EmailScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Text(sealed.sealedPdfFile, color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    Text(sealed.sealedPdfFile, color = com.verumomnis.forensic.ui.theme.VoAccentBlue, fontFamily = JetBrainsMono, fontSize = 10.sp)
                     Text("Seal ${sealed.seal.shortcode} · 24h count ${sealed.assessment.recipientSendCount24h}", color = VoTextMuted, fontSize = 10.sp)
                     if (sealed.assessment.reasons.isNotEmpty()) {
                         Text(sealed.assessment.reasons.joinToString("; "), color = color, fontSize = 10.sp)

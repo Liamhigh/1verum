@@ -33,7 +33,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +51,8 @@ import com.verumomnis.forensic.ui.theme.VoRed
 import com.verumomnis.forensic.ui.theme.VoSurfaceAlt
 import com.verumomnis.forensic.ui.theme.VoTextMuted
 import com.verumomnis.forensic.ui.theme.VoTextPrimary
+import com.verumomnis.forensic.ui.theme.JetBrainsMono
+import com.verumomnis.forensic.ui.theme.SourceSans
 import com.verumomnis.forensic.ui.theme.severityColor
 
 @Composable
@@ -336,7 +337,7 @@ fun ReportScreen(
             InfoRow("Contradictions", report.contradictions.size.toString())
             InfoRow("Seal status", report.seal.status)
             Spacer(Modifier.height(6.dp))
-            Text(report.seal.extendedFooter(), color = VoAccentBlue, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            Text(report.seal.extendedFooter(), color = VoAccentBlue, fontFamily = JetBrainsMono, fontSize = 10.sp)
             Spacer(Modifier.height(8.dp))
             Text(
                 report.executiveSummary,
@@ -359,7 +360,7 @@ fun ReportScreen(
                 Text(
                     report.body,
                     color = VoTextPrimary,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = SourceSans,
                     fontSize = 10.sp,
                     lineHeight = 15.sp
                 )
@@ -460,7 +461,7 @@ fun ReportScreen(
                 }
                 if (a.fullTranscript.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
-                    Text(a.fullTranscript, color = VoTextPrimary, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                    Text(a.fullTranscript, color = VoTextPrimary, fontFamily = SourceSans, fontSize = 9.sp)
                 }
             }
         }
@@ -478,7 +479,7 @@ fun ReportScreen(
                             .padding(12.dp)
                     ) {
                         Text("${ex.exhibitId} · ${ex.kind} · ${ex.fileName}", color = VoAccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("SHA-512 ${ex.sha512.take(24)}…", color = VoTextMuted, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                        Text("SHA-512 ${ex.sha512.take(24)}…", color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 9.sp)
                         val g = ex.gps
                         Text(
                             "GPS " + (g?.let { "%.5f, %.5f (${ex.gpsSource})".format(it.latitude, it.longitude) } ?: "NOT RECORDED"),
@@ -497,7 +498,7 @@ fun ReportScreen(
             Text(state.otsStatus, color = VoTextMuted, fontSize = 12.sp)
             state.otsResult?.let { ots ->
                 Spacer(Modifier.height(4.dp))
-                Text("SHA-256 digest: ${ots.sha256Digest}", color = VoTextPrimary, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                Text("SHA-256 digest: ${ots.sha256Digest}", color = VoTextPrimary, fontFamily = JetBrainsMono, fontSize = 9.sp)
                 Text("Calendars: ${ots.calendarUrls.joinToString(", ").ifEmpty { "—" }}", color = VoTextMuted, fontSize = 10.sp)
                 Text("Proof: ${ots.otsProofFile}", color = VoTextMuted, fontSize = 10.sp)
             }

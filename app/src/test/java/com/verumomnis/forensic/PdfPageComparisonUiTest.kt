@@ -45,7 +45,7 @@ class PdfPageComparisonUiTest {
             .associate { it.relativeTo(vaultRoot).path to it.readBytes().toList() }
         var ocrCalls = 0
         val vm = VerumViewModel(app, IdentityService(app, InMemoryIdentityKeyStore()), vault = vault,
-            pdfPageRetry = { _, _, _, _ -> ocrCalls++; error("Preview must never run OCR") },
+            pdfPageRetry = { _, _, _, _, _ -> ocrCalls++; error("Preview must never run OCR") },
             pdfPagePreview = com.verumomnis.forensic.pdf.PdfPagePreview(vault, app.cacheDir, ::comparisonRaster))
         compose.setContent { VerumOmnisTheme { PdfPageReviewCard(vm.state.collectAsState().value, vm) } }
         compose.waitUntil(10_000) { vm.state.value.pdfReviewRecords.any { it.sha512 == hash } }

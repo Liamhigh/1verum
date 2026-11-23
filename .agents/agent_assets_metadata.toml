@@ -56,3 +56,17 @@ mtime_ms = 1795379432591
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/0d83e2a4-ef3b-4eca-912a-55d7f658bb83/d45ddb54-6d06-417b-99e5-f26a46e51c5c"
 storage_version_token = "1795379451718439"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "jdbhL9LTT0CeelpSKYdM9"
+uri = "file://app/build/screenshots/font-consistency-report-sample.png"
+type = "image"
+title = "Report typography sample"
+description = "Representative report screen using the app’s shared heading, body, and metadata font roles."
+logical_id = "4785794f-74c3-442f-a9e0-f95a6faa2986"
+content_hash = "sha256:fe684eb49e30a9822f9bbda16deb1f721c5e609d03f57e965c326e765e672ebe"
+size = 624058
+mtime_ms = 1795400327293
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:15876f3b-aad3-46f8-8fce-221baaa10b57/4785794f-74c3-442f-a9e0-f95a6faa2986/e58c3227-084d-4cdd-86a9-8c3a29a1594c"
+storage_version_token = "1795400344446397"
+content_type = "image/png"

@@ -169,6 +169,14 @@ private fun ContradictionCard(contradiction: Contradiction, index: Int) {
                     "${legal.citation} (${legal.jurisdiction})\nOfficial source: ${legal.authoritativeUrl}",
                     color = VoTextMuted, fontSize = 10.sp, lineHeight = 14.sp
                 )
+                if (legal.requiresHumanReview) {
+                    Text(
+                        "Human review required: ${legal.reviewNote.ifBlank { "Confirm scope and applicability." }}",
+                        color = VoTextMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp
+                    )
+                }
             }
         }
 

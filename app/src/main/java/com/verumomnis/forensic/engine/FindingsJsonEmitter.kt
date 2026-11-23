@@ -20,7 +20,7 @@ import java.time.Instant
  * Engine-to-G3 contract serializer for the G3 Hybrid Report Pipeline (GHRP).
  *
  * Serializes deterministic [ForensicFindings] into the Findings JSON schema
- * (v1.0.0) that Gemma 3 narrates from. Every record is anchored to a source
+ * (v1.1.0) that Gemma 3 narrates from. Every record is anchored to a source
  * document, page/line, and SHA-512 hash. G3-raised candidates are recorded in
  * the identical format but labelled as pending verification.
  */
@@ -212,7 +212,10 @@ object FindingsJsonEmitter {
             logical_pattern = logicalPattern,
             legal_hypothesis = buildJsonObject {
                 put("jurisdiction", JsonPrimitive(c.jurisdiction))
-                put("requires_human_review", JsonPrimitive(c.legalReferences.isEmpty()))
+                put(
+                    "requires_human_review",
+                    JsonPrimitive(c.legalReferences.isEmpty() || c.legalReferences.any { it.requiresHumanReview })
+                )
                 put("references", Json.encodeToJsonElement(ListSerializer(LegalReference.serializer()), c.legalReferences))
             },
             verification_status = STATUS_ENGINE_VERIFIED,

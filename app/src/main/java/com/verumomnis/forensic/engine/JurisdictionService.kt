@@ -6,12 +6,12 @@ import com.verumomnis.forensic.model.JurisdictionSource
 import com.verumomnis.forensic.model.LegalReference
 
 /**
- * Maps GPS coordinates to a jurisdiction and the statutes that apply to each
- * canonical contradiction category in that jurisdiction.
+ * Resolves a case venue from an investigator choice or a conservative GPS
+ * suggestion, then returns only deliberately supported official-source legal
+ * references for matching categories and source text.
  *
- * The service is deterministic and offline. New regions are added by extending
- * the [REGIONS] list; if no region matches, the result falls back to a
- * keyword-derived international framework.
+ * The service is deterministic and offline. A missing verified reference remains
+ * unmapped for qualified human review; GPS is not legal authority.
  */
 object JurisdictionService {
 
@@ -303,6 +303,9 @@ object JurisdictionService {
         supportingText: String = ""
     ): List<LegalReference> {
         val source = supportingText.lowercase()
+        val electronicSignatureMention =
+            Regex("""electronic\s+signatures?|digital\s+signatures?|e[- ]?sign""")
+                .containsMatchIn(source)
         val reference = when {
             jurisdictionCode.startsWith("ZA") &&
                 category == ContradictionCategory.SECTION_12B &&
@@ -318,6 +321,49 @@ object JurisdictionService {
                     jurisdiction = jurisdictionCode,
                     authoritativeUrl = "https://www.gov.za/documents/electronic-communications-and-transactions-act"
                 ) else null
+            jurisdictionCode == "UK" &&
+                category == ContradictionCategory.SIGNATURE_STATUS &&
+                electronicSignatureMention ->
+                LegalReference(
+                    citation = "Electronic Communications Act 2000, section 7",
+                    jurisdiction = "UK",
+                    authoritativeUrl = "https://www.legislation.gov.uk/ukpga/2000/7/section/7",
+                    requiresHumanReview = true,
+                    reviewNote = "Section 7 addresses evidentiary admissibility, authenticity and integrity; it does not establish validity for every electronic signature."
+                )
+            jurisdictionCode == "US" &&
+                category == ContradictionCategory.SIGNATURE_STATUS &&
+                electronicSignatureMention &&
+                Regex("""interstate|foreign commerce|e-sign act|electronic signatures in global and national commerce""")
+                    .containsMatchIn(source) ->
+                LegalReference(
+                    citation = "Electronic Signatures in Global and National Commerce Act, 15 U.S.C. § 7001(a)",
+                    jurisdiction = "US",
+                    authoritativeUrl = "https://uscode.house.gov/us/usc/t15/s7001",
+                    requiresHumanReview = true,
+                    reviewNote = "Section 7001(a) applies to transactions in or affecting interstate or foreign commerce and is subject to statutory exceptions and consumer-consent requirements."
+                )
+            jurisdictionCode == "IN" &&
+                category == ContradictionCategory.SIGNATURE_STATUS &&
+                electronicSignatureMention ->
+                LegalReference(
+                    citation = "Information Technology Act, 2000, section 5",
+                    jurisdiction = "IN",
+                    authoritativeUrl = "https://www.indiacode.nic.in/show-data?actid=AC_CEN_45_76_00001_200021_1517807324077&orderno=6&sectionId=13015&sectionno=5",
+                    requiresHumanReview = true,
+                    reviewNote = "Section 5 depends on the prescribed electronic-signature method and applicable statutory exclusions."
+                )
+            jurisdictionCode == "AU" &&
+                category == ContradictionCategory.SIGNATURE_STATUS &&
+                electronicSignatureMention &&
+                Regex("""commonwealth|electronic transactions act\s+1999""").containsMatchIn(source) ->
+                LegalReference(
+                    citation = "Electronic Transactions Act 1999 (Cth), section 10",
+                    jurisdiction = "AU",
+                    authoritativeUrl = "https://www.legislation.gov.au/C2004A00553/latest/text",
+                    requiresHumanReview = true,
+                    reviewNote = "Section 10 concerns signature requirements under Commonwealth law; check state, territory and transaction-specific rules."
+                )
             else -> null
         }
         return listOfNotNull(reference)

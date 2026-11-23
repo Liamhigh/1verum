@@ -257,6 +257,9 @@ object ReportGenerator {
                     c.legalReferences.forEach { legal ->
                         appendLine("      Legal hypothesis: ${legal.citation} (${legal.jurisdiction})")
                         appendLine("         Authoritative source: ${legal.authoritativeUrl}")
+                        if (legal.requiresHumanReview) {
+                            appendLine("         Human review required: ${legal.reviewNote.ifBlank { "Confirm the statute's scope and application to this case." }}")
+                        }
                     }
                 }
                 appendLine("      Confidence: ${c.confidence} · Council: ACCEPTED (${c.confirmingBrains.joinToString(", ").ifEmpty { "B1 only" }})")
@@ -288,6 +291,9 @@ object ReportGenerator {
                 } else {
                     c.legalReferences.forEach { legal ->
                         appendLine("      Legal hypothesis: ${legal.citation} (${legal.jurisdiction}) — ${legal.authoritativeUrl}")
+                        if (legal.requiresHumanReview) {
+                            appendLine("         Human review required: ${legal.reviewNote.ifBlank { "Confirm the statute's scope and application to this case." }}")
+                        }
                     }
                 }
             }

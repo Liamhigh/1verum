@@ -420,6 +420,13 @@ fun ReportScreen(
                         c.legalReferences.forEach { legal ->
                             Text("Legal hypothesis: ${legal.citation} (${legal.jurisdiction})", color = VoTextPrimary, fontSize = 12.sp)
                             Text("Official source: ${legal.authoritativeUrl}", color = VoTextMuted, fontSize = 11.sp)
+                            if (legal.requiresHumanReview) {
+                                Text(
+                                    "Human review required: ${legal.reviewNote.ifBlank { "Confirm scope and applicability." }}",
+                                    color = VoTextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                     Text("Automated interpretation, not a legal finding: ${c.legalSignificance}", color = VoTextMuted, fontSize = 12.sp, lineHeight = 18.sp)

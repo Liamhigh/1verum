@@ -11,7 +11,9 @@ import com.verumomnis.forensic.vault.EvidenceVault
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import com.verumomnis.forensic.model.ContradictionCategory
+import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.GpsRecord
+import com.verumomnis.forensic.model.JurisdictionSource
 import com.verumomnis.forensic.model.PageExtraction
 import com.verumomnis.forensic.model.PageReadStatus
 import com.verumomnis.forensic.model.PdfExtractionCoverage
@@ -149,6 +151,121 @@ class EvidenceTraceabilityTest {
         assertTrue(JurisdictionService.legalReferencesFor(
             "INTL", ContradictionCategory.PERJURY
         ).isEmpty())
+    }
+
+    @Test
+    fun additionalElectronicSignatureReferencesRequireExactJurisdictionAndOfficialSources() {
+        data class ExpectedReference(
+            val jurisdiction: String,
+            val sourceText: String,
+            val citation: String,
+            val officialUrl: String
+        )
+
+        val cases = listOf(
+            ExpectedReference(
+                "UK",
+                "The parties used an electronic signature.",
+                "Electronic Communications Act 2000, section 7",
+                "https://www.legislation.gov.uk/ukpga/2000/7/section/7"
+            ),
+            ExpectedReference(
+                "US",
+                "E-SIGN Act: electronic signature in interstate commerce.",
+                "Electronic Signatures in Global and National Commerce Act, 15 U.S.C. § 7001(a)",
+                "https://uscode.house.gov/us/usc/t15/s7001"
+            ),
+            ExpectedReference(
+                "IN",
+                "An electronic signature under the Information Technology Act.",
+                "Information Technology Act, 2000, section 5",
+                "https://www.indiacode.nic.in/show-data?actid=AC_CEN_45_76_00001_200021_1517807324077&orderno=6&sectionId=13015&sectionno=5"
+            ),
+            ExpectedReference(
+                "AU",
+                "Commonwealth law requires an electronic signature.",
+                "Electronic Transactions Act 1999 (Cth), section 10",
+                "https://www.legislation.gov.au/C2004A00553/latest/text"
+            )
+        )
+
+        cases.forEach { expected ->
+            val reference = JurisdictionService.legalReferencesFor(
+                expected.jurisdiction,
+                ContradictionCategory.SIGNATURE_STATUS,
+                expected.sourceText
+            ).single()
+            assertEquals(expected.jurisdiction, reference.jurisdiction)
+            assertEquals(expected.citation, reference.citation)
+            assertEquals(expected.officialUrl, reference.authoritativeUrl)
+            assertTrue(reference.requiresHumanReview)
+            assertTrue(reference.reviewNote.isNotBlank())
+        }
+    }
+
+    @Test
+    fun unsupportedSignatureScopesAndCategoriesStillRequireHumanReview() {
+        assertTrue(
+            JurisdictionService.legalReferencesFor(
+                "US", ContradictionCategory.SIGNATURE_STATUS, "electronic signature in a local-only matter"
+            ).isEmpty()
+        )
+        assertTrue(
+            JurisdictionService.legalReferencesFor(
+                "AU", ContradictionCategory.SIGNATURE_STATUS, "state law and electronic signature"
+            ).isEmpty()
+        )
+        assertTrue(
+            JurisdictionService.legalReferencesFor(
+                "CA", ContradictionCategory.SIGNATURE_STATUS, "electronic signature"
+            ).isEmpty()
+        )
+        assertTrue(
+            JurisdictionService.legalReferencesFor(
+                "UK", ContradictionCategory.PERJURY, "perjury allegation"
+            ).isEmpty()
+        )
+
+        val reference = JurisdictionService.legalReferencesFor(
+            "UK", ContradictionCategory.SIGNATURE_STATUS, "electronic signature"
+        ).single()
+        val contradiction = com.verumomnis.forensic.model.Contradiction(
+            contradictionId = "VO-UK-SIGNATURE",
+            brainSource = "B1",
+            category = ContradictionCategory.SIGNATURE_STATUS,
+            claimA = com.verumomnis.forensic.model.ContradictionClaim(
+                text = "A signature is electronic.",
+                source = "fixture.pdf",
+                evidenceId = "DOC001",
+                sha512 = "a".repeat(128)
+            ),
+            claimB = com.verumomnis.forensic.model.ContradictionClaim(
+                text = "The signature was handwritten.",
+                source = "fixture.pdf",
+                evidenceId = "DOC001",
+                sha512 = "a".repeat(128)
+            ),
+            severity = com.verumomnis.forensic.model.Severity.MODERATE,
+            legalSignificance = "Signature-status indicator",
+            timestamp = now.toString(),
+            jurisdiction = "UK",
+            legalReferences = listOf(reference)
+        )
+        val record = FindingsJsonEmitter.contradictionToRecord(contradiction)
+        assertTrue(record.legal_hypothesis.toString().contains("\"requires_human_review\":true"))
+
+        val findings = ForensicFindings(
+            documentsAnalyzed = 1,
+            evidenceAtoms = emptyList(),
+            contradictions = listOf(contradiction.copy(councilStatus = "ACCEPTED")),
+            timeline = emptyList(),
+            legalMappings = listOf(reference.citation),
+            jurisdiction = "UK",
+            jurisdictionSource = JurisdictionSource("UK", venueLabel = "United Kingdom"),
+            brainVerdicts = mapOf("B1" to "CONTRADICTION")
+        )
+        val report = ReportGenerator.generate(findings, "ReviewNote", now)
+        assertTrue(report.body.contains("Human review required: ${reference.reviewNote}"))
     }
 
     @Test

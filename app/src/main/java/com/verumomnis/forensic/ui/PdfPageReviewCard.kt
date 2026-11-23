@@ -144,6 +144,7 @@ internal fun PdfPageReviewDialog(
     onRetry: (List<Int>) -> Unit
 ) {
     var selected by remember(record) { mutableStateOf(setOf<Int>()) }
+    var expandedTextPages by remember(record) { mutableStateOf(emptySet<Int>()) }
     val coverage = record.coverage
     val limit = PdfOcrExtractor.DEFAULT_MAX_OCR_PAGES
     val remaining = coverage.remainingPages.map { it.page }.toSet()
@@ -156,6 +157,11 @@ internal fun PdfPageReviewDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(record.fileName, color = VoTextPrimary)
+                Text(
+                    "Saved page text is read-only. Check embedded PDF text and on-device OCR separately before resuming report generation.",
+                    color = VoTextMuted,
+                    fontSize = 12.sp
+                )
                 Text("${selected.size} selected · at most $limit pages per fresh attempt. OCR stays on this device and may still fail or miss content.",
                     color = VoTextMuted, fontSize = 12.sp)
                 if (!usable) Text("Page count or saved page text is unavailable. Re-import the original PDF to establish coverage before retrying.",
@@ -175,7 +181,53 @@ internal fun PdfPageReviewDialog(
                             )
                             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                                 Text("Page ${page.page} · ${page.status}", color = VoTextPrimary, fontSize = 13.sp)
+                                val textSource = when (page.status) {
+                                    com.verumomnis.forensic.model.PageReadStatus.TEXT_LAYER -> "Embedded PDF text"
+                                    com.verumomnis.forensic.model.PageReadStatus.OCR -> "On-device OCR"
+                                    else -> "No extracted text saved"
+                                }
+                                Text("Text source: $textSource", color = VoAccentBlue, fontSize = 11.sp)
                                 Text(page.reason.replace('_', ' '), color = VoTextMuted, fontSize = 11.sp)
+                                val savedText = page.extractedText
+                                if (!savedText.isNullOrBlank()) {
+                                    val expanded = page.page in expandedTextPages
+                                    if (savedText.length > 360) {
+                                        TextButton(
+                                            onClick = {
+                                                expandedTextPages = if (expanded) {
+                                                    expandedTextPages - page.page
+                                                } else {
+                                                    expandedTextPages + page.page
+                                                }
+                                            }
+                                        ) {
+                                            Text(
+                                                if (expanded) "Show less saved text" else "Show full saved text",
+                                                color = VoAccentBlue,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        if (savedText.length > 360 && !expanded) {
+                                            "${savedText.take(360).trimEnd()}…"
+                                        } else {
+                                            savedText
+                                        },
+                                        color = VoTextPrimary,
+                                        fontSize = 12.sp
+                                    )
+                                } else {
+                                    Text(
+                                        if (page.extractedChars > 0) {
+                                            "Text was detected, but this saved record does not contain the text."
+                                        } else {
+                                            "No saved page text is available to preview."
+                                        },
+                                        color = VoTextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
                         }
                     }

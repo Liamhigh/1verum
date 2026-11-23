@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], qualifiers = "w411dp-h1000dp-mdpi")
@@ -75,5 +76,76 @@ class PdfPageReviewUiTest {
         val checkbox = compose.onNodeWithContentDescription("Select original page 2, UNREAD")
         checkbox.assertIsEnabled().performScrollTo().performClick()
         compose.onNodeWithText("Start fresh OCR retry").assertIsEnabled()
+    }
+
+    @Test fun savedPageTextLoadsReadOnlyAndShowsItsExtractionSourceAfterReload() {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        val previewAttemptId = "preview-${UUID.randomUUID()}"
+        val savedOcrText = "OCR text segment. ".repeat(32)
+        val previewRecord = record.copy(
+            fileName = "saved-preview.pdf",
+            coverage = PdfExtractionCoverage(
+                totalPages = 2,
+                pages = listOf(
+                    PageExtraction(
+                        page = 1,
+                        status = PageReadStatus.TEXT_LAYER,
+                        reason = "embedded_text",
+                        textLayerChars = 36,
+                        extractedChars = 36,
+                        extractedText = "Saved embedded PDF text from page one."
+                    ),
+                    PageExtraction(
+                        page = 2,
+                        status = PageReadStatus.OCR,
+                        reason = "on_device_ocr",
+                        extractedChars = savedOcrText.length,
+                        ocrAttempted = true,
+                        extractedText = savedOcrText
+                    )
+                ),
+                retryAttempt = PdfRetryAttempt(
+                    id = previewAttemptId,
+                    createdAt = "2026-11-22T00:00:00Z",
+                    selectedPages = listOf(2)
+                )
+            )
+        )
+        val vault = com.verumomnis.forensic.vault.EvidenceVault(
+            java.io.File(app.cacheDir, "saved-page-text-preview-$previewAttemptId"),
+            masterKeyProvider = { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 4 }, "AES") }
+        )
+        val hash = vault.preservePdfSource("%PDF saved preview fixture".toByteArray())
+        vault.storePdfExtraction("DOC001", previewRecord.fileName, hash, previewRecord.coverage)
+        var ocrCalls = 0
+        val vm = com.verumomnis.forensic.ui.VerumViewModel(
+            app,
+            com.verumomnis.forensic.identity.IdentityService(
+                app,
+                com.verumomnis.forensic.identity.InMemoryIdentityKeyStore()
+            ),
+            vault = vault,
+            pdfPageRetry = { _, _, _ ->
+                ocrCalls += 1
+                error("Previewing saved text must not rerun OCR")
+            }
+        )
+
+        compose.setContent { VerumOmnisTheme {
+            com.verumomnis.forensic.ui.PdfPageReviewCard(vm.state.collectAsState().value, vm)
+        } }
+        compose.waitUntil(10_000) {
+            vm.state.value.pdfReviewRecords.any { it.fileName == previewRecord.fileName }
+        }
+        assertEquals(1, vm.state.value.pdfRetryRecoveries.size)
+        assertTrue(vm.state.value.pdfRetryRecoveries.single().canResumeReport)
+        compose.onNodeWithText("RESUME REPORT GENERATION").assertExists()
+        compose.onNodeWithText("REVIEW PAGES: ${previewRecord.fileName.uppercase()}").performClick()
+        compose.onNodeWithText("Text source: Embedded PDF text").assertExists()
+        compose.onNodeWithText("Saved embedded PDF text from page one.").assertExists()
+        compose.onNodeWithText("Text source: On-device OCR").assertExists()
+        compose.onNodeWithText("Show full saved text").performScrollTo().performClick()
+        compose.onNodeWithText(savedOcrText).assertExists()
+        assertEquals(0, ocrCalls)
     }
 }

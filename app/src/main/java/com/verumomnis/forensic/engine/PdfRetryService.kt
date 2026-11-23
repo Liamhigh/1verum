@@ -15,6 +15,8 @@ data class PdfRetryResult(
     val report: ForensicReport? = null,
     val reportFile: File? = null,
     val message: String,
+    /** The exact JSON path recorded by this report, never a nearby vault JSON. */
+    val findingsJsonFile: File? = null,
 ) {
     val stage: PdfRetryRecoveryStage
         get() = when {
@@ -26,6 +28,21 @@ data class PdfRetryResult(
     val canResumeReport: Boolean
         get() = record.coverage.pages.none { it.extractedChars > 0 && it.extractedText == null } &&
             record.coverage.pages.any { !it.extractedText.isNullOrBlank() }
+
+    val canSharePair: Boolean
+        get() = report != null && reportFile.isReadableNonEmpty() && findingsJsonFile.isReadableNonEmpty()
+
+    val sharePairError: String?
+        get() = when {
+            report == null -> "The retry report is unavailable."
+            !reportFile.isReadableNonEmpty() -> "The retry PDF is missing or unreadable. Export it again before sharing both files."
+            !findingsJsonFile.isReadableNonEmpty() ->
+                "The matching findings JSON is missing or unreadable. No other JSON file will be substituted."
+            else -> null
+        }
+
+    private fun File?.isReadableNonEmpty(): Boolean =
+        this != null && isFile && canRead() && length() > 0
 }
 
 enum class PdfRetryRecoveryStage { EXTRACTION_ONLY, FINDINGS_READY, PDF_READY }
@@ -90,11 +107,13 @@ class PdfRetryService(
         requireSavedRetry(record)
         val report = findReport(record, savedReports)
         val file = report?.let { findReportPdf(record.fileName, it.reference) }
+        val findingsJson = report?.let { findRetryFindingsJson(record, it) }
         val retryAttempt = requireNotNull(record.coverage.retryAttempt)
         return PdfRetryResult(
             record = record,
             report = report,
             reportFile = file,
+            findingsJsonFile = findingsJson,
             message = when {
                 retryAttempt.cancelled && report == null -> {
                     val unprocessed = retryAttempt.selectedPages.size - retryAttempt.processedPages.size
@@ -177,7 +196,12 @@ class PdfRetryService(
     }
 
     private fun retryReportPdf(record: DocumentExtractionCoverage, report: ForensicReport): PdfRetryResult {
-        val saved = PdfRetryResult(record, report = report, message = "Retry findings and report snapshot are saved.")
+        val saved = PdfRetryResult(
+            record,
+            report = report,
+            message = "Retry findings and report snapshot are saved.",
+            findingsJsonFile = findRetryFindingsJson(record, report)
+        )
         return try {
             val file = vault.retainReportPdf(writePdf(report, record.fileName))
             check(file.isFile && file.length() > 0) { "Report PDF was not saved." }
@@ -235,11 +259,34 @@ class PdfRetryService(
         val suffixPattern = Regex("${Regex.escape(stem)}_\\d+\\.pdf")
         return vault.reportsSealed.listFiles().orEmpty()
             .filter { file ->
-                file.isFile && file.length() > 0 &&
+                file.isFile && file.canRead() && file.length() > 0 &&
                     (file.name == expectedName || suffixPattern.matches(file.name))
             }
             .sortedWith(compareBy<File> { if (it.name == expectedName) 0 else 1 }.thenBy { it.name })
             .firstOrNull()
+    }
+
+    /**
+     * Follow the report's own path and require the retry's attempt id in both its
+     * extraction coverage and filename. Never guess from the newest JSON in the vault.
+     */
+    private fun findRetryFindingsJson(
+        record: DocumentExtractionCoverage,
+        report: ForensicReport
+    ): File? {
+        val attemptId = record.coverage.retryAttempt?.id ?: return null
+        if (report.extractionCoverage.none { saved ->
+                saved.sha512.equals(record.sha512, ignoreCase = true) &&
+                    saved.coverage.retryAttempt?.id == attemptId
+            }
+        ) return null
+        if (report.findingsJsonPath.isBlank()) return null
+        val file = runCatching { File(report.findingsJsonPath).canonicalFile }.getOrNull() ?: return null
+        val findingsRoot = runCatching { vault.findings.canonicalFile.toPath() }.getOrNull() ?: return null
+        val filePath = file.toPath()
+        val expectedName = Regex("ocr_retry_${Regex.escape(attemptId)}_findings(?:_\\d+)?\\.json")
+        if (filePath.parent != findingsRoot || !expectedName.matches(file.name)) return null
+        return file.takeIf { it.isFile && it.canRead() && it.length() > 0 }
     }
 
     private fun savedText(record: DocumentExtractionCoverage): String {

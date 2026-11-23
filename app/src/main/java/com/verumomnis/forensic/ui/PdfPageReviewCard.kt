@@ -122,18 +122,39 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
                             enabled = !busy,
                             onClick = { viewModel.retryPdfReviewExport(record) }
                         )
+                        recovery?.sharePairError?.let { error ->
+                            Text(error, color = VoGold, fontSize = 11.sp)
+                        }
                     }
                     PdfRetryRecoveryStage.PDF_READY -> {
                         val file = recovery?.reportFile
                         if (file != null) {
-                            VerumSecondaryButton("Share new retry PDF", onClick = {
-                                shareError = try {
-                                    SealedPdfExporter(context).share(file)
-                                    ""
-                                } catch (_: Exception) {
-                                    "The new PDF could not be shared. It is still saved in the vault."
-                                }
-                            })
+                            val retry = recovery
+                            if (retry?.canSharePair == true &&
+                                retry.report != null &&
+                                retry.findingsJsonFile != null
+                            ) {
+                                VerumSecondaryButton("Share retry PDF + findings JSON", onClick = {
+                                    shareError = try {
+                                        SealedPdfExporter(context).shareRetryPair(
+                                            report = retry.report,
+                                            source = record,
+                                            reportPdf = file,
+                                            findingsJson = retry.findingsJsonFile
+                                        )
+                                        ""
+                                    } catch (_: Exception) {
+                                        "Could not share the matching PDF and findings JSON. Saved evidence was not changed; check storage and try again."
+                                    }
+                                })
+                            } else {
+                                Text(
+                                    retry?.sharePairError
+                                        ?: "Both matching retry files are required before sharing. Saved evidence was not changed.",
+                                    color = VoRed,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }

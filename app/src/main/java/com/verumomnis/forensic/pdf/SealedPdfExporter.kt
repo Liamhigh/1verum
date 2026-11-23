@@ -1,11 +1,14 @@
 package com.verumomnis.forensic.pdf
 
 import android.content.Context
+import android.content.ClipData
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.core.content.FileProvider
 import com.verumomnis.forensic.R
+import com.verumomnis.forensic.model.DocumentExtractionCoverage
 import com.verumomnis.forensic.model.ForensicReport
 import com.verumomnis.forensic.model.SealedEmail
 import com.verumomnis.forensic.vault.EvidenceVault
@@ -93,4 +96,107 @@ class SealedPdfExporter(
         }
         context.startActivity(Intent.createChooser(intent, "Share sealed PDF").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
+
+    /**
+     * Shares the exact report and its report-linked findings JSON as one pair.
+     * Copies only their bytes into cache to provide descriptive share filenames;
+     * vaulted evidence and saved reports are never renamed or rewritten.
+     */
+    fun shareRetryPair(
+        report: ForensicReport,
+        source: DocumentExtractionCoverage,
+        reportPdf: File,
+        findingsJson: File,
+        launchChooser: (Intent) -> Unit = { chooser ->
+            context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    ) {
+        val attemptId = source.coverage.retryAttempt?.id
+            ?: throw IllegalArgumentException("The source record is not an OCR retry.")
+        val belongsToRetry = report.extractionCoverage.any { saved ->
+            saved.sha512.equals(source.sha512, ignoreCase = true) &&
+                saved.coverage.retryAttempt?.id == attemptId
+        }
+        require(belongsToRetry) { "The selected report does not belong to this source PDF and retry attempt." }
+
+        val expectedJson = runCatching { File(report.findingsJsonPath).canonicalFile }.getOrNull()
+        require(expectedJson != null && expectedJson == findingsJson.canonicalFile) {
+            "The selected findings JSON is not the exact file linked by this report."
+        }
+        val expectedJsonName = Regex("ocr_retry_${Regex.escape(attemptId)}_findings(?:_\\d+)?\\.json")
+        require(expectedJsonName.matches(findingsJson.name)) {
+            "The selected findings JSON does not match this retry attempt."
+        }
+        val expectedPdfName = SealedOutputNames.forensicReport(source.fileName, report.reference)
+        val expectedPdfStem = expectedPdfName.removeSuffix(".pdf")
+        val numberedPdfName = Regex("${Regex.escape(expectedPdfStem)}_\\d+\\.pdf")
+        require(reportPdf.name == expectedPdfName || numberedPdfName.matches(reportPdf.name)) {
+            "The selected PDF does not match this retry report."
+        }
+        requireReadable(reportPdf, "retry PDF")
+        requireReadable(findingsJson, "matching findings JSON")
+
+        val shareDirectory = File(context.cacheDir, "retry-share")
+        if (!shareDirectory.isDirectory && !shareDirectory.mkdirs()) {
+            throw java.io.IOException("Unable to prepare temporary files for sharing.")
+        }
+        val sourceStem = safeShareName(source.fileName.substringBeforeLast('.', source.fileName))
+        val attemptStem = safeShareName(attemptId)
+        val shareStem = "VerumOmnis_${sourceStem}_retry_$attemptStem"
+        val pdfCopy = File.createTempFile("${shareStem}_report_", ".pdf", shareDirectory)
+        val jsonCopy = File.createTempFile("${shareStem}_findings_", ".json", shareDirectory)
+        try {
+            reportPdf.copyTo(pdfCopy, overwrite = true)
+            findingsJson.copyTo(jsonCopy, overwrite = true)
+            check(pdfCopy.length() == reportPdf.length() && jsonCopy.length() == findingsJson.length()) {
+                "A complete copy of both retry files could not be prepared."
+            }
+
+            val pdfUri = FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", pdfCopy
+            )
+            val jsonUri = FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", jsonCopy
+            )
+            val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "*/*"
+                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/json"))
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf<Uri>(pdfUri, jsonUri))
+                putExtra(
+                    Intent.EXTRA_SUBJECT,
+                    "Verum Omnis OCR retry · ${source.fileName} · attempt $attemptId"
+                )
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    "Source PDF: ${source.fileName}\nRetry attempt: $attemptId"
+                )
+                clipData = ClipData.newUri(
+                    context.contentResolver, "Verum Omnis retry files", pdfUri
+                ).apply {
+                    addItem(ClipData.Item(jsonUri))
+                }
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            launchChooser(
+                Intent.createChooser(send, "Share retry PDF and findings JSON")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            )
+        } catch (error: Exception) {
+            pdfCopy.delete()
+            jsonCopy.delete()
+            throw error
+        }
+    }
+
+    private fun requireReadable(file: File, label: String) {
+        require(file.isFile && file.canRead() && file.length() > 0) {
+            "The $label is missing or unreadable."
+        }
+    }
+
+    private fun safeShareName(value: String): String = value
+        .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+        .trim('.', '_')
+        .take(48)
+        .ifBlank { "document" }
 }

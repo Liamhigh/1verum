@@ -73,6 +73,12 @@ class PdfRetryIntegrationTest {
         before.forEach { (path, hash) -> assertEquals("Must retain $path", hash, Sha512.hash(File(root, path))) }
         assertEquals(old.body, Json.decodeFromString(ForensicReport.serializer(), originalReportFile.readText()).body)
         val firstReport = requireNotNull(first.report)
+        assertTrue(first.canSharePair)
+        assertEquals(File(firstReport.findingsJsonPath).canonicalFile, first.findingsJsonFile!!.canonicalFile)
+        assertEquals(
+            File(second.report!!.findingsJsonPath).canonicalFile,
+            second.findingsJsonFile!!.canonicalFile
+        )
         assertNotEquals(firstReport.reference, second.report!!.reference)
         assertNotEquals(first.reportFile, second.reportFile)
         assertTrue(firstReport.body.contains("NEW PDF-only OCR Retry Report"))
@@ -89,6 +95,95 @@ class PdfRetryIntegrationTest {
         val materialised = File(root, "source-check.pdf")
         reloaded.materializePdfSource(second.record, materialised)
         assertArrayEquals(bytes, materialised.readBytes())
+    }
+
+    @Test fun retryRecoveryNeverSubstitutesAnUnrelatedFindingsJson() {
+        val vault = vault()
+        val source = source(vault)
+        val result = service(vault).retry(source, listOf(2), null, now)
+        val report = requireNotNull(result.report)
+        val unrelated = vault.storeFindingUnique("ocr_retry_different-attempt_findings.json", """{"unrelated":true}""")
+
+        val recovery = service(vault).recoverSaved(
+            result.record,
+            listOf(report.copy(findingsJsonPath = unrelated.absolutePath))
+        )
+
+        assertNull(recovery.findingsJsonFile)
+        assertFalse(recovery.canSharePair)
+        assertTrue(recovery.sharePairError!!.contains("matching findings JSON"))
+    }
+
+    @Test fun sharesExactRetryPdfAndLinkedJsonWithSourceAndAttemptFilenames() {
+        val vault = vault()
+        val source = source(vault)
+        val result = service(vault).retry(source, listOf(2), null, now)
+        val report = requireNotNull(result.report)
+        val pdf = requireNotNull(result.reportFile)
+        val json = requireNotNull(result.findingsJsonFile)
+        val attemptId = result.record.coverage.retryAttempt!!.id
+        val launched = java.util.concurrent.atomic.AtomicReference<android.content.Intent?>()
+        val exporter = com.verumomnis.forensic.pdf.SealedPdfExporter(app)
+
+        exporter.shareRetryPair(report, result.record, pdf, json) { launched.set(it) }
+
+        val chooser = requireNotNull(launched.get())
+        val send = requireNotNull(
+            chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT)
+        ) as android.content.Intent
+        assertEquals(android.content.Intent.ACTION_SEND_MULTIPLE, send.action)
+        val streams = requireNotNull(
+            send.getParcelableArrayListExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)
+        )
+        assertEquals(2, streams.size)
+        assertEquals(2, send.clipData?.itemCount)
+        val names = streams.map { uri ->
+            val cursor = requireNotNull(app.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null, null, null
+            ))
+            cursor.use {
+                assertTrue(it.moveToFirst())
+                it.getString(0)
+            }
+        }
+        assertTrue(names.any { it.contains("original") && it.contains(attemptId) && it.endsWith(".pdf") })
+        assertTrue(names.any { it.contains("original") && it.contains(attemptId) && it.endsWith(".json") })
+        assertTrue(send.getStringExtra(android.content.Intent.EXTRA_SUBJECT)!!.contains(source.fileName))
+        assertTrue(send.getStringExtra(android.content.Intent.EXTRA_SUBJECT)!!.contains(attemptId))
+        assertTrue(send.flags and android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        val cachedShareFiles = File(app.cacheDir, "retry-share").listFiles().orEmpty()
+        assertArrayEquals(
+            pdf.readBytes(),
+            cachedShareFiles.single { it.name == names.single { name -> name.endsWith(".pdf") } }.readBytes()
+        )
+        assertArrayEquals(
+            json.readBytes(),
+            cachedShareFiles.single { it.name == names.single { name -> name.endsWith(".json") } }.readBytes()
+        )
+    }
+
+    @Test fun missingMatchingJsonBlocksSharingWithoutChangingTheRetryPdf() {
+        val vault = vault()
+        val source = source(vault)
+        val result = service(vault).retry(source, listOf(2), null, now)
+        val report = requireNotNull(result.report)
+        val pdf = requireNotNull(result.reportFile)
+        val json = requireNotNull(result.findingsJsonFile)
+        val pdfBytes = pdf.readBytes()
+        assertTrue(json.delete())
+        val recovery = service(vault).recoverSaved(result.record)
+        val launched = java.util.concurrent.atomic.AtomicBoolean(false)
+        val exporter = com.verumomnis.forensic.pdf.SealedPdfExporter(app)
+
+        assertFalse(recovery.canSharePair)
+        assertTrue(recovery.sharePairError!!.contains("matching findings JSON"))
+        assertThrows(IllegalArgumentException::class.java) {
+            exporter.shareRetryPair(report, result.record, pdf, json) { launched.set(true) }
+        }
+        assertFalse(launched.get())
+        assertArrayEquals(pdfBytes, pdf.readBytes())
     }
 
     @Test fun allUnreadAttemptIsSavedWithoutClaimingCleanFindingsOrProducingAReport() {

@@ -317,6 +317,22 @@ fun ReportScreen(
             Text(report.classification, color = VoRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             InfoRow("Jurisdiction", report.jurisdiction)
+            report.jurisdictionSource?.let { source ->
+                InfoRow(
+                    "Governing venue",
+                    "${source.venueLabel.ifBlank { source.jurisdiction }} (${source.jurisdiction})"
+                )
+                InfoRow(
+                    "Venue basis",
+                    when (source.selectionBasis) {
+                        "INVESTIGATOR_SELECTED" -> "Investigator-selected; GPS is context only"
+                        "GPS_SUGGESTION" -> "GPS suggestion; confirm independently"
+                        "GPS_FALLBACK" -> "GPS could not determine venue"
+                        "NO_GPS_FALLBACK" -> "No GPS venue available"
+                        else -> "Basis not recorded; confirm independently"
+                    }
+                )
+            }
             InfoRow("Contradictions", report.contradictions.size.toString())
             InfoRow("Seal status", report.seal.status)
             Spacer(Modifier.height(6.dp))

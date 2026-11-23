@@ -217,7 +217,10 @@ data class BehavioralAnalysis(
 data class JurisdictionSource(
     val jurisdiction: String,
     val gps: GpsRecord? = null,
-    val statutes: List<String> = emptyList()
+    val statutes: List<String> = emptyList(),
+    val venueLabel: String = "",
+    /** INVESTIGATOR_SELECTED, GPS_SUGGESTION, GPS_FALLBACK, NO_GPS_FALLBACK, or UNSPECIFIED. */
+    val selectionBasis: String = "UNSPECIFIED"
 )
 
 @Serializable

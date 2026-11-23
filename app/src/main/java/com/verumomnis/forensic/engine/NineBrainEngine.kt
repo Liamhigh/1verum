@@ -39,7 +39,8 @@ object NineBrainEngine {
         documents: List<EvidenceDocument>,
         audio: List<AudioEvidence> = emptyList(),
         media: List<MediaEvidence> = emptyList(),
-        now: Instant
+        now: Instant,
+        selectedVenueCode: String? = null
     ): ForensicFindings {
         val timestamp = now.toString()
 
@@ -56,7 +57,7 @@ object NineBrainEngine {
         }
         val allDocs = documents + audioDocs
         val gps = documents.firstNotNullOfOrNull { it.gps }
-        val jurisdictionSource = JurisdictionService.resolve(gps)
+        val jurisdictionSource = JurisdictionService.resolve(gps, selectedVenueCode)
         val jurisdiction = jurisdictionSource.jurisdiction
         val extractedPersons = EntityExtractor.extractPersons(allDocs)
 

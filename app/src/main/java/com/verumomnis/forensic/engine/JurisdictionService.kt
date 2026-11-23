@@ -15,6 +15,8 @@ import com.verumomnis.forensic.model.LegalReference
  */
 object JurisdictionService {
 
+    data class Venue(val code: String, val label: String)
+
     data class Region(
         val code: String,
         val label: String,
@@ -231,14 +233,42 @@ object JurisdictionService {
         )
     )
 
-    /** Resolve a jurisdiction record from GPS, or return an international fallback. */
-    fun resolve(gps: GpsRecord?): JurisdictionSource {
-        gps ?: return JurisdictionSource("INTL")
+    /** Venues available for an explicit investigator selection. */
+    fun supportedVenues(): List<Venue> = REGIONS.map { Venue(it.code, it.label) }
+
+    fun venueLabel(code: String): String? =
+        REGIONS.firstOrNull { it.code == code }?.label
+
+    /**
+     * Resolve the case venue. An explicit investigator choice takes precedence;
+     * GPS remains attached as supporting context and never overrides that choice.
+     */
+    fun resolve(gps: GpsRecord?, selectedVenueCode: String? = null): JurisdictionSource {
+        selectedVenueCode?.takeIf { it.isNotBlank() }?.let { code ->
+            val label = venueLabel(code)
+                ?: throw IllegalArgumentException("Unsupported legal venue: $code")
+            return JurisdictionSource(
+                jurisdiction = code,
+                gps = gps,
+                venueLabel = label,
+                selectionBasis = "INVESTIGATOR_SELECTED"
+            )
+        }
+        gps ?: return JurisdictionSource(
+            jurisdiction = "INTL",
+            venueLabel = "International / venue not determined",
+            selectionBasis = "NO_GPS_FALLBACK"
+        )
         val matches = REGIONS.filter { it.contains(gps) }
         // These rectangles overlap across real borders. If a point fits both
         // countries, do not guess which country's law governs the matter.
         if (matches.any { it.code == "US" } && matches.any { it.code == "CA" }) {
-            return JurisdictionSource("INTL", gps)
+            return JurisdictionSource(
+                jurisdiction = "INTL",
+                gps = gps,
+                venueLabel = "International / venue not determined",
+                selectionBasis = "GPS_FALLBACK"
+            )
         }
         val preferred = listOf("UAE-DIFC", "ZA-GP", "ZA-KZN", "UK", "CA")
         val region = preferred.firstNotNullOfOrNull { code -> matches.firstOrNull { it.code == code } }
@@ -247,12 +277,19 @@ object JurisdictionService {
             JurisdictionSource(
                 jurisdiction = region.code,
                 gps = gps,
+                venueLabel = region.label,
+                selectionBasis = "GPS_SUGGESTION",
                 // Category tables are legacy issue hints, not authoritative citations.
                 // Actual statute output is limited to legalReferencesFor().
                 statutes = emptyList()
             )
         } else {
-            JurisdictionSource("INTL", gps)
+            JurisdictionSource(
+                jurisdiction = "INTL",
+                gps = gps,
+                venueLabel = "International / venue not determined",
+                selectionBasis = "GPS_FALLBACK"
+            )
         }
     }
 

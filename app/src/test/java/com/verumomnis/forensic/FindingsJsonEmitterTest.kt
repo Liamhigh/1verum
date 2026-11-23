@@ -80,7 +80,7 @@ class FindingsJsonEmitterTest {
         val json = FindingsJsonEmitter.emit(findings, "TestCase", now)
 
         assertTrue("JSON should contain engine version", json.contains("\"engine_version\":\"5.3.1c\""))
-        assertTrue("JSON should contain findings_json_version", json.contains("\"findings_json_version\":\"1.0.0\""))
+        assertTrue("JSON should contain findings_json_version", json.contains("\"findings_json_version\":\"1.1.0\""))
         assertTrue("JSON should contain source_bundle", json.contains("\"source_bundle\":\"TestCase\""))
         assertTrue("JSON should contain generated_utc", json.contains("\"generated_utc\":\"2026-07-14T09:00:00Z\""))
         assertTrue(

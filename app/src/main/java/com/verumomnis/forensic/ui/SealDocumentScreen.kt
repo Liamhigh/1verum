@@ -84,6 +84,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.verumomnis.forensic.core.Constitution
+import com.verumomnis.forensic.engine.JurisdictionService
 import com.verumomnis.forensic.R
 import com.verumomnis.forensic.pdf.QrCodeGenerator
 import com.verumomnis.forensic.seal.SealMetadataCodec
@@ -152,6 +153,14 @@ fun SealDocumentScreen(
             Spacer(Modifier.height(20.dp))
             if (!state.sealBusy && state.sealResult == null) {
             SealingModeSelector(selected = state.sealMode, onSelect = viewModel::setSealMode)
+            if (state.sealMode == "forensic") {
+                Spacer(Modifier.height(14.dp))
+                CaseVenueSelector(
+                    selectedVenueCode = state.selectedVenueCode,
+                    gpsSuggestion = JurisdictionService.resolve(state.gps),
+                    onSelect = viewModel::setSelectedVenue
+                )
+            }
             Spacer(Modifier.height(20.dp))
             UploadZone(
                 hasFile = state.sealPdfBytes != null,

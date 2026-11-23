@@ -33,6 +33,7 @@ import com.verumomnis.forensic.engine.EvidenceDocument
 import com.verumomnis.forensic.engine.FindingsJsonEmitter
 import com.verumomnis.forensic.engine.ForensicService
 import com.verumomnis.forensic.engine.GuardianBrain
+import com.verumomnis.forensic.engine.JurisdictionService
 import com.verumomnis.forensic.engine.MediaEvidence
 import com.verumomnis.forensic.engine.ReportGenerator
 import com.verumomnis.forensic.engine.ScanResult
@@ -213,6 +214,8 @@ data class UiState(
     val scanSets: List<ScanSet> = emptyList(),
     val reportDocumentLinkIds: List<String> = emptyList(),
     val jurisdiction: String = "ZA-KZN",
+    /** Optional case-specific investigator choice; null means GPS suggestion/fallback. */
+    val selectedVenueCode: String? = null,
     val files: List<FileEntry> = emptyList(),
     val scanning: Boolean = false,
     val scanResult: ScanResult? = null,
@@ -1438,8 +1441,14 @@ class VerumViewModel(
                     }
                     // Each selected document starts a fresh active case, rather
                     // than accidentally including previous uploads. Vault files stay.
+                    val selectedVenueCode = _state.value.selectedVenueCode
                     clearCase()
-                    _state.update { it.copy(reportPdfSourceName = name) }
+                    _state.update {
+                        it.copy(
+                            reportPdfSourceName = name,
+                            selectedVenueCode = selectedVenueCode
+                        )
+                    }
                     addDocument(EvidenceDocument(
                         evidenceId = "DOC001", fileName = name, type = "pdf",
                         text = text, sha512 = sha512ForAnchor, gps = gps,
@@ -1710,9 +1719,18 @@ class VerumViewModel(
                 otsStatus = "Evidence seal not yet anchored to Bitcoin (OpenTimestamps).",
                 findingsJsonPath = "",
                 guardianBlock = null,
-                researchFindings = null
+                researchFindings = null,
+                selectedVenueCode = null
             )
         }
+    }
+
+    fun setSelectedVenue(code: String?) {
+        if (code != null && JurisdictionService.venueLabel(code) == null) {
+            _state.update { it.copy(sealError = "That legal venue is not supported.") }
+            return
+        }
+        _state.update { it.copy(selectedVenueCode = code, sealError = "") }
     }
 
     fun addDocument(doc: EvidenceDocument) {
@@ -1761,7 +1779,12 @@ class VerumViewModel(
             return
         }
         _state.update { it.copy(scanning = true, scanLog = "Nine-Brain forensic analysis in progress…") }
-        val result = ForensicService.scan(documents, audios, medias, now, vault = vault, caseName = caseName)
+        val result = ForensicService.scan(
+            documents, audios, medias, now,
+            vault = vault,
+            caseName = caseName,
+            selectedVenueCode = _state.value.selectedVenueCode
+        )
         val findingsJsonName = FindingsJsonEmitter.findingsFileName(caseName, now)
         val findingsJsonPath = java.io.File(vault.findings, findingsJsonName).absolutePath
         val guardian = result.findings.guardian

@@ -108,9 +108,10 @@ object ForensicService {
         media: List<MediaEvidence> = emptyList(),
         now: Instant,
         vault: EvidenceVault? = null,
-        caseName: String = ""
+        caseName: String = "",
+        selectedVenueCode: String? = null
     ): ScanResult {
-        val findings = NineBrainEngine.analyze(documents, audio, media, now).copy(
+        val findings = NineBrainEngine.analyze(documents, audio, media, now, selectedVenueCode).copy(
             extractionCoverage = documents.mapNotNull { doc ->
                 val coverage = doc.extractionCoverage ?: if (
                     doc.type.equals("pdf", ignoreCase = true) ||

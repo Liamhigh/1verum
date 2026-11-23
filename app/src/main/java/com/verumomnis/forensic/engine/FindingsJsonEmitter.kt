@@ -3,6 +3,7 @@ package com.verumomnis.forensic.engine
 import com.verumomnis.forensic.model.Contradiction
 import com.verumomnis.forensic.model.ForensicFindings
 import com.verumomnis.forensic.model.LegalReference
+import com.verumomnis.forensic.model.JurisdictionSource
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.builtins.ListSerializer
@@ -25,7 +26,7 @@ import java.time.Instant
  */
 object FindingsJsonEmitter {
 
-    const val FINDINGS_JSON_VERSION = "1.0.0"
+    const val FINDINGS_JSON_VERSION = "1.1.0"
     const val ENGINE_VERSION = com.verumomnis.forensic.engine.contradiction.EngineVersion.VALUE
 
     const val STATUS_ENGINE_VERIFIED = "ENGINE-VERIFIED"
@@ -43,6 +44,7 @@ object FindingsJsonEmitter {
         val case_ids: List<String> = emptyList(),
         val corpus_sha512: String = "",
         val jurisdiction: String = "",
+        val jurisdiction_source: JurisdictionSource? = null,
         val engine_verified_count: Int = 0,
         val g3_candidate_count: Int = 0,
         val supplement_date: String? = null,
@@ -122,6 +124,7 @@ object FindingsJsonEmitter {
             case_ids = listOf(caseName),
             corpus_sha512 = corpusSha512,
             jurisdiction = findings.jurisdiction,
+            jurisdiction_source = findings.jurisdictionSource,
             engine_verified_count = records.size - candidateCount,
             g3_candidate_count = candidateCount,
             integrity_findings = emptyList(),

@@ -27,6 +27,7 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
 
     companion object {
         const val INPUT_CASE_NAME = "case_name"
+        const val INPUT_JURISDICTION = "jurisdiction"
         const val INPUT_EVIDENCE_COUNT = "evidence_count"
         const val PREFIX_FILENAME = "evidence_"
         const val SUFFIX_FILENAME = "_filename"
@@ -89,7 +90,11 @@ class ForensicScanWorker(context: Context, params: WorkerParameters) : Coroutine
         // The uploader already vaulted the original bytes. Do not re-store the
         // extracted text here: that used to replace derived evidence artifacts
         // under the same name on a second scan.
-        val scanResult = ForensicService.scan(documents, now = now)
+        val scanResult = ForensicService.scan(
+            documents,
+            now = now,
+            selectedVenueCode = inputData.getString(INPUT_JURISDICTION)
+        )
 
         setProgress(progress("Report", "Generating sealed forensic report", 75))
         val findingsName = FindingsJsonEmitter.findingsFileName(caseName, now)

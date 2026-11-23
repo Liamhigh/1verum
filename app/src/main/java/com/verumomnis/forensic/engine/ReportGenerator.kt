@@ -165,6 +165,19 @@ object ReportGenerator {
         appendLine("Classification: $classification")
         appendLine("Date: $now")
         appendLine("Jurisdiction: ${findings.jurisdiction}")
+        findings.jurisdictionSource?.let { source ->
+            val venue = source.venueLabel.ifBlank { source.jurisdiction }
+            appendLine("Governing venue: $venue (${source.jurisdiction})")
+            appendLine(
+                "Venue basis: " + when (source.selectionBasis) {
+                    "INVESTIGATOR_SELECTED" -> "Investigator-selected; GPS is supporting context and did not select or override this venue."
+                    "GPS_SUGGESTION" -> "GPS suggestion only; confirm the governing legal venue independently."
+                    "GPS_FALLBACK" -> "GPS could not determine a supported venue; confirm the legal venue independently."
+                    "NO_GPS_FALLBACK" -> "No GPS venue available; legal venue was not determined."
+                    else -> "Venue-selection basis was not recorded; confirm the governing legal venue independently."
+                }
+            )
+        }
         appendLine("Constitution: v${Constitution.VERSION} | Nine-Brain: ${Constitution.NINE_BRAIN_VERSION}")
         appendLine("=".repeat(72))
         appendLine()
@@ -196,6 +209,16 @@ object ReportGenerator {
         appendLine()
         findings.jurisdictionSource?.let { js ->
             appendLine("2a. JURISDICTION SOURCE")
+            appendLine("   Governing venue: ${js.venueLabel.ifBlank { js.jurisdiction }} (${js.jurisdiction})")
+            appendLine(
+                "   Basis: " + when (js.selectionBasis) {
+                    "INVESTIGATOR_SELECTED" -> "Investigator-selected; GPS is supporting context and did not override this venue."
+                    "GPS_SUGGESTION" -> "GPS suggestion only; independently confirm governing law and venue."
+                    "GPS_FALLBACK" -> "GPS could not determine a supported venue; independently confirm governing law and venue."
+                    "NO_GPS_FALLBACK" -> "No GPS venue available; legal venue not determined."
+                    else -> "Venue-selection basis was not recorded; independently confirm governing law and venue."
+                }
+            )
             js.gps?.let { g ->
                 appendLine("   Coordinates: %.6f, %.6f".format(g.latitude, g.longitude))
             }

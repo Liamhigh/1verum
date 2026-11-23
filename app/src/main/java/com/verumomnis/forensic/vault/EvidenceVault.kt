@@ -35,6 +35,7 @@ class EvidenceVault(
     val chatSessions = File(root, "chat_sessions")
     val research = File(root, "research")
     val config = File(root, "config")
+    val documentLinks = File(root, "document_links")
 
     private val keyProvider: () -> SecretKey = masterKeyProvider ?: {
         VaultKeyStore.getOrCreateMasterKey(hasEncryptedVaultData())
@@ -44,8 +45,66 @@ class EvidenceVault(
     fun initialize() {
         listOf(
             evidenceRaw, evidenceProcessed, findings, reportsSealed, reportsDraft,
-            seals, chatSessions, research, config
+            seals, chatSessions, research, config, documentLinks
         ).forEach { it.mkdirs() }
+    }
+
+    /** Link metadata is updated atomically; sealed files are never rewritten. */
+    @Synchronized
+    fun saveDocumentLink(record: com.verumomnis.forensic.model.LinkedDocumentRecord) {
+        require(record.id.matches(Regex("[A-Za-z0-9-]+")))
+        require(record.sourceSha512.matches(Regex("[a-fA-F0-9]{128}")))
+        listOfNotNull(record.sourcePath, record.sealedPdfPath, record.reportPdfPath, record.timestampProofPath)
+            .forEach { resolveDocumentPath(it) }
+        initialize()
+        val target = File(documentLinks, "${record.id}.json")
+        val existing = listDocumentLinks().firstOrNull { it.id == record.id }
+        require(existing == null || (existing.sourceSha512 == record.sourceSha512 &&
+            existing.sourceName == record.sourceName && existing.sourcePath == record.sourcePath &&
+            existing.createdAt == record.createdAt)) { "Document parent identity cannot be changed." }
+        val bytes = Json.encodeToString(
+            com.verumomnis.forensic.model.LinkedDocumentRecord.serializer(), record
+        ).toByteArray()
+        writeAtomically(target) { output -> output.write(bytes); "" }
+    }
+
+    fun listDocumentLinks(): List<com.verumomnis.forensic.model.LinkedDocumentRecord> =
+        documentLinks.listFiles { f -> f.isFile && f.extension == "json" }.orEmpty().map { file ->
+            Json.decodeFromString(
+                com.verumomnis.forensic.model.LinkedDocumentRecord.serializer(), file.readText()
+            )
+        }.sortedByDescending { it.createdAt }
+
+    fun documentPath(file: File): String {
+        val base = root.canonicalFile.toPath()
+        val path = file.canonicalFile.toPath()
+        require(path.startsWith(base) && path != base) { "Output must be inside the vault." }
+        return base.relativize(path).toString()
+    }
+
+    fun resolveDocumentPath(path: String): File {
+        require(path.isNotBlank() && !File(path).isAbsolute && path.split('/').none { it == ".." })
+        val file = File(root, path)
+        val base = root.canonicalFile.toPath()
+        require(file.canonicalFile.toPath().startsWith(base) && file.canonicalFile.toPath() != base)
+        return file
+    }
+
+    /** A report writer may return a temporary file; links only point at durable vault copies. */
+    fun retainReportPdf(written: File): File {
+        check(written.isFile && written.length() > 0) { "The report PDF was not saved." }
+        if (written.canonicalFile.parentFile == reportsSealed.canonicalFile) return written
+        initialize()
+        val target = com.verumomnis.forensic.pdf.SealedOutputNames.createUniqueFile(reportsSealed, written.name)
+        try {
+            written.inputStream().use { input ->
+                writeAtomically(target) { output -> input.copyTo(output); "" }
+            }
+            return target
+        } catch (error: Exception) {
+            target.delete()
+            throw error
+        }
     }
 
     fun storeEvidence(fileName: String, bytes: ByteArray): String {
@@ -464,7 +523,7 @@ class EvidenceVault(
      */
     fun emptyVault(): Int {
         var count = 0
-        listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, seals, research).forEach { dir ->
+        listOf(evidenceRaw, evidenceProcessed, reportsSealed, reportsDraft, seals, research, documentLinks).forEach { dir ->
             dir.listFiles()?.forEach { f -> if (f.isFile && f.delete()) count++ }
         }
         // findings holds the manifest alongside per-scan output; keep the manifest.

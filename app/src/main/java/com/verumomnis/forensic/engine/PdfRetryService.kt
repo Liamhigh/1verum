@@ -102,8 +102,9 @@ class PdfRetryService(
         val report = saved.report ?: return saved
         if (saved.stage == PdfRetryRecoveryStage.PDF_READY) return saved
         return try {
-            val file = writePdf(report, record.fileName)
+            val file = vault.retainReportPdf(writePdf(report, record.fileName))
             check(file.isFile && file.length() > 0) { "Report PDF was not saved." }
+            linkRetryReport(record, report, file)
             saved.copy(
                 reportFile = file,
                 message = "New PDF-only OCR retry report exported. Earlier reports and original evidence are unchanged."
@@ -121,6 +122,7 @@ class PdfRetryService(
         now: Instant
     ): PdfRetryResult {
         val attempt = requireNotNull(record.coverage.retryAttempt)
+        ensureRetryLink(record)
         val caseName = "OCR retry ${attempt.id}"
         val scan = ForensicService.scan(listOf(EvidenceDocument(
             evidenceId = record.evidenceId.ifBlank { "DOC001" },
@@ -142,14 +144,16 @@ class PdfRetryService(
             findingsJsonPath = findingsFile.absolutePath
         ))
         vault.storeReport(report)
+        linkRetryReport(record, report)
         return retryReportPdf(record, report)
     }
 
     private fun retryReportPdf(record: DocumentExtractionCoverage, report: ForensicReport): PdfRetryResult {
         val saved = PdfRetryResult(record, report = report, message = "Retry findings and report snapshot are saved.")
         return try {
-            val file = writePdf(report, record.fileName)
+            val file = vault.retainReportPdf(writePdf(report, record.fileName))
             check(file.isFile && file.length() > 0) { "Report PDF was not saved." }
+            linkRetryReport(record, report, file)
             saved.copy(
                 reportFile = file,
                 message = "New PDF-only OCR retry report saved. Earlier sealed reports and original evidence are unchanged."
@@ -159,6 +163,25 @@ class PdfRetryService(
                 message = "Retry findings and report snapshot saved, but the new PDF could not be exported. Check storage and retry export. Earlier reports are unchanged."
             )
         }
+    }
+
+    private fun ensureRetryLink(record: DocumentExtractionCoverage): com.verumomnis.forensic.model.LinkedDocumentRecord {
+        val attempt = requireNotNull(record.coverage.retryAttempt)
+        val id = "retry-${attempt.id}"
+        return vault.listDocumentLinks().firstOrNull { it.id == id }
+            ?: com.verumomnis.forensic.model.LinkedDocumentRecord(
+                id, record.fileName, record.sha512, attempt.createdAt,
+                vault.documentPath(File(vault.evidenceRaw, "pdf_source_${record.sha512}.pdf")),
+                forensicRequested = true
+            ).also { vault.saveDocumentLink(it) }
+    }
+
+    private fun linkRetryReport(record: DocumentExtractionCoverage, report: ForensicReport, file: File? = null) {
+        val link = ensureRetryLink(record)
+        vault.saveDocumentLink(link.copy(
+            reportReference = report.reference,
+            reportPdfPath = file?.let(vault::documentPath) ?: link.reportPdfPath
+        ))
     }
 
     private fun requireSavedRetry(record: DocumentExtractionCoverage) {

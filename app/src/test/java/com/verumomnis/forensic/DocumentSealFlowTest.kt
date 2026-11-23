@@ -41,6 +41,7 @@ class DocumentSealFlowTest {
     private val input = "%PDF-1.4\nsynthetic input".toByteArray()
     private val extractionCalls = AtomicInteger()
     private val sealCalls = AtomicInteger()
+    private fun savedLinks() = com.verumomnis.forensic.vault.EvidenceVault(File(app.filesDir, "vault")).listDocumentLinks()
 
     private val offline = object : BlockchainService {
         override fun anchor(sha512Hex: String) = OtsAnchorResult(
@@ -61,7 +62,10 @@ class DocumentSealFlowTest {
             ).apply { writeText("%PDF-1.4\nsynthetic report writer boundary") }
         },
         inspectOptions: (DocumentSealer.SealOptions) -> Unit = {},
-        coverage: PdfExtractionCoverage? = null
+        coverage: PdfExtractionCoverage? = null,
+        anchor: () -> OpenTimestampsClient.OtsResult = {
+            OpenTimestampsClient.OtsResult.Failure("Offline fixture")
+        }
     ) = VerumViewModel(
         application = app, identityService = IdentityService(app, InMemoryIdentityKeyStore()),
         vault = com.verumomnis.forensic.vault.EvidenceVault(File(app.filesDir, "vault"),
@@ -80,7 +84,7 @@ class DocumentSealFlowTest {
                 )
             },
             extractText = { extractionCalls.incrementAndGet(); text },
-            anchor = { OpenTimestampsClient.OtsResult.Failure("Offline fixture") },
+            anchor = { anchor() },
             extractPdf = {
                 extractionCalls.incrementAndGet()
                 PdfExtractionResult(text, coverage ?: PdfExtractionCoverage(documentFailure = "Synthetic legacy extractor"))
@@ -122,6 +126,49 @@ class DocumentSealFlowTest {
         assertFalse(state.sealForensicRequested)
         assertNull(state.report)
         assertNull(state.reportPdfFile)
+        val link = savedLinks().single()
+        assertEquals("original.pdf", link.sourceName)
+        assertEquals(Sha512.hash(input), link.sourceSha512)
+        assertFalse(link.forensicRequested)
+        assertEquals(state.websiteSealedFile!!.name, File(link.sealedPdfPath!!).name)
+        assertNull(link.reportPdfPath)
+        assertNull(link.timestampProofPath)
+    }
+
+    @Test fun timestampSidecarIsExplicitlyLinkedToItsSealedSource() {
+        val proof = "synthetic pending timestamp proof".toByteArray()
+        val vm = vm(anchor = { OpenTimestampsClient.OtsResult.Success("synthetic-calendar", proof) })
+        vm.selectPdfForSealing(input, "timestamp.pdf", input.size.toLong())
+        vm.sealDocument(now)
+        await { !vm.state.value.sealBusy }
+        val vault = com.verumomnis.forensic.vault.EvidenceVault(File(app.filesDir, "vault"))
+        val link = vault.listDocumentLinks().single()
+        assertNotNull(link.sealedPdfPath)
+        assertNotNull(link.timestampProofPath)
+        assertArrayEquals(proof, vault.resolveDocumentPath(link.timestampProofPath!!).readBytes())
+        assertEquals(Sha512.hash(input), link.sourceSha512)
+    }
+
+    @Test fun deletingOneAttemptKeepsTheSharedOriginalAndOtherAttempt() {
+        val vm = vm()
+        repeat(2) { index ->
+            vm.selectPdfForSealing(input, "duplicate-name.pdf", input.size.toLong())
+            vm.sealDocument(now.plusSeconds(index.toLong()))
+            await { !vm.state.value.sealBusy }
+        }
+        vm.refreshVaultStats()
+        await { vm.state.value.scanSets.count { it.sourceSha512 != null } == 2 }
+        val toDelete = vm.state.value.scanSets.first { it.sourceSha512 != null }
+        val kept = vm.state.value.scanSets.last { it.sourceSha512 != null }
+        vm.deleteScanSet(toDelete)
+        await { savedLinks().size == 1 }
+        val vault = com.verumomnis.forensic.vault.EvidenceVault(
+            File(app.filesDir, "vault"),
+            masterKeyProvider = { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 7 }, "AES") }
+        )
+        assertEquals(kept.id, "linked:${vault.listDocumentLinks().single().id}")
+        assertArrayEquals(input, vault.readEvidence("pdf_source_${Sha512.hash(input)}.pdf"))
+        assertTrue(kept.artifacts.all { it.available })
     }
 
     @Test fun forensicChoiceWaitsForPdfAndIgnoresDoubleTapOrModeChanges() {
@@ -157,6 +204,10 @@ class DocumentSealFlowTest {
         assertTrue(state.sealForensicError.isBlank())
         assertNull(state.guardianBlock)
         assertEquals(Sha512.hash(input), state.files.single().sha512)
+        val link = savedLinks().single()
+        assertEquals(state.reportPdfFile!!.name, File(link.reportPdfPath!!).name)
+        assertEquals(state.report!!.reference, link.reportReference)
+        assertEquals(state.websiteSealedFile!!.name, File(link.sealedPdfPath!!).name)
     }
 
     @Test fun unreadableEvidenceKeepsSealedPdfButNeverClaimsAReportWasCreated() {
@@ -171,6 +222,7 @@ class DocumentSealFlowTest {
         assertTrue(vm.state.value.sealForensicError.contains("incomplete PDF coverage"))
         assertTrue(vm.state.value.sealReportReference.isBlank())
         assertNull(vm.state.value.report)
+        assertNull(savedLinks().single().reportPdfPath)
         assertTrue(File(app.filesDir, "vault/findings/pdf_extraction_${Sha512.hash(input)}.json").isFile)
     }
 
@@ -190,6 +242,7 @@ class DocumentSealFlowTest {
         assertNotNull(vm.state.value.report)
         assertTrue(vm.state.value.reportPdfError.isNotBlank())
         assertNull(vm.state.value.reportPdfFile)
+        assertNull(savedLinks().single().reportPdfPath)
         fail = false
         // Merely choosing another input must not rename an already-created report.
         vm.selectPdfForSealing(input, "newly-selected.pdf", input.size.toLong())
@@ -198,6 +251,7 @@ class DocumentSealFlowTest {
         assertTrue(vm.state.value.reportPdfFile!!.isFile)
         assertTrue(vm.state.value.reportPdfFile!!.name.startsWith("retry_forensic_report_"))
         assertTrue(vm.state.value.reportPdfError.isBlank())
+        assertEquals(vm.state.value.reportPdfFile!!.name, File(savedLinks().single().reportPdfPath!!).name)
     }
 
     @Test fun nextDocumentDoesNotReuseOldReportOrMixOldEvidence() {

@@ -358,6 +358,12 @@ private fun ScanSetRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                set.sourceSha512?.let {
+                    Text(
+                        "Source ${it.take(12)}… · ${set.id.removePrefix("linked:").take(8)}",
+                        color = VoTextMuted, fontFamily = JetBrainsMono, fontSize = 10.sp
+                    )
+                }
                 Spacer(Modifier.height(2.dp))
                 Text(
                     set.statusLabel,
@@ -387,11 +393,17 @@ private fun ScanSetRow(
 
         if (expanded) {
             Column(modifier = Modifier.fillMaxWidth().padding(start = 64.dp, end = 14.dp, bottom = 12.dp)) {
+                set.sourceSha512?.let {
+                    Text("Linked outputs · ${set.timestamp}", color = VoTextMuted, fontSize = 11.sp)
+                }
+                set.linkNotes.forEach { note ->
+                    Text(note, color = VoTextMuted, fontSize = 11.sp)
+                }
                 set.artifacts.forEach { artifact ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onOpenArtifact(artifact) }
+                            .clickable(enabled = artifact.available) { onOpenArtifact(artifact) }
                             .padding(vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -410,6 +422,9 @@ private fun ScanSetRow(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (!artifact.available) {
+                                Text("Missing or empty file", color = VoRedText, fontSize = 11.sp)
+                            }
                         }
                         Text(
                             formatBytes(artifact.sizeBytes),

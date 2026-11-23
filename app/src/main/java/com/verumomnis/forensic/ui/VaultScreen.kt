@@ -149,6 +149,27 @@ fun VaultScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        state.scanSets.filter { it.sourceSha512 != null }.forEach { linked ->
+            VoCard(title = linked.name, icon = Icons.Filled.Description) {
+                Text(
+                    "Linked document · ${linked.sourceSha512?.take(12)}… · ${linked.id.removePrefix("linked:").take(8)}",
+                    color = VoAccentBlue, fontSize = 11.sp
+                )
+                linked.linkNotes.forEach { Text(it, color = VoTextMuted, fontSize = 11.sp) }
+                linked.artifacts.forEach { artifact ->
+                    TextButton(
+                        enabled = artifact.available,
+                        onClick = { openVaultArtifact(context, artifact.file) }
+                    ) {
+                        Text(
+                            "${artifact.kind.label}: ${artifact.fileName}" +
+                                if (artifact.available) "" else " · missing or empty",
+                            color = VoTextPrimary, fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
         VoCard(title = "EVIDENCE VAULT", icon = Icons.Filled.Lock) {
             InfoRow("Evidence files", state.files.size.toString())
             InfoRow("Media files", state.files.count { it.type == "image" || it.type == "video" }.toString())

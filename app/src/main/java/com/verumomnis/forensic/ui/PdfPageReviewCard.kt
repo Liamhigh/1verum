@@ -3,6 +3,7 @@ package com.verumomnis.forensic.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
@@ -24,6 +25,8 @@ import com.verumomnis.forensic.ui.theme.*
 fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     LaunchedEffect(state.pendingFiles.size, state.sealBusy) { viewModel.loadPdfPageReview() }
     var review by remember { mutableStateOf<DocumentExtractionCoverage?>(null) }
+    var reviewPage by remember { mutableStateOf<Int?>(null) }
+    var searchOpen by remember { mutableStateOf(false) }
     var expandedReports by remember { mutableStateOf(emptySet<String>()) }
     var shareError by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -42,6 +45,13 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     VoCard(title = "PDF PAGE REVIEW & RETRY", icon = Icons.Filled.Description) {
         Text("Review original page numbers and extraction gaps. A retry creates a new, labelled PDF-only analysis; it does not revise earlier sealed reports or re-analyse other case evidence.",
             color = VoTextMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+        VerumSecondaryButton(
+            label = "Search saved page text",
+            enabled = !busy,
+            onClick = { searchOpen = true },
+            modifier = Modifier.fillMaxWidth()
+        )
         if (state.pdfRetryCanCancel) {
             Spacer(Modifier.height(8.dp))
             VerumSecondaryButton(
@@ -78,7 +88,7 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
                 Text(attemptLabel, color = if (it.cancelled) VoGold else VoAccentBlue, fontSize = 10.sp)
             }
             VerumSecondaryButton(label = "Review pages: ${record.fileName}", enabled = !busy,
-                onClick = { review = record }, modifier = Modifier.fillMaxWidth())
+                onClick = { reviewPage = null; review = record }, modifier = Modifier.fillMaxWidth())
             if (attempt != null) {
                 val stage = recovery?.stage ?: PdfRetryRecoveryStage.EXTRACTION_ONLY
                 val stageLabel = if (attempt.cancelled) {
@@ -186,7 +196,18 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
         PdfPageReviewDialog(record, busy, onDismiss = { review = null }, onRetry = { pages ->
             viewModel.retryPdfPages(record, pages)
             review = null
-        })
+        }, initialPage = reviewPage)
+    }
+    if (searchOpen) {
+        SavedPdfPageSearchDialog(
+            records = state.pdfReviewRecords,
+            onDismiss = { searchOpen = false },
+            onOpenPage = { record, page ->
+                searchOpen = false
+                reviewPage = page
+                review = record
+            }
+        )
     }
 }
 
@@ -195,11 +216,20 @@ internal fun PdfPageReviewDialog(
     record: DocumentExtractionCoverage,
     busy: Boolean,
     onDismiss: () -> Unit,
-    onRetry: (List<Int>) -> Unit
+    onRetry: (List<Int>) -> Unit,
+    initialPage: Int? = null
 ) {
     var selected by remember(record) { mutableStateOf(setOf<Int>()) }
-    var expandedTextPages by remember(record) { mutableStateOf(emptySet<Int>()) }
+    var expandedTextPages by remember(record, initialPage) {
+        mutableStateOf(initialPage?.let { setOf(it) } ?: emptySet<Int>())
+    }
     val coverage = record.coverage
+    val sortedPages = remember(record) { coverage.pages.sortedBy { it.page } }
+    val initialIndex = sortedPages.indexOfFirst { it.page == initialPage }.coerceAtLeast(0)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    LaunchedEffect(record, initialPage) {
+        if (sortedPages.isNotEmpty()) listState.scrollToItem(initialIndex)
+    }
     val limit = PdfOcrExtractor.DEFAULT_MAX_OCR_PAGES
     val remaining = coverage.remainingPages.map { it.page }.toSet()
     val usable = coverage.totalPages != null && coverage.totalPages > 0 &&
@@ -211,6 +241,12 @@ internal fun PdfPageReviewDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(record.fileName, color = VoTextPrimary)
+                record.coverage.retryAttempt?.let {
+                    Text("Saved retry attempt: ${it.id}", color = VoAccentBlue, fontSize = 11.sp)
+                }
+                initialPage?.let {
+                    Text("Search result · original page $it", color = VoAccentBlue, fontSize = 12.sp)
+                }
                 Text(
                     "Saved page text is read-only. Check embedded PDF text and on-device OCR separately before resuming report generation.",
                     color = VoTextMuted,
@@ -222,8 +258,8 @@ internal fun PdfPageReviewDialog(
                     color = VoGold, fontSize = 12.sp)
                 coverage.documentFailure?.let { Text(it, color = VoGold, fontSize = 12.sp) }
                 if (remaining.isEmpty() && usable) Text("No unread, failed or skipped pages remain. OCR accuracy still needs manual review.", color = VoTextMuted)
-                LazyColumn(Modifier.heightIn(max = 330.dp)) {
-                    items(coverage.pages.sortedBy { it.page }, key = { it.page }) { page ->
+                LazyColumn(Modifier.heightIn(max = 330.dp), state = listState) {
+                    items(sortedPages, key = { it.page }) { page ->
                         Row(Modifier.fillMaxWidth()) {
                             Checkbox(
                                 modifier = Modifier.semantics { contentDescription = "Select original page ${page.page}, ${page.status}" },

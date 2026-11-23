@@ -136,7 +136,12 @@ class SealedPdfExporter(
         requireReadable(reportPdf, "retry PDF")
         requireReadable(findingsJson, "matching findings JSON")
 
-        val shareDirectory = File(context.cacheDir, "retry-share")
+        val shareCache = RetryShareCache(context.cacheDir)
+        val cleanup = shareCache.cleanExpired()
+        if (cleanup.failures > 0) {
+            android.util.Log.w("RetryShareCache", "Some expired sharing copies could not be cleared.")
+        }
+        val shareDirectory = shareCache.directory
         if (!shareDirectory.isDirectory && !shareDirectory.mkdirs()) {
             throw java.io.IOException("Unable to prepare temporary files for sharing.")
         }

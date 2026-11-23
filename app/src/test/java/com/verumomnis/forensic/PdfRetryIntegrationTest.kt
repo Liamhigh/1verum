@@ -124,9 +124,23 @@ class PdfRetryIntegrationTest {
         val attemptId = result.record.coverage.retryAttempt!!.id
         val launched = java.util.concurrent.atomic.AtomicReference<android.content.Intent?>()
         val exporter = com.verumomnis.forensic.pdf.SealedPdfExporter(app)
+        val shareDirectory = File(app.cacheDir, "retry-share").apply { mkdirs() }
+        val expired = File(shareDirectory, "VerumOmnis_old_retry_previous_report_123.pdf").apply {
+            writeText("expired synthetic share copy")
+            assertTrue(setLastModified(System.currentTimeMillis() - 25 * 60 * 60 * 1000L))
+        }
+        val recent = File(shareDirectory, "VerumOmnis_recent_retry_previous_findings_456.json").apply {
+            writeText("recent synthetic share copy")
+        }
+        val pdfBefore = pdf.readBytes()
+        val jsonBefore = json.readBytes()
 
         exporter.shareRetryPair(report, result.record, pdf, json) { launched.set(it) }
 
+        assertFalse(expired.exists())
+        assertTrue(recent.exists())
+        assertArrayEquals(pdfBefore, pdf.readBytes())
+        assertArrayEquals(jsonBefore, json.readBytes())
         val chooser = requireNotNull(launched.get())
         val send = requireNotNull(
             chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT)

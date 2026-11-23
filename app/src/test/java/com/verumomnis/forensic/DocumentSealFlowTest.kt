@@ -133,6 +133,8 @@ class DocumentSealFlowTest {
         assertEquals(state.websiteSealedFile!!.name, File(link.sealedPdfPath!!).name)
         assertNull(link.reportPdfPath)
         assertNull(link.timestampProofPath)
+        assertEquals(OtsStatus.OFFLINE, state.sealResult!!.timestampSubmission)
+        assertEquals(OtsStatus.OFFLINE, link.timestampSubmission)
     }
 
     @Test fun timestampSidecarIsExplicitlyLinkedToItsSealedSource() {
@@ -147,6 +149,36 @@ class DocumentSealFlowTest {
         assertNotNull(link.timestampProofPath)
         assertArrayEquals(proof, vault.resolveDocumentPath(link.timestampProofPath!!).readBytes())
         assertEquals(Sha512.hash(input), link.sourceSha512)
+        assertEquals(OtsStatus.PENDING, link.timestampSubmission)
+        assertEquals(OtsStatus.PENDING, vm.state.value.sealResult!!.timestampSubmission)
+    }
+
+    @Test fun failedSubmissionIsNotRecordedAsPendingAndSavesNoProof() {
+        val vm = vm(anchor = { OpenTimestampsClient.OtsResult.Failure("Synthetic rejection", OtsStatus.FAILED) })
+        vm.selectPdfForSealing(input, "failed-timestamp.pdf", input.size.toLong())
+        vm.sealDocument(now)
+        await { !vm.state.value.sealBusy }
+        assertEquals(OtsStatus.FAILED, vm.state.value.sealResult!!.timestampSubmission)
+        assertNull(vm.state.value.sealResult!!.otsProof)
+        assertEquals(OtsStatus.FAILED, savedLinks().single().timestampSubmission)
+        assertNull(savedLinks().single().timestampProofPath)
+    }
+
+    @Test fun documentVerificationIsKeptSeparateFromTheForensicReportAnchor() {
+        val verified = OtsVerifyResult(OtsStatus.CONFIRMED, pending = false, bitcoinAttested = true)
+        val vm = vm(anchor = {
+            OpenTimestampsClient.OtsResult.Success(
+                "synthetic-calendar", "synthetic-proof".toByteArray(), OtsStatus.CONFIRMED, verified
+            )
+        })
+        vm.selectPdfForSealing(input, "confirmed-source.pdf", input.size.toLong())
+        vm.setSealMode("forensic")
+        vm.sealDocument(now)
+        await { !vm.state.value.sealBusy && vm.state.value.otsResult != null }
+        assertEquals(OtsStatus.OFFLINE, vm.state.value.otsResult!!.status)
+        assertEquals(verified, vm.state.value.sealResult!!.timestampVerification)
+        assertEquals(OtsStatus.CONFIRMED, vm.state.value.sealResult!!.timestampSubmission)
+        assertEquals(verified, savedLinks().single().timestampVerification)
     }
 
     @Test fun deletingOneAttemptKeepsTheSharedOriginalAndOtherAttempt() {

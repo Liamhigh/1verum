@@ -797,11 +797,7 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
             Text(if (showDetails) "Hide seal details" else "Show seal details", color = VoAccentBlue)
         }
         if (showDetails) {
-        VoHonestyNote(
-            title = "OpenTimestamps proof pending",
-            text = "The Bitcoin blockchain confirmation typically completes within 1–2 hours. " +
-                "The SHA-512 fingerprint already proves document integrity."
-        )
+        SealTimestampProofPanel(result, onDownloadProof = { shareOtsProof(context, result, documentName) })
         Spacer(Modifier.height(16.dp))
         // Document metadata as .id-field label/value rows (§3.3).
         Column(
@@ -840,14 +836,23 @@ private fun ResultsCard(result: SealResult, documentName: String, viewModel: Ver
             Text("Verify on verumglobal.foundation", color = VoAccentBlue)
         }
         Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DownloadButton(
-                label = "Download .OTS Proof",
-                primary = false,
-                modifier = Modifier.weight(1f),
-                onClick = { shareOtsProof(context, result, documentName) }
-            )
         }
+    }
+}
+
+@Composable
+internal fun SealTimestampProofPanel(result: SealResult, onDownloadProof: () -> Unit) {
+    val timestamp = sealTimestampPresentation(
+        result.timestampSubmission, result.timestampVerification, result.otsProof?.isNotEmpty() == true
+    )
+    Column {
+        VoHonestyNote(title = timestamp.title, text = timestamp.description)
+        if (timestamp.canDownloadProof) {
+            Spacer(Modifier.height(12.dp))
+            DownloadButton(
+                label = "Download .OTS Proof", primary = false,
+                modifier = Modifier.fillMaxWidth(), onClick = onDownloadProof
+            )
         }
     }
 }
@@ -942,7 +947,7 @@ private fun DownloadButton(label: String, primary: Boolean, modifier: Modifier =
 }
 
 private fun shareOtsProof(context: Context, result: SealResult, documentName: String) {
-    result.otsProof?.let { proof ->
+    result.otsProof?.takeIf { it.isNotEmpty() }?.let { proof ->
         val dir = File(context.filesDir, "vault/reports/sealed").apply { mkdirs() }
         val file = com.verumomnis.forensic.pdf.SealedOutputNames.createUniqueFile(
             dir,
@@ -980,7 +985,7 @@ private fun InfoSection() {
             InfoItem("A4 Watermark Background", "The full-page Verum Omnis watermark is applied at 20% opacity behind your content. Your document stays at full original size for maximum readability when printed.", Modifier.weight(1f))
             InfoItem("Clean QR Code", "QR code modules only — no border, no box, no interfering elements. Positioned top-right with natural white quiet zone and subtle gray panel. Scans instantly with any phone.", Modifier.weight(1f))
             InfoItem("Dual Hash", "SHA-256 for OpenTimestamps blockchain anchoring. SHA-512 as the Verum forensic fingerprint. Two independent hashes, zero trust required.", Modifier.weight(1f))
-            InfoItem("Bitcoin Blockchain", "OpenTimestamps anchors the SHA-256 hash into Bitcoin. Once confirmed (~1-2 hours), the timestamp is permanently and independently verifiable.", Modifier.weight(1f))
+            InfoItem("Bitcoin Blockchain", "OpenTimestamps can submit a digest for later Bitcoin attestation. Check the recorded proof status; confirmation timing varies. A hash alone does not establish time or legal admissibility.", Modifier.weight(1f))
             InfoItem("Identity Pipeline", "Optional sender identity (name, ID, address, email) encoded into the QR code for affidavit pre-fill and chain of custody.", Modifier.weight(1f))
             InfoItem("GPS + Device", "Automatic geolocation and device fingerprint capture. Proves where and from what device the seal was applied.", Modifier.weight(1f))
             InfoItem("Password Protection", "Optional AES-256 password protection with delivery receipt cover page. Recipient must email sender for password — that email IS the read receipt.", Modifier.weight(1f))

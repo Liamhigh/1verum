@@ -2,6 +2,7 @@ package com.verumomnis.forensic.seal
 
 import com.verumomnis.forensic.blockchain.OpenTimestampsService
 import com.verumomnis.forensic.model.OtsStatus
+import com.verumomnis.forensic.model.OtsVerifyResult
 import java.util.Base64
 
 /**
@@ -28,14 +29,21 @@ object OpenTimestampsClient {
          * first calendar that responded; [proof] is the pending `.ots` proof.
          * NOTE: this is a PENDING anchor — Bitcoin attestation follows later.
          */
-        data class Success(val calendar: String, val proof: ByteArray) : OtsResult() {
+        data class Success(
+            val calendar: String,
+            val proof: ByteArray,
+            val status: OtsStatus = OtsStatus.PENDING,
+            val verification: OtsVerifyResult? = null
+        ) : OtsResult() {
             override fun equals(other: Any?): Boolean =
-                other is Success && calendar == other.calendar && proof.contentEquals(other.proof)
-            override fun hashCode(): Int = 31 * calendar.hashCode() + proof.contentHashCode()
+                other is Success && calendar == other.calendar && proof.contentEquals(other.proof) &&
+                    status == other.status && verification == other.verification
+            override fun hashCode(): Int = 31 * (31 * (31 * calendar.hashCode() + proof.contentHashCode()) +
+                status.hashCode()) + (verification?.hashCode() ?: 0)
         }
 
         /** Anchoring did not complete. [error] states why (e.g. offline). */
-        data class Failure(val error: String) : OtsResult()
+        data class Failure(val error: String, val status: OtsStatus = OtsStatus.OFFLINE) : OtsResult()
     }
 
     /**
@@ -50,26 +58,30 @@ object OpenTimestampsClient {
      */
     fun submit(sha512Hex: String): OtsResult {
         val anchor = runCatching { OpenTimestampsService.anchor(sha512Hex) }.getOrElse {
-            return OtsResult.Failure("OpenTimestamps error — ${it.message ?: "unknown"}. Not anchored.")
+            return OtsResult.Failure("OpenTimestamps error — ${it.message ?: "unknown"}. Not anchored.", OtsStatus.FAILED)
         }
         return when (anchor.status) {
             OtsStatus.PENDING, OtsStatus.CONFIRMED -> {
                 val proof = anchor.otsProofBase64
                     ?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
-                if (proof != null) {
+                if (proof != null && proof.isNotEmpty()) {
                     OtsResult.Success(
                         calendar = anchor.calendarUrls.firstOrNull().orEmpty(),
-                        proof = proof
+                        proof = proof,
+                        status = anchor.status,
+                        verification = if (anchor.status == OtsStatus.CONFIRMED) {
+                            OpenTimestampsService.verify(proof, checkBitcoin = false)
+                        } else null
                     )
                 } else {
-                    OtsResult.Failure(anchor.message.ifBlank { "No OTS proof returned. Not anchored." })
+                    OtsResult.Failure(anchor.message.ifBlank { "No OTS proof returned. Not anchored." }, OtsStatus.FAILED)
                 }
             }
             OtsStatus.OFFLINE -> OtsResult.Failure(
                 anchor.message.ifBlank { "Offline — digest not submitted; retry when online." }
             )
             OtsStatus.FAILED -> OtsResult.Failure(
-                anchor.message.ifBlank { "OpenTimestamps anchoring failed." }
+                anchor.message.ifBlank { "OpenTimestamps anchoring failed." }, OtsStatus.FAILED
             )
         }
     }

@@ -141,7 +141,9 @@ data class SealResult(
     val priorChain: List<String>,
     val pageCount: Int,
     /** Actual sealing time (epoch ms) — SealMetadata.t, as encoded in the QR. */
-    val sealedAtMs: Long
+    val sealedAtMs: Long,
+    val timestampSubmission: OtsStatus? = null,
+    val timestampVerification: OtsVerifyResult? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -154,6 +156,8 @@ data class SealResult(
             priorChain == other.priorChain &&
             pageCount == other.pageCount &&
             sealedAtMs == other.sealedAtMs &&
+            timestampSubmission == other.timestampSubmission &&
+            timestampVerification == other.timestampVerification &&
             sealedPdf.contentEquals(other.sealedPdf) &&
             (otsProof == null && other.otsProof == null || otsProof != null && other.otsProof != null && otsProof.contentEquals(other.otsProof))
     }
@@ -165,6 +169,8 @@ data class SealResult(
         result = 31 * result + priorChain.hashCode()
         result = 31 * result + pageCount
         result = 31 * result + sealedAtMs.hashCode()
+        result = 31 * result + (timestampSubmission?.hashCode() ?: 0)
+        result = 31 * result + (timestampVerification?.hashCode() ?: 0)
         result = 31 * result + sealedPdf.contentHashCode()
         result = 31 * result + (otsProof?.contentHashCode() ?: 0)
         return result
@@ -1307,12 +1313,30 @@ class VerumViewModel(
                 updatePipelineStep("OpenTimestamps", SealPipelineStepStatus.PROCESSING)
                 // Anchor the document's SHA-512 fingerprint via the canonical OTS service.
                 val sha512ForAnchor = com.verumomnis.forensic.seal.SealHasher.sha512Hex(bytes)
-                val ots = runCatching { documentSealServices.anchor(sha512ForAnchor) }.getOrNull()
+                val ots = runCatching { documentSealServices.anchor(sha512ForAnchor) }.getOrElse {
+                    OpenTimestampsClient.OtsResult.Failure("Timestamp submission failed.", OtsStatus.FAILED)
+                }
+                val timestampSubmission = when (ots) {
+                    is OpenTimestampsClient.OtsResult.Success ->
+                        if (ots.proof.isEmpty()) OtsStatus.FAILED else ots.status
+                    is OpenTimestampsClient.OtsResult.Failure -> ots.status
+                }
+                val timestampVerification = (ots as? OpenTimestampsClient.OtsResult.Success)?.verification
+                link = link.copy(
+                    timestampSubmission = timestampSubmission,
+                    timestampVerification = timestampVerification
+                )
+                vault.saveDocumentLink(link)
                 updatePipelineStep(
                     "OpenTimestamps",
-                    if (ots is OpenTimestampsClient.OtsResult.Success) SealPipelineStepStatus.COMPLETE else SealPipelineStepStatus.ERROR,
+                    if (timestampSubmission == OtsStatus.PENDING || timestampSubmission == OtsStatus.CONFIRMED)
+                        SealPipelineStepStatus.COMPLETE else SealPipelineStepStatus.ERROR,
                     when (ots) {
-                        is OpenTimestampsClient.OtsResult.Success -> "pending Bitcoin attestation"
+                        is OpenTimestampsClient.OtsResult.Success -> when (timestampSubmission) {
+                            OtsStatus.PENDING -> "proof saved · Bitcoin confirmation pending"
+                            OtsStatus.CONFIRMED -> "proof saved · check recorded verification"
+                            else -> "no usable timestamp proof"
+                        }
                         is OpenTimestampsClient.OtsResult.Failure -> ots.error
                         else -> "offline — not anchored"
                     }
@@ -1364,7 +1388,7 @@ class VerumViewModel(
                 // The pipeline's own OTS result carries the pending proof
                 // (DocumentSealer ran with anchorToBlockchain = false, so
                 // result.ots is null by design — do not read it here).
-                val otsProofBytes = (ots as? OpenTimestampsClient.OtsResult.Success)?.proof
+                val otsProofBytes = (ots as? OpenTimestampsClient.OtsResult.Success)?.proof?.takeIf { it.isNotEmpty() }
                 otsProofBytes?.let { proof ->
                     val proofFile = SealedOutputNames.createUniqueFile(
                         websiteSealDir(),
@@ -1388,7 +1412,9 @@ class VerumViewModel(
                             pageCount = result.pageCount,
                             // The true sealing time — SealMetadata.t as encoded
                             // in the QR — not whenever a results card composes.
-                            sealedAtMs = result.metadata.t
+                            sealedAtMs = result.metadata.t,
+                            timestampSubmission = timestampSubmission,
+                            timestampVerification = timestampVerification
                         ),
                         websiteSealedFile = outFile,
                         websiteSealStatus = "Sealed $name → ${result.sealId} (${result.pageCount} page(s)). Saved to vault/reports/sealed."

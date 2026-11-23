@@ -14,5 +14,7 @@ data class LinkedDocumentRecord(
     val sealedPdfPath: String? = null,
     val reportPdfPath: String? = null,
     val timestampProofPath: String? = null,
-    val reportReference: String? = null
+    val reportReference: String? = null,
+    val timestampSubmission: OtsStatus? = null,
+    val timestampVerification: OtsVerifyResult? = null
 )

@@ -13,7 +13,7 @@ import com.verumomnis.forensic.identity.IdentityService
 import com.verumomnis.forensic.identity.InMemoryIdentityKeyStore
 import com.verumomnis.forensic.model.*
 import com.verumomnis.forensic.ui.PdfPageReviewCard
-import com.verumomnis.forensic.ui.SavedPdfPageSearchDialog
+import com.verumomnis.forensic.ui.SavedPdfPageSearchPanel
 import com.verumomnis.forensic.ui.VerumViewModel
 import com.verumomnis.forensic.ui.theme.VerumOmnisTheme
 import com.verumomnis.forensic.vault.EvidenceVault
@@ -87,14 +87,14 @@ class SavedPdfPageSearchUiTest {
         } }
         compose.waitUntil(10_000) { vm.state.value.pdfReviewRecords.size == 2 }
         compose.onNodeWithText("SEARCH SAVED PAGE TEXT").performScrollTo().performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("Ada Lovelace")
+        compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Ada Lovelace")
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("3 matching page(s) across 2 saved extraction(s)").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Retry ${attempt.id}", substring = true).assertExists()
         compose.onNode(isRoot() and hasAnyDescendant(hasText("Search saved PDF text")))
             .captureRoboImage("build/screenshots/saved-pdf-search-results.png")
-        compose.onNodeWithTag("saved-pdf-search-results").performScrollToNode(
+        compose.onNodeWithTag("saved-pdf-search-results").performScrollTo().performScrollToNode(
             hasText("Original extraction · revision ${originalRecord.revision}")
         )
         compose.onNodeWithText("Original extraction · revision ${originalRecord.revision}").assertExists()
@@ -124,7 +124,7 @@ class SavedPdfPageSearchUiTest {
         )
         var opened = false
         compose.setContent { VerumOmnisTheme {
-            SavedPdfPageSearchDialog(listOf(record), {}, { _, _ -> opened = true })
+            SavedPdfPageSearchPanel(listOf(record)) { _, _ -> opened = true }
         } }
         compose.onNodeWithText("Enter a name or phrase", substring = true).assertExists()
         compose.onNode(hasSetTextAction()).performTextInput("Absent person")

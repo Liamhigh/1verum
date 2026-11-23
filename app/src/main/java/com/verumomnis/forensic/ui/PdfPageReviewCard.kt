@@ -47,11 +47,20 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
             color = VoTextMuted, fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
         VerumSecondaryButton(
-            label = "Search saved page text",
+            label = if (searchOpen) "Hide saved text search" else "Search saved page text",
             enabled = !busy,
-            onClick = { searchOpen = true },
+            onClick = { searchOpen = !searchOpen },
             modifier = Modifier.fillMaxWidth()
         )
+        if (searchOpen) {
+            SavedPdfPageSearchPanel(
+                records = state.pdfReviewRecords,
+                onOpenPage = { record, page ->
+                    reviewPage = page
+                    review = record
+                }
+            )
+        }
         if (state.pdfRetryCanCancel) {
             Spacer(Modifier.height(8.dp))
             VerumSecondaryButton(
@@ -197,17 +206,6 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
             viewModel.retryPdfPages(record, pages)
             review = null
         }, initialPage = reviewPage)
-    }
-    if (searchOpen) {
-        SavedPdfPageSearchDialog(
-            records = state.pdfReviewRecords,
-            onDismiss = { searchOpen = false },
-            onOpenPage = { record, page ->
-                searchOpen = false
-                reviewPage = page
-                review = record
-            }
-        )
     }
 }
 

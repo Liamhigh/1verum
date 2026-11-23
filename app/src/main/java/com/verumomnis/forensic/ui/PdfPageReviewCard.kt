@@ -29,6 +29,7 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
     var searchOpen by remember { mutableStateOf(false) }
     var expandedReports by remember { mutableStateOf(emptySet<String>()) }
     var shareError by remember { mutableStateOf("") }
+    var shareRefresh by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val latest = state.pdfReviewRecords.groupBy { it.sha512 }.values.map { records ->
         records.maxWithOrNull(compareBy<DocumentExtractionCoverage> { it.revision }
@@ -40,6 +41,8 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
         .distinctBy { record ->
             record.coverage.retryAttempt?.id?.let { "retry:$it" } ?: "${record.sha512}:${record.revision}"
         }
+    // Available even if a saved retry record is no longer listed.
+    TemporarySharingCopiesControl(refreshKey = shareRefresh)
     if (latest.isEmpty() && state.pdfRetryMessage.isBlank()) return
     val busy = state.pdfRetryBusy || state.sealBusy || state.scanning || state.reportPdfGenerating
     VoCard(title = "PDF PAGE REVIEW & RETRY", icon = Icons.Filled.Description) {
@@ -191,6 +194,7 @@ fun PdfPageReviewCard(state: UiState, viewModel: VerumViewModel) {
                                     } catch (_: Exception) {
                                         "Could not share the matching PDF and findings JSON. Saved evidence was not changed; check storage and try again."
                                     }
+                                    shareRefresh++
                                 })
                             } else {
                                 Text(

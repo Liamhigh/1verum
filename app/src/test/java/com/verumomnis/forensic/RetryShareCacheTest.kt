@@ -124,4 +124,70 @@ class RetryShareCacheTest {
         assertEquals(RetryShareCache.CleanupResult(), cache.cleanExpired(Long.MIN_VALUE))
         assertTrue(staged.exists())
     }
+
+    @Test fun inventoryAndManualClearIncludeRecentUnknownAndFutureCopiesOnly() {
+        val cache = RetryShareCache(File(temporary.root, "cache"))
+        val copies = listOf(
+            file(cache.directory, pdfName, now),
+            file(cache.directory, jsonName, 0),
+            file(cache.directory, pdfName.replace("123", "999"), now + 60_000)
+        )
+        val protectedFiles = listOf(
+            file(File(temporary.root, "vault/evidence/raw"), "source.pdf", now),
+            file(File(temporary.root, "vault/reports"), pdfName, now),
+            file(File(temporary.root, "vault/findings"), jsonName, now),
+            file(cache.directory, "findings.json", now),
+            file(cache.directory, "report.pdf", now),
+            file(File(cache.directory, "nested"), pdfName, now),
+            file(cache.directory.parentFile!!, pdfName, now)
+        )
+        val before = protectedFiles.associateWith { it.readBytes() }
+        val link = File(cache.directory, jsonName.replace("456", "999"))
+        Files.createSymbolicLink(link.toPath(), protectedFiles.first().toPath())
+
+        assertEquals(RetryShareCache.Inventory(3, copies.sumOf { it.length() }), cache.inventory())
+        assertEquals(RetryShareCache.CleanupResult(deleted = 3), cache.clearAll())
+        assertEquals(RetryShareCache.Inventory(), cache.inventory())
+        assertTrue(Files.isSymbolicLink(link.toPath()))
+        before.forEach { (path, bytes) -> assertArrayEquals(path.path, bytes, path.readBytes()) }
+    }
+
+    @Test fun manualClearReportsPartialFailuresAndCanBeRetried() {
+        val cache = RetryShareCache(temporary.root) { candidate ->
+            if (candidate.name == jsonName) false else candidate.delete()
+        }
+        val pdf = file(cache.directory, pdfName, now)
+        val json = file(cache.directory, jsonName, now)
+        assertEquals(RetryShareCache.CleanupResult(1, 1), cache.clearAll())
+        assertFalse(pdf.exists())
+        assertEquals(RetryShareCache.Inventory(1, json.length()), cache.inventory())
+        assertEquals(RetryShareCache.CleanupResult(1), RetryShareCache(temporary.root).clearAll())
+    }
+
+    @Test fun replacingShareDirectoryWithVaultLinkAfterInventoryFailsClosed() {
+        val cache = RetryShareCache(File(temporary.root, "cache"))
+        val staged = file(cache.directory, pdfName, now)
+        assertEquals(1, cache.inventory().count)
+        assertTrue(staged.delete())
+        assertTrue(cache.directory.delete())
+        val original = file(File(temporary.root, "vault"), pdfName, now)
+        val bytes = original.readBytes()
+        Files.createSymbolicLink(cache.directory.toPath(), original.parentFile.toPath())
+        assertEquals(RetryShareCache.Inventory(failures = 1), cache.inventory())
+        assertEquals(RetryShareCache.CleanupResult(failures = 1), cache.clearAll())
+        assertArrayEquals(bytes, original.readBytes())
+    }
+
+    @Test fun manualClearContinuesAfterThrownDeletionAndDoesNotCreateMissingDirectory() {
+        val cache = RetryShareCache(temporary.root) { candidate ->
+            if (candidate.name == jsonName) throw IOException("Synthetic failure")
+            candidate.delete()
+        }
+        assertEquals(RetryShareCache.Inventory(), cache.inventory())
+        assertEquals(RetryShareCache.CleanupResult(), cache.clearAll())
+        assertFalse(cache.directory.exists())
+        file(cache.directory, pdfName, now)
+        file(cache.directory, jsonName, now)
+        assertEquals(RetryShareCache.CleanupResult(1, 1), cache.clearAll())
+    }
 }

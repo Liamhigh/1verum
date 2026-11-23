@@ -30,28 +30,62 @@ internal class RetryShareCache(
 
     data class CleanupResult(val deleted: Int = 0, val failures: Int = 0)
 
+    data class Inventory(val count: Int = 0, val totalBytes: Long = 0, val failures: Int = 0)
+
+    /** Counts only the same validated direct copies that cleanup can remove. */
+    fun inventory(): Inventory {
+        var count = 0
+        var bytes = 0L
+        val failures = visitCopies { file ->
+            bytes = Math.addExact(bytes, file.length())
+            count++
+        }
+        return Inventory(count, bytes, failures)
+    }
+
+    /** Explicit privacy action, independent of the automatic 24-hour grace period. */
+    fun clearAll(): CleanupResult = clean { true }
+
     /** Cleanup is best effort: one inaccessible file must not block a new share. */
     fun cleanExpired(nowMillis: Long = System.currentTimeMillis()): CleanupResult {
         // Fail closed for invalid clocks; do not let subtraction overflow.
         if (nowMillis < RETENTION_MILLIS) return CleanupResult()
         val cutoff = nowMillis - RETENTION_MILLIS
+        return clean { file ->
+            val stagedAt = file.lastModified()
+            // Unknown and future dates are deliberately retained by automatic cleanup.
+            stagedAt > 0 && stagedAt <= cutoff
+        }
+    }
+
+    private fun clean(eligible: (File) -> Boolean): CleanupResult {
         var deleted = 0
+        var failures = 0
+        val inspectionFailures = visitCopies { file ->
+            if (eligible(file)) {
+                if (deleteFile(file)) deleted++ else failures++
+            }
+        }
+        failures += inspectionFailures
+        return CleanupResult(deleted, failures)
+    }
+
+    /** Never recurse or follow symlinks; validate again on every operation. */
+    private fun visitCopies(action: (File) -> Unit): Int {
         var failures = 0
         try {
             val expectedDirectory = File(cacheRoot.canonicalFile, "retry-share")
+            if (!directory.exists() && !Files.isSymbolicLink(directory.toPath())) return 0
             if (Files.isSymbolicLink(directory.toPath()) ||
                 directory.canonicalFile != expectedDirectory || !directory.isDirectory
-            ) return CleanupResult()
-            val files = directory.listFiles() ?: return CleanupResult(failures = 1)
+            ) return 1
+            val files = directory.listFiles() ?: return 1
             for (file in files) {
                 try {
                     if (!STAGED_NAME.matches(file.name) || Files.isSymbolicLink(file.toPath()) ||
                         !file.isFile || file.canonicalFile.parentFile != expectedDirectory
                     ) continue
-                    val stagedAt = file.lastModified()
-                    // Unknown and future dates are deliberately retained.
-                    if (stagedAt <= 0 || stagedAt > cutoff) continue
-                    if (deleteFile(file)) deleted++ else failures++
+                    action(file)
                 } catch (_: Exception) {
                     failures++
                 }
@@ -59,6 +93,6 @@ internal class RetryShareCache(
         } catch (_: Exception) {
             failures++
         }
-        return CleanupResult(deleted, failures)
+        return failures
     }
 }

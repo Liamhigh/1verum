@@ -45,3 +45,11 @@ Robolectric's MIME registry can be empty even for standard Android PDF types.
 valid `.pdf` filename; this did not establish a device-side MIME defect.
 **How to apply:** Model the platform MIME registry explicitly in provider tests,
 and distinguish that fixture setup from production MIME behavior.
+
+Robolectric file-provider streams can fail on close because the host JDK does
+not open `java.io.FileDescriptor` to the test sandbox.
+**Why:** A sharesheet test could read its attachment but failed while closing the
+descriptor with `InaccessibleObjectException`; this was not an Android sharing failure.
+**How to apply:** Verify provider display names and URI grants separately from
+the staged file bytes, or explicitly open the required JDK module in the host
+test configuration when descriptor lifecycle testing is necessary.

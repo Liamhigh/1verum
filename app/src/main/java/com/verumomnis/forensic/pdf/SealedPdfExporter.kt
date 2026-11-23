@@ -144,11 +144,13 @@ class SealedPdfExporter(
         val attemptStem = safeShareName(attemptId)
         val shareStem = "VerumOmnis_${sourceStem}_retry_$attemptStem"
         val pdfCopy = File.createTempFile("${shareStem}_report_", ".pdf", shareDirectory)
-        val jsonCopy = File.createTempFile("${shareStem}_findings_", ".json", shareDirectory)
+        var jsonCopy: File? = null
         try {
+            val preparedJson = File.createTempFile("${shareStem}_findings_", ".json", shareDirectory)
+            jsonCopy = preparedJson
             reportPdf.copyTo(pdfCopy, overwrite = true)
-            findingsJson.copyTo(jsonCopy, overwrite = true)
-            check(pdfCopy.length() == reportPdf.length() && jsonCopy.length() == findingsJson.length()) {
+            findingsJson.copyTo(preparedJson, overwrite = true)
+            check(pdfCopy.length() == reportPdf.length() && preparedJson.length() == findingsJson.length()) {
                 "A complete copy of both retry files could not be prepared."
             }
 
@@ -156,7 +158,7 @@ class SealedPdfExporter(
                 context, "${context.packageName}.fileprovider", pdfCopy
             )
             val jsonUri = FileProvider.getUriForFile(
-                context, "${context.packageName}.fileprovider", jsonCopy
+                context, "${context.packageName}.fileprovider", preparedJson
             )
             val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                 type = "*/*"
@@ -183,7 +185,7 @@ class SealedPdfExporter(
             )
         } catch (error: Exception) {
             pdfCopy.delete()
-            jsonCopy.delete()
+            jsonCopy?.delete()
             throw error
         }
     }
